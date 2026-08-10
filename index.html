@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kutubxona</title>
+<meta name="description" content="6000+ o'zbek va jahon kitoblari — qidiruv, mavzular, audiokitoblar.">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root{
+    --bg:#0f1020; --card:#191a2e; --card2:#20223a; --text:#eef0f8; --muted:#9aa0c0;
+    --accent:#6c8cff; --accent2:#a06bff; --line:#2a2c47; --chip:#23253f; --danger:#ff5d73;
+    --radius:16px; --shadow:0 6px 24px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{margin:0; padding:0}
+  body{background:var(--bg); color:var(--text); font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;
+    padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom); overscroll-behavior-y:none}
+  .wrap{max-width:760px; margin:0 auto; padding:12px 14px 90px}
+  header{position:sticky; top:0; z-index:20; background:linear-gradient(180deg,var(--bg) 72%,transparent); padding:8px 14px 10px; margin:0 -14px 4px}
+  h1{font-size:20px; font-weight:700; margin:2px 0 10px; letter-spacing:.2px}
+  .searchbar{display:flex; align-items:center; gap:8px; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:10px 12px}
+  .searchbar svg{flex:0 0 auto; opacity:.7}
+  .searchbar input{flex:1; background:none; border:0; outline:none; color:var(--text); font-size:15px}
+  .searchbar .clr{opacity:.5; padding:2px 4px; display:none; cursor:pointer}
+  .row{display:flex; gap:8px; align-items:center; overflow-x:auto; scrollbar-width:none; padding:10px 14px 2px; margin:0 -14px}
+  .row::-webkit-scrollbar{display:none}
+  .chip{flex:0 0 auto; background:var(--chip); border:1px solid var(--line); color:var(--muted); padding:7px 13px; border-radius:999px; font-size:13px; font-weight:600; white-space:nowrap; cursor:pointer; transition:.15s}
+  .chip .n{opacity:.55; margin-left:4px}
+  .chip.on{background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border-color:transparent}
+  .chip.on .n{opacity:.85}
+  .tabs{display:flex; gap:6px; margin-top:2px}
+  .tab{flex:1; text-align:center; padding:9px; border-radius:12px; font-weight:700; font-size:14px; color:var(--muted); background:var(--card); border:1px solid var(--line); cursor:pointer}
+  .tab.on{color:#fff; background:linear-gradient(135deg,var(--accent),var(--accent2)); border-color:transparent}
+  .bar{display:flex; justify-content:space-between; align-items:center; margin:14px 2px 8px}
+  .bar .lbl{font-size:13px; color:var(--muted); font-weight:600}
+  .sort{background:var(--card); border:1px solid var(--line); color:var(--text); border-radius:10px; padding:6px 8px; font-size:13px}
+  .grid{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+  @media(min-width:560px){.grid{grid-template-columns:1fr 1fr 1fr}}
+  .book{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; cursor:pointer; position:relative; display:flex; flex-direction:column}
+  .cover{height:118px; display:flex; align-items:flex-end; padding:10px; position:relative}
+  .cover .ini{font-size:30px; font-weight:800; color:rgba(255,255,255,.92); line-height:1; text-shadow:0 2px 8px rgba(0,0,0,.3)}
+  .cover .aud{position:absolute; top:8px; right:8px; background:rgba(0,0,0,.35); border-radius:8px; padding:3px 7px; font-size:11px; font-weight:700; color:#fff}
+  .ci{position:absolute; inset:0; width:100%; height:100%; object-fit:cover}
+  .fav{position:absolute; top:8px; left:8px; width:30px; height:30px; border-radius:50%; background:rgba(0,0,0,.32); display:flex; align-items:center; justify-content:center; font-size:15px; z-index:2}
+  .meta{padding:9px 10px 11px; display:flex; flex-direction:column; gap:4px; flex:1}
+  .meta .t{font-weight:700; font-size:13.5px; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
+  .meta .a{font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .meta .g{margin-top:auto; font-size:11px; color:var(--accent); font-weight:700}
+  .more{margin:18px auto 0; display:block; background:var(--card); border:1px solid var(--line); color:var(--text); padding:11px 22px; border-radius:12px; font-weight:700; font-size:14px}
+  .empty{text-align:center; color:var(--muted); padding:60px 20px}
+  .empty .em{font-size:40px; display:block; margin-bottom:10px}
+  .skel{height:210px; border-radius:var(--radius); background:linear-gradient(100deg,var(--card) 30%,var(--card2) 50%,var(--card) 70%); background-size:200% 100%; animation:sh 1.2s infinite}
+  @keyframes sh{to{background-position:-200% 0}}
+  /* Discovery homepage */
+  .section{margin:18px 0 6px}
+  .shead{display:flex; align-items:baseline; justify-content:space-between; margin:0 2px 10px}
+  .shead h2{font-size:16px; font-weight:800; margin:0; letter-spacing:.2px}
+  .shead .see{font-size:12.5px; font-weight:700; color:var(--accent); cursor:pointer; white-space:nowrap}
+  .shelf{display:flex; gap:12px; overflow-x:auto; scrollbar-width:none; padding:2px 14px 6px; margin:0 -14px}
+  .shelf::-webkit-scrollbar{display:none}
+  .si{flex:0 0 128px; width:128px; cursor:pointer}
+  .si .sc{height:170px; border-radius:14px; display:flex; align-items:flex-end; padding:9px; position:relative; box-shadow:var(--shadow)}
+  .si .sc .ini{font-size:26px; font-weight:800; color:rgba(255,255,255,.92); text-shadow:0 2px 8px rgba(0,0,0,.3)}
+  .si .sc .aud{position:absolute; top:7px; right:7px; background:rgba(0,0,0,.35); border-radius:7px; padding:2px 6px; font-size:11px}
+  .si .st{font-size:12.5px; font-weight:700; line-height:1.25; margin:7px 1px 1px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
+  .si .sa{font-size:11px; color:var(--muted); margin:0 1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .authchips{display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; padding:2px 14px 4px; margin:0 -14px}
+  .authchips::-webkit-scrollbar{display:none}
+  .authchip{flex:0 0 auto; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:9px 13px; cursor:pointer; display:flex; flex-direction:column; gap:1px; min-width:110px}
+  .authchip .an{font-size:13px; font-weight:700; white-space:nowrap}
+  .authchip .ac{font-size:11px; color:var(--muted)}
+  .genretiles{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+  .gtile{border-radius:14px; padding:14px; cursor:pointer; color:#fff; font-weight:800; font-size:15px; min-height:66px; display:flex; flex-direction:column; justify-content:center; box-shadow:var(--shadow)}
+  .gtile .gc{font-size:12px; font-weight:600; opacity:.85; margin-top:3px}
+  .sheet{position:fixed; inset:0; z-index:50; background:rgba(0,0,0,.5); display:none; align-items:flex-end}
+  .sheet.open{display:flex}
+  .sheetc{background:var(--bg); width:100%; max-width:760px; margin:0 auto; max-height:92vh; border-radius:22px 22px 0 0; overflow-y:auto; padding:0 0 24px; animation:up .28s cubic-bezier(.2,.8,.2,1)}
+  @keyframes up{from{transform:translateY(40px); opacity:.6}to{transform:none; opacity:1}}
+  .dhero{height:150px; display:flex; align-items:flex-end; padding:16px; position:relative}
+  .dgrip{position:absolute; top:8px; left:50%; transform:translateX(-50%); width:38px; height:4px; border-radius:2px; background:rgba(255,255,255,.4)}
+  .dhero .ini{font-size:44px; font-weight:800; color:#fff; text-shadow:0 2px 10px rgba(0,0,0,.35)}
+  .dbody{padding:16px 18px 0}
+  .dtitle{font-size:20px; font-weight:800; line-height:1.25; margin:0 0 4px}
+  .dauthor{color:var(--muted); font-size:14px; margin-bottom:14px}
+  .pills{display:flex; flex-wrap:wrap; gap:7px; margin-bottom:16px}
+  .pill{background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:5px 11px; font-size:12px; color:var(--muted); font-weight:600}
+  .pill b{color:var(--text); font-weight:700}
+  .sec{margin:16px 0}
+  .sec h3{font-size:13px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); margin:0 0 6px}
+  .sec p{margin:0; font-size:14.5px; line-height:1.6; white-space:pre-wrap}
+  .subs{display:flex; flex-wrap:wrap; gap:6px}
+  .sub{background:var(--card2); border-radius:8px; padding:4px 10px; font-size:12px; color:var(--accent); font-weight:600; cursor:pointer}
+  .actions{position:sticky; bottom:0; background:linear-gradient(180deg,transparent,var(--bg) 24%); padding:16px 18px calc(16px + env(safe-area-inset-bottom)); display:flex; gap:10px; margin-top:8px}
+  .btn{flex:1; border:0; border-radius:13px; padding:14px; font-weight:800; font-size:15px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:7px}
+  .btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff}
+  .btn.ghost{flex:0 0 auto; width:52px; background:var(--card); border:1px solid var(--line); color:var(--text)}
+  .btn.ghost.on{color:var(--danger)}
+  .toast{position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(20px); background:var(--card2); border:1px solid var(--line); color:var(--text); padding:11px 18px; border-radius:12px; font-weight:600; font-size:14px; opacity:0; transition:.25s; z-index:99; box-shadow:var(--shadow)}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>📚 Kutubxona <a href="quran.html" style="float:right; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle">📖 Qur'on</a></h1>
+    <div class="searchbar">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input id="q" type="search" placeholder="Kitob, muallif, mavzu…" autocomplete="off" enterkeyhint="search">
+      <span class="clr" id="clr">✕</span>
+    </div>
+    <div class="tabs">
+      <div class="tab on" id="tabBrowse">Barchasi</div>
+      <div class="tab" id="tabFav">❤️ Saqlanganlar</div>
+    </div>
+    <div class="row" id="genres"></div>
+    <div class="row" id="filters"></div>
+  </header>
+
+  <div class="bar">
+    <span class="lbl" id="count">Yuklanmoqda…</span>
+    <select class="sort" id="sort">
+      <option value="relevance">Moslik</option>
+      <option value="newest">Yangi</option>
+      <option value="title">Alifbo</option>
+    </select>
+  </div>
+
+  <div id="home" style="display:none"></div>
+  <div class="grid" id="grid"></div>
+  <button class="more" id="more" style="display:none">Yana yuklash</button>
+  <div class="empty" id="empty" style="display:none"><span class="em">🔍</span>Hech narsa topilmadi</div>
+</div>
+
+<div class="sheet" id="sheet"><div class="sheetc" id="sheetc"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const tg = window.Telegram?.WebApp;
+const $ = s => document.querySelector(s);
+const COVERS=[['#6c8cff','#a06bff'],['#ff7a59','#ff4d8d'],['#3ddc97','#2bb0c9'],['#ffcf5c','#ff8a3d'],['#7b6cff','#4d9dff'],['#ff6b9d','#c86bff'],['#38d9a9','#4dc3ff'],['#ffa14d','#ff6b6b'],['#5c7cff','#8a6bff']];
+function coverFor(id){let h=0;const s=String(id||'');for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;return COVERS[h%COVERS.length];}
+function initials(t){return String(t||'?').replace(/[^\p{L}\p{N} ]/gu,'').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'📖';}
+function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+// Uzbek Cyrillic -> Latin, so a Latin query matches a Cyrillic title and vice-versa.
+const CYR={'а':'a','б':'b','в':'v','г':'g','ғ':'g','д':'d','е':'e','ё':'yo','ж':'j','з':'z','и':'i','й':'y','к':'k','қ':'q','л':'l','м':'m','н':'n','о':'o','п':'p','р':'r','с':'s','т':'t','у':'u','ў':'o','ф':'f','х':'x','ҳ':'h','ц':'ts','ч':'ch','ш':'sh','щ':'sh','ъ':'','ь':'','э':'e','ю':'yu','я':'ya'};
+// Canonical search key: lowercase, transliterate Cyrillic, drop apostrophes (o' == oʻ == ў),
+// then keep letters/digits only. Both the query and the book text pass through this.
+function canon(s){s=String(s||'').toLowerCase();let o='';for(const ch of s)o+=(CYR[ch]!==undefined?CYR[ch]:ch);return o.replace(/[ʻʼ'`'‘’ʼ]/g,'').replace(/[^\p{L}\p{N} ]/gu,' ').replace(/\s+/g,' ').trim();}
+const norm=canon;
+// True when strings are within one edit (insert/delete/substitute) — cheap typo tolerance.
+function within1(a,b){if(a===b)return true;const la=a.length,lb=b.length;if(la===lb){const d=[];for(let k=0;k<la;k++)if(a[k]!==b[k]){d.push(k);if(d.length>2)break;}if(d.length===2&&d[1]===d[0]+1&&a[d[0]]===b[d[1]]&&a[d[1]]===b[d[0]])return true;}if(Math.abs(la-lb)>1)return false;let i=0,j=0,e=0;while(i<la&&j<lb){if(a[i]===b[j]){i++;j++;continue;}if(++e>1)return false;if(la>lb)i++;else if(lb>la)j++;else{i++;j++;}}if(i<la||j<lb)e++;return e<=1;}
+function indexBook(b){b._t=canon(b.t);b._a=canon(b.a);b._g=canon(b.g);b._sm=canon(b.sm);b._subs=canon((b.s||[]).join(' '));b._w=(b._t+' '+b._a).split(' ').filter(w=>w.length>=3);}
+
+let DB={books:[],genres:[],audiences:[],types:[],bot:''};
+let byId={};
+let state={q:'',genre:'',audience:'',type:'',sort:'relevance',view:'browse',shown:24,result:[],all:false};
+let HOME={newest:[],audio:[],authors:[],genres:[]};
+let favs=new Set();
+const PAGE=24;
+
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),1800);}
+function haptic(x='light'){try{tg?.HapticFeedback?.impactOccurred(x)}catch(e){}}
+
+// ---- favourites via Telegram CloudStorage (fallback: localStorage) ----
+function cloudGet(){return new Promise(res=>{
+  if(tg?.CloudStorage?.getItem){tg.CloudStorage.getItem('favs',(e,v)=>res(e?null:v));}
+  else res(localStorage.getItem('favs'));
+});}
+function cloudSet(v){if(tg?.CloudStorage?.setItem)tg.CloudStorage.setItem('favs',v,()=>{});else localStorage.setItem('favs',v);}
+async function loadFavs(){try{const v=await cloudGet();favs=new Set(v?JSON.parse(v):[]);}catch(e){favs=new Set();}}
+function saveFavs(){cloudSet(JSON.stringify([...favs].slice(0,500)));}
+
+// ---- search / filter / sort (all client-side) ----
+function score(b,terms){
+  if(b._t===undefined)indexBook(b);
+  let sc=0;
+  for(const term of terms){
+    if(!term)continue;
+    let s=0;
+    if(b._t.startsWith(term))s=120;else if(b._t.includes(term))s=60;
+    if(b._a.includes(term))s=Math.max(s,35);
+    if(b._g.includes(term))s=Math.max(s,25);
+    if(b._subs.includes(term))s=Math.max(s,20);
+    if(b._sm.includes(term))s=Math.max(s,10);
+    if(s===0&&term.length>=4){    // typo fallback: edit-distance<=1 vs title/author words
+      for(const w of b._w){if(within1(w,term)){s=40;break;}}
+    }
+    if(s===0)return 0;           // every term must match somewhere (AND)
+    sc+=s;
+  }
+  return sc;
+}
+function compute(){
+  const terms=norm(state.q).split(/\s+/).filter(Boolean);
+  let list;
+  if(state.view==='favorites'){list=[...favs].map(id=>byId[id]).filter(Boolean);}
+  else{list=DB.books;}
+  let arr=[];
+  for(const b of list){
+    if(state.genre&&b.g!==state.genre)continue;
+    if(state.audience&&b.au!==state.audience)continue;
+    if(state.type&&((state.type==='audio')!==!!b.ha))continue;
+    if(terms.length){const sc=score(b,terms);if(sc<=0)continue;b._s=sc;}
+    arr.push(b);
+  }
+  if(terms.length&&state.sort==='relevance')arr.sort((x,y)=>y._s-x._s);
+  else if(state.sort==='title')arr.sort((x,y)=>(x.t||'').localeCompare(y.t||'','uz'));
+  // 'newest' & default keep DB order (already newest-first)
+  state.result=arr;state.shown=PAGE;
+}
+
+function chipRow(el,items,cur,key,fmt){
+  el.innerHTML=(key==='genre'?`<span class="chip ${!cur?'on':''}" data-v="">Barchasi</span>`:'')+
+    items.map(x=>`<span class="chip ${cur===x.v?'on':''}" data-v="${esc(x.v)}">${fmt(x)}<span class="n">${x.c}</span></span>`).join('');
+  el.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{
+    const v=c.dataset.v; state[key]=(state[key]===v&&key!=='genre')?'':v; state.all=false; haptic(); renderChips(); run();
+  });
+}
+function renderChips(){
+  chipRow($('#genres'),DB.genres.map(x=>({v:x.v,l:x.v,c:x.c})),state.genre,'genre',x=>esc(x.l));
+  const f=$('#filters');
+  f.innerHTML=DB.types.map(x=>`<span class="chip ${state.type===x.v?'on':''}" data-k="type" data-v="${x.v}">${x.v==='audio'?'🎧':'📄'} ${esc(x.l)}<span class="n">${x.c}</span></span>`).join('')+
+    DB.audiences.map(x=>`<span class="chip ${state.audience===x.v?'on':''}" data-k="audience" data-v="${esc(x.v)}">${esc(x.l)}<span class="n">${x.c}</span></span>`).join('');
+  f.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{const k=c.dataset.k;state[k]=state[k]===c.dataset.v?'':c.dataset.v;state.all=false;haptic();renderChips();run();});
+}
+
+function cardHtml(b){
+  const[c1,c2]=coverFor(b.i);const fav=favs.has(b.i);
+  return `<div class="book" data-id="${esc(b.i)}">
+    <div class="cover" style="background:linear-gradient(135deg,${c1},${c2})">
+      ${b.hc?`<img class="ci" src="covers/${encodeURIComponent(b.i)}.jpg" loading="lazy" onerror="this.remove()">`:''}
+      <span class="fav" data-fav="${esc(b.i)}">${fav?'❤️':'🤍'}</span>
+      ${b.ha?'<span class="aud">🎧</span>':''}
+      <span class="ini">${esc(initials(b.t))}</span>
+    </div>
+    <div class="meta"><div class="t">${esc(b.t)}</div>
+      <div class="a">${esc(b.a||'Noma\'lum muallif')}</div>
+      <div class="g">${esc(b.g||'')}</div></div></div>`;
+}
+function render(){
+  const grid=$('#grid');
+  const slice=state.result.slice(0,state.shown);
+  grid.innerHTML=slice.map(cardHtml).join('');
+  grid.querySelectorAll('.book').forEach(el=>el.onclick=e=>{if(e.target.closest('[data-fav]'))return;openDetail(el.dataset.id);});
+  grid.querySelectorAll('[data-fav]').forEach(el=>el.onclick=e=>{e.stopPropagation();toggleFav(el.dataset.fav);});
+  $('#empty').style.display=state.result.length?'none':'block';
+  $('#more').style.display=state.result.length>state.shown?'block':'none';
+  const noun=state.view==='favorites'?'saqlangan':'kitob';
+  $('#count').textContent=state.result.length?`${state.result.length} ta ${noun}`:'';
+}
+// ---- discovery homepage (shown when browsing with no query/filter) ----
+function buildHome(){
+  HOME.newest=DB.books.slice(0,18);
+  HOME.audio=DB.books.filter(b=>b.ha).slice(0,18);
+  const ac={};
+  for(const b of DB.books){const a=(b.a||'').trim();if(a&&a.length>1&&!/noma'?lum/i.test(a))ac[a]=(ac[a]||0)+1;}
+  HOME.authors=Object.entries(ac).filter(([a,c])=>c>=2).sort((x,y)=>y[1]-x[1]).slice(0,16).map(([a,c])=>({a,c}));
+  HOME.genres=DB.genres.slice(0,5).map(g=>({v:g.v,c:g.c,books:DB.books.filter(b=>b.g===g.v).slice(0,18)}));
+}
+function siHtml(b){const[c1,c2]=coverFor(b.i);return `<div class="si" data-id="${esc(b.i)}"><div class="sc" style="background:linear-gradient(135deg,${c1},${c2})">${b.hc?`<img class="ci" src="covers/${encodeURIComponent(b.i)}.jpg" loading="lazy" onerror="this.remove()">`:''}${b.ha?'<span class="aud">🎧</span>':''}<span class="ini">${esc(initials(b.t))}</span></div><div class="st">${esc(b.t)}</div><div class="sa">${esc(b.a||'')}</div></div>`;}
+function shelf(title,books,see){return `<div class="section"><div class="shead"><h2>${esc(title)}</h2>${see?`<span class="see" ${see}>Barchasi →</span>`:''}</div><div class="shelf">${books.map(siHtml).join('')}</div></div>`;}
+function renderHome(){
+  const h=$('#home');let html='';
+  if(HOME.newest.length)html+=shelf("🆕 Yangi qo'shilgan",HOME.newest,'data-see="newest"');
+  if(HOME.authors.length)html+=`<div class="section"><div class="shead"><h2>✍️ Mashhur mualliflar</h2></div><div class="authchips">${HOME.authors.map(a=>`<div class="authchip" data-auth="${esc(a.a)}"><span class="an">${esc(a.a)}</span><span class="ac">${a.c} ta kitob</span></div>`).join('')}</div></div>`;
+  if(HOME.audio.length)html+=shelf("🎧 Audiokitoblar",HOME.audio,'data-see="audio"');
+  for(const g of HOME.genres)html+=shelf(g.v,g.books,`data-see="genre" data-v="${esc(g.v)}"`);
+  h.innerHTML=html;
+  h.querySelectorAll('.si').forEach(el=>el.onclick=()=>openDetail(el.dataset.id));
+  h.querySelectorAll('[data-auth]').forEach(el=>el.onclick=()=>{state.all=false;$('#q').value=el.dataset.auth;state.q=el.dataset.auth;$('#clr').style.display='block';haptic();run();window.scrollTo(0,0);});
+  h.querySelectorAll('[data-see]').forEach(el=>el.onclick=()=>{const s=el.dataset.see;if(s==='newest'){state.all=true;state.sort='newest';$('#sort').value='newest';}else if(s==='audio'){state.type='audio';renderChips();}else if(s==='genre'){state.genre=el.dataset.v;renderChips();}haptic();run();window.scrollTo(0,0);});
+}
+function isHome(){return state.view==='browse'&&!state.q&&!state.genre&&!state.audience&&!state.type&&!state.all;}
+function showHome(on){$('#home').style.display=on?'block':'none';$('#grid').style.display=on?'none':'grid';$('.bar').style.display=on?'none':'flex';if(on){$('#more').style.display='none';$('#empty').style.display='none';}}
+function run(){if(isHome()){renderHome();showHome(true);}else{compute();render();showHome(false);}}
+
+function toggleFav(id){
+  haptic('medium');
+  if(favs.has(id))favs.delete(id);else favs.add(id);
+  saveFavs();
+  if(state.view==='favorites')run();else render();
+  if($('#sheet').classList.contains('open')){const el=$('#dFav');if(el){const on=favs.has(id);el.classList.toggle('on',on);el.textContent=on?'❤️':'🤍';}}
+  toast(favs.has(id)?'❤️ Saqlandi':'Olib tashlandi');
+}
+
+function openDetail(id){
+  const b=byId[id];if(!b)return;haptic();
+  const sh=$('#sheet'),c=$('#sheetc');sh.classList.add('open');tg?.BackButton?.show();
+  const[c1,c2]=coverFor(b.i);const fav=favs.has(b.i);
+  const pill=(l,v)=>v?`<span class="pill">${l} <b>${esc(v)}</b></span>`:'';
+  const audLabel=(DB.audiences.find(a=>a.v===b.au)||{}).l;
+  const typeTxt=b.ha?(b.ap>1?`Audiokitob · ${b.ap} qism`:'Audiokitob'):'PDF / matn';
+  c.innerHTML=`
+    <div class="dhero" style="background:linear-gradient(135deg,${c1},${c2})">${b.hc?`<img class="ci" src="covers/${encodeURIComponent(b.i)}.jpg" onerror="this.remove()">`:''}<div class="dgrip"></div><span class="ini">${esc(initials(b.t))}</span></div>
+    <div class="dbody">
+      <h2 class="dtitle">${esc(b.t)}</h2>
+      <div class="dauthor">${esc(b.a||'Noma\'lum muallif')}</div>
+      <div class="pills">${pill('📂',b.g)}${pill('🎯',audLabel)}${pill('🗓',b.y)}${pill('🌐',b.l)}<span class="pill">${b.ha?'🎧':'📄'} <b>${esc(typeTxt)}</b></span>${b.mb?`<span class="pill">💾 <b>${b.mb} MB</b></span>`:''}</div>
+      ${b.sm?`<div class="sec"><h3>Qisqacha</h3><p>${esc(b.sm)}</p></div>`:''}
+      ${b.d?`<div class="sec"><h3>Tavsif</h3><p>${esc(b.d)}</p></div>`:''}
+      ${(b.s&&b.s.length)?`<div class="sec"><h3>Mavzular</h3><div class="subs">${b.s.map(s=>`<span class="sub" data-sub="${esc(s)}">${esc(s)}</span>`).join('')}</div></div>`:''}
+    </div>
+    <div class="actions">
+      <button class="btn primary" id="openBot">📖 Botda o'qish</button>
+      <button class="btn ghost ${fav?'on':''}" id="dFav">${fav?'❤️':'🤍'}</button>
+      <button class="btn ghost" id="dShare">↗️</button>
+    </div>`;
+  const url=`https://t.me/${DB.bot}?start=b_${encodeURIComponent(b.i)}`;
+  $('#openBot').onclick=()=>{haptic('medium');tg?.openTelegramLink?tg.openTelegramLink(url):window.open(url);setTimeout(()=>tg?.close?.(),150);};
+  $('#dFav').onclick=()=>toggleFav(b.i);
+  $('#dShare').onclick=()=>{const txt=`📚 ${b.t}${b.a?' — '+b.a:''}`;const s=`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(txt)}`;tg?.openTelegramLink?tg.openTelegramLink(s):navigator.share?.({title:b.t,url});};
+  c.querySelectorAll('[data-sub]').forEach(el=>el.onclick=()=>{closeSheet();$('#q').value=el.dataset.sub;state.q=el.dataset.sub;$('#clr').style.display='block';if(state.view!=='browse'){state.view='browse';setTabs();}run();window.scrollTo(0,0);});
+  c.scrollTop=0;
+}
+function closeSheet(){$('#sheet').classList.remove('open');tg?.BackButton?.hide();}
+
+// events
+let deb;
+$('#q').addEventListener('input',e=>{state.q=e.target.value.trim();state.all=false;$('#clr').style.display=state.q?'block':'none';clearTimeout(deb);deb=setTimeout(()=>{if(state.view!=='browse'){state.view='browse';setTabs();}run();},200);});
+$('#clr').onclick=()=>{$('#q').value='';state.q='';state.all=false;$('#clr').style.display='none';run();};
+$('#sort').onchange=e=>{state.sort=e.target.value;run();};
+$('#more').onclick=()=>{state.shown+=PAGE;render();};
+$('#sheet').onclick=e=>{if(e.target.id==='sheet')closeSheet();};
+function setTabs(){$('#tabBrowse').classList.toggle('on',state.view==='browse');$('#tabFav').classList.toggle('on',state.view==='favorites');}
+$('#tabBrowse').onclick=()=>{state.view='browse';state.q='';$('#q').value='';$('#clr').style.display='none';state.genre='';state.audience='';state.type='';state.all=false;renderChips();setTabs();run();window.scrollTo(0,0);};
+$('#tabFav').onclick=()=>{state.view='favorites';state.all=false;setTabs();run();};
+window.addEventListener('scroll',()=>{if(isHome())return;if(window.innerHeight+window.scrollY>=document.body.offsetHeight-500&&state.result.length>state.shown){state.shown+=PAGE;render();}});
+
+function applyTheme(){if(!tg)return;const p=tg.themeParams||{};const set=(k,v)=>{if(v)document.documentElement.style.setProperty(k,v);};
+  set('--bg',p.bg_color);set('--card',p.secondary_bg_color);set('--text',p.text_color);set('--muted',p.hint_color);set('--accent',p.button_color);set('--accent2',p.button_color);if(p.section_bg_color)set('--card2',p.section_bg_color);}
+
+async function boot(){
+  if(tg){tg.ready();tg.expand();tg.BackButton?.onClick(closeSheet);applyTheme();tg.onEvent?.('themeChanged',applyTheme);}
+  $('#grid').innerHTML=Array(6).fill('<div class="skel"></div>').join('');
+  try{
+    const r=await fetch('./books.json',{cache:'no-cache'});DB=await r.json();
+    byId={};for(const b of DB.books){byId[b.i]=b;indexBook(b);}
+    buildHome();
+  }catch(e){$('#count').textContent='';$('#grid').innerHTML='';$('#empty').style.display='block';$('#empty').innerHTML='<span class="em">⚠️</span>Ma\'lumot yuklanmadi';return;}
+  await loadFavs();
+  renderChips();run();
+}
+boot();
+</script>
+</body>
+</html>
