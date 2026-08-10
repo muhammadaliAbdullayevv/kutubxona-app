@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://muhammadaliabdullayevv.github.io/kutubxona-app/sitemap.xml
