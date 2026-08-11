@@ -47,6 +47,8 @@
   .meta .t{font-weight:700; font-size:13.5px; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
   .meta .a{font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
   .meta .g{margin-top:auto; font-size:11px; color:var(--accent); font-weight:700}
+  .meta .stats{display:flex; gap:8px; font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums}
+  .meta .stats b{color:var(--text)}
   .more{margin:18px auto 0; display:block; background:var(--card); border:1px solid var(--line); color:var(--text); padding:11px 22px; border-radius:12px; font-weight:700; font-size:14px}
   .empty{text-align:center; color:var(--muted); padding:60px 20px}
   .empty .em{font-size:40px; display:block; margin-bottom:10px}
@@ -122,6 +124,8 @@
     <select class="sort" id="sort">
       <option value="relevance">Moslik</option>
       <option value="newest">Yangi</option>
+      <option value="popular">Mashhur</option>
+      <option value="rating">Baholangan</option>
       <option value="title">Alifbo</option>
     </select>
   </div>
@@ -206,6 +210,8 @@ function compute(){
   }
   if(terms.length&&state.sort==='relevance')arr.sort((x,y)=>y._s-x._s);
   else if(state.sort==='title')arr.sort((x,y)=>(x.t||'').localeCompare(y.t||'','uz'));
+  else if(state.sort==='popular')arr.sort((x,y)=>(y.dl||0)-(x.dl||0));
+  else if(state.sort==='rating')arr.sort((x,y)=>(y.ra&&y.rc?y.ra:-1)-(x.ra&&x.rc?x.ra:-1)||(y.rc||0)-(x.rc||0));
   // 'newest' & default keep DB order (already newest-first)
   state.result=arr;state.shown=PAGE;
 }
@@ -236,8 +242,10 @@ function cardHtml(b){
     </div>
     <div class="meta"><div class="t">${esc(b.t)}</div>
       <div class="a">${esc(b.a||'Noma\'lum muallif')}</div>
+      ${(b.rc||b.dl)?`<div class="stats">${b.rc?`⭐ <b>${b.ra}</b>`:''}${b.dl?`⬇️ <b>${fmtNum(b.dl)}</b>`:''}</div>`:''}
       <div class="g">${esc(b.g||'')}</div></div></div>`;
 }
+function fmtNum(n){n=n||0;return n>=1000?(n/1000).toFixed(n>=10000?0:1).replace(/\.0$/,'')+'k':String(n);}
 function render(){
   const grid=$('#grid');
   const slice=state.result.slice(0,state.shown);
@@ -296,7 +304,7 @@ function openDetail(id){
     <div class="dbody">
       <h2 class="dtitle">${esc(b.t)}</h2>
       <div class="dauthor">${esc(b.a||'Noma\'lum muallif')}</div>
-      <div class="pills">${pill('📂',b.g)}${pill('🎯',audLabel)}${pill('🗓',b.y)}${pill('🌐',b.l)}<span class="pill">${b.ha?'🎧':'📄'} <b>${esc(typeTxt)}</b></span>${b.mb?`<span class="pill">💾 <b>${b.mb} MB</b></span>`:''}</div>
+      <div class="pills">${pill('📂',b.g)}${pill('🎯',audLabel)}${pill('🗓',b.y)}${pill('🌐',b.l)}<span class="pill">${b.ha?'🎧':'📄'} <b>${esc(typeTxt)}</b></span>${b.mb?`<span class="pill">💾 <b>${b.mb} MB</b></span>`:''}${b.dl?`<span class="pill">⬇️ <b>${fmtNum(b.dl)}</b></span>`:''}${b.rc?`<span class="pill">⭐ <b>${b.ra}</b> (${b.rc})</span>`:''}</div>
       ${b.sm?`<div class="sec"><h3>Qisqacha</h3><p>${esc(b.sm)}</p></div>`:''}
       ${b.d?`<div class="sec"><h3>Tavsif</h3><p>${esc(b.d)}</p></div>`:''}
       ${(b.s&&b.s.length)?`<div class="sec"><h3>Mavzular</h3><div class="subs">${b.s.map(s=>`<span class="sub" data-sub="${esc(s)}">${esc(s)}</span>`).join('')}</div></div>`:''}
