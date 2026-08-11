@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Kutubxona</title>
 <meta name="description" content="6000+ o'zbek va jahon kitoblari — qidiruv, mavzular, audiokitoblar.">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" href="favicon-32.png" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#0f1020">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
   :root{
@@ -125,7 +130,6 @@
       <option value="relevance">Moslik</option>
       <option value="newest">Yangi</option>
       <option value="popular">Mashhur</option>
-      <option value="rating">Baholangan</option>
       <option value="title">Alifbo</option>
     </select>
   </div>
@@ -165,6 +169,10 @@ const PAGE=24;
 
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),1800);}
 function haptic(x='light'){try{tg?.HapticFeedback?.impactOccurred(x)}catch(e){}}
+
+// ---- recently viewed (localStorage only — purely a local browsing convenience) ----
+function loadRecent(){try{return JSON.parse(localStorage.getItem('recent')||'[]');}catch(e){return [];}}
+function pushRecent(id){try{let r=loadRecent().filter(x=>x!==id);r.unshift(id);localStorage.setItem('recent',JSON.stringify(r.slice(0,20)));}catch(e){}}
 
 // ---- favourites via Telegram CloudStorage (fallback: localStorage) ----
 function cloudGet(){return new Promise(res=>{
@@ -211,7 +219,6 @@ function compute(){
   if(terms.length&&state.sort==='relevance')arr.sort((x,y)=>y._s-x._s);
   else if(state.sort==='title')arr.sort((x,y)=>(x.t||'').localeCompare(y.t||'','uz'));
   else if(state.sort==='popular')arr.sort((x,y)=>(y.dl||0)-(x.dl||0));
-  else if(state.sort==='rating')arr.sort((x,y)=>(y.ra&&y.rc?y.ra:-1)-(x.ra&&x.rc?x.ra:-1)||(y.rc||0)-(x.rc||0));
   // 'newest' & default keep DB order (already newest-first)
   state.result=arr;state.shown=PAGE;
 }
@@ -242,7 +249,7 @@ function cardHtml(b){
     </div>
     <div class="meta"><div class="t">${esc(b.t)}</div>
       <div class="a">${esc(b.a||'Noma\'lum muallif')}</div>
-      ${(b.rc||b.dl)?`<div class="stats">${b.rc?`⭐ <b>${b.ra}</b>`:''}${b.dl?`⬇️ <b>${fmtNum(b.dl)}</b>`:''}</div>`:''}
+      ${b.dl?`<div class="stats">⬇️ <b>${fmtNum(b.dl)}</b></div>`:''}
       <div class="g">${esc(b.g||'')}</div></div></div>`;
 }
 function fmtNum(n){n=n||0;return n>=1000?(n/1000).toFixed(n>=10000?0:1).replace(/\.0$/,'')+'k':String(n);}
@@ -259,6 +266,7 @@ function render(){
 }
 // ---- discovery homepage (shown when browsing with no query/filter) ----
 function buildHome(){
+  HOME.recent=loadRecent().map(id=>byId[id]).filter(Boolean).slice(0,18);
   HOME.newest=DB.books.slice(0,18);
   HOME.audio=DB.books.filter(b=>b.ha).slice(0,18);
   const ac={};
@@ -270,6 +278,7 @@ function siHtml(b){const[c1,c2]=coverFor(b.i);return `<div class="si" data-id="$
 function shelf(title,books,see){return `<div class="section"><div class="shead"><h2>${esc(title)}</h2>${see?`<span class="see" ${see}>Barchasi →</span>`:''}</div><div class="shelf">${books.map(siHtml).join('')}</div></div>`;}
 function renderHome(){
   const h=$('#home');let html='';
+  if(HOME.recent.length)html+=shelf("🕘 Yaqinda ko'rilgan",HOME.recent,null);
   if(HOME.newest.length)html+=shelf("🆕 Yangi qo'shilgan",HOME.newest,'data-see="newest"');
   if(HOME.authors.length)html+=`<div class="section"><div class="shead"><h2>✍️ Mashhur mualliflar</h2></div><div class="authchips">${HOME.authors.map(a=>`<div class="authchip" data-auth="${esc(a.a)}"><span class="an">${esc(a.a)}</span><span class="ac">${a.c} ta kitob</span></div>`).join('')}</div></div>`;
   if(HOME.audio.length)html+=shelf("🎧 Audiokitoblar",HOME.audio,'data-see="audio"');
@@ -292,8 +301,17 @@ function toggleFav(id){
   toast(favs.has(id)?'❤️ Saqlandi':'Olib tashlandi');
 }
 
+function relatedShelf(b){
+  const byAuthor=b.a?DB.books.filter(x=>x.i!==b.i&&x.a===b.a):[];
+  const seen=new Set(byAuthor.map(x=>x.i));
+  const byGenre=b.g?DB.books.filter(x=>x.i!==b.i&&x.g===b.g&&!seen.has(x.i)):[];
+  const groups=[['Shu muallifdan',byAuthor.slice(0,12)],['Shunga o’xshash',byGenre.slice(0,12)]].filter(([,arr])=>arr.length);
+  if(!groups.length)return '';
+  return groups.map(([label,arr])=>`<div class="sec"><h3>${esc(label)}</h3><div class="shelf" style="margin:0 -18px; padding:2px 18px 4px">${arr.map(siHtml).join('')}</div></div>`).join('');
+}
 function openDetail(id){
   const b=byId[id];if(!b)return;haptic();
+  pushRecent(b.i);
   const sh=$('#sheet'),c=$('#sheetc');sh.classList.add('open');tg?.BackButton?.show();
   const[c1,c2]=coverFor(b.i);const fav=favs.has(b.i);
   const pill=(l,v)=>v?`<span class="pill">${l} <b>${esc(v)}</b></span>`:'';
@@ -304,10 +322,11 @@ function openDetail(id){
     <div class="dbody">
       <h2 class="dtitle">${esc(b.t)}</h2>
       <div class="dauthor">${esc(b.a||'Noma\'lum muallif')}</div>
-      <div class="pills">${pill('📂',b.g)}${pill('🎯',audLabel)}${pill('🗓',b.y)}${pill('🌐',b.l)}<span class="pill">${b.ha?'🎧':'📄'} <b>${esc(typeTxt)}</b></span>${b.mb?`<span class="pill">💾 <b>${b.mb} MB</b></span>`:''}${b.dl?`<span class="pill">⬇️ <b>${fmtNum(b.dl)}</b></span>`:''}${b.rc?`<span class="pill">⭐ <b>${b.ra}</b> (${b.rc})</span>`:''}</div>
+      <div class="pills">${pill('📂',b.g)}${pill('🎯',audLabel)}${pill('🗓',b.y)}${pill('🌐',b.l)}<span class="pill">${b.ha?'🎧':'📄'} <b>${esc(typeTxt)}</b></span>${b.mb?`<span class="pill">💾 <b>${b.mb} MB</b></span>`:''}${b.dl?`<span class="pill">⬇️ <b>${fmtNum(b.dl)}</b></span>`:''}</div>
       ${b.sm?`<div class="sec"><h3>Qisqacha</h3><p>${esc(b.sm)}</p></div>`:''}
       ${b.d?`<div class="sec"><h3>Tavsif</h3><p>${esc(b.d)}</p></div>`:''}
       ${(b.s&&b.s.length)?`<div class="sec"><h3>Mavzular</h3><div class="subs">${b.s.map(s=>`<span class="sub" data-sub="${esc(s)}">${esc(s)}</span>`).join('')}</div></div>`:''}
+      ${relatedShelf(b)}
     </div>
     <div class="actions">
       <button class="btn primary" id="openBot">📖 Botda o'qish</button>
@@ -319,6 +338,7 @@ function openDetail(id){
   $('#dFav').onclick=()=>toggleFav(b.i);
   $('#dShare').onclick=()=>{const txt=`📚 ${b.t}${b.a?' — '+b.a:''}`;const s=`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(txt)}`;tg?.openTelegramLink?tg.openTelegramLink(s):navigator.share?.({title:b.t,url});};
   c.querySelectorAll('[data-sub]').forEach(el=>el.onclick=()=>{closeSheet();$('#q').value=el.dataset.sub;state.q=el.dataset.sub;$('#clr').style.display='block';if(state.view!=='browse'){state.view='browse';setTabs();}run();window.scrollTo(0,0);});
+  c.querySelectorAll('.si').forEach(el=>el.onclick=()=>openDetail(el.dataset.id));
   c.scrollTop=0;
 }
 function closeSheet(){$('#sheet').classList.remove('open');tg?.BackButton?.hide();}
@@ -338,9 +358,15 @@ window.addEventListener('scroll',()=>{if(isHome())return;if(window.innerHeight+w
 function applyTheme(){if(!tg)return;const p=tg.themeParams||{};const set=(k,v)=>{if(v)document.documentElement.style.setProperty(k,v);};
   set('--bg',p.bg_color);set('--card',p.secondary_bg_color);set('--text',p.text_color);set('--muted',p.hint_color);set('--accent',p.button_color);set('--accent2',p.button_color);if(p.section_bg_color)set('--card2',p.section_bg_color);}
 
+function skeletonShelf(){return `<div class="section"><div class="shead"><h2 class="skel" style="width:140px;height:16px;border-radius:6px"></h2></div><div class="shelf">${Array(4).fill('<div class="si"><div class="skel" style="height:170px;border-radius:14px"></div></div>').join('')}</div></div>`;}
 async function boot(){
   if(tg){tg.ready();tg.expand();tg.BackButton?.onClick(closeSheet);applyTheme();tg.onEvent?.('themeChanged',applyTheme);}
-  $('#grid').innerHTML=Array(6).fill('<div class="skel"></div>').join('');
+  if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+  // Most first loads land on the home view, not a filtered grid — show shimmer shelves
+  // (matching what will actually render) instead of a generic grid skeleton.
+  $('#home').style.display='block';
+  $('#home').innerHTML=skeletonShelf()+skeletonShelf();
+  $('.bar').style.display='none';
   try{
     const r=await fetch('./books.json',{cache:'no-cache'});DB=await r.json();
     byId={};for(const b of DB.books){byId[b.i]=b;indexBook(b);}
