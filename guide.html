@@ -10,157 +10,204 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="theme-color" content="#0f1020">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<link rel="stylesheet" href="detail.css">
 <style>
-  .top{padding:2px 2px 4px}
-  .top h1{font-size:23px; margin-bottom:6px}
-  .top p{color:var(--muted); font-size:14.5px; margin:0; line-height:1.55}
-  .search{margin:16px 0 8px; position:relative}
-  .search input{width:100%; background:var(--card); border:1px solid var(--line); border-radius:13px; padding:12px 14px; color:var(--text); font-size:14.5px; outline:none}
-  .search input:focus{border-color:var(--accent)}
-  .toc{display:flex; flex-wrap:wrap; gap:7px; margin:12px 0 22px}
-  .toc a{background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 12px; font-size:12.5px; font-weight:600; color:var(--muted); text-decoration:none; white-space:nowrap}
-  .toc a:hover{color:var(--text); border-color:var(--accent)}
-  .feat{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px 17px; margin-bottom:12px; scroll-margin-top:14px}
-  .feat.hidden{display:none}
-  .feat h2{font-size:15.5px; font-weight:800; margin:0 0 6px; display:flex; align-items:center; gap:8px}
-  .feat h2 .ic{font-size:18px}
-  .feat p{margin:0; font-size:14px; line-height:1.65; color:var(--muted)}
-  .feat p b{color:var(--text); font-weight:700}
-  .feat code{background:var(--chip); border:1px solid var(--line); border-radius:6px; padding:1px 6px; font-size:12.5px; color:var(--text); font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
-  .feat .ex{margin-top:8px; font-size:13px; color:var(--muted)}
-  .feat .ex i{color:var(--text); font-style:normal; font-weight:600}
-  .section-lbl{font-size:12px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); font-weight:700; margin:24px 2px 10px}
-  .section-lbl:first-of-type{margin-top:4px}
-  .empty{text-align:center; color:var(--muted); padding:50px 20px; display:none}
-  .empty span{font-size:34px; display:block; margin-bottom:10px}
-  footer{margin-top:26px; text-align:center}
-  footer p{color:var(--muted); font-size:12.5px; margin:0 0 14px}
+  :root{
+    --bg:#0f1020; --card:#191a2e; --card2:#20223a; --text:#eef0f8; --muted:#9aa0c0;
+    --accent:#6c8cff; --accent2:#a06bff; --line:#2a2c47; --chip:#23253f;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{margin:0; padding:0}
+  body{background:var(--bg); color:var(--text); font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif}
+  .wrap{max-width:640px; margin:0 auto; padding:22px 16px 48px}
+
+  .hero{margin-bottom:22px}
+  .hero .eyebrow{font-size:12px; text-transform:uppercase; letter-spacing:.8px; color:var(--accent); font-weight:800; margin:0 0 8px}
+  .hero h1{font-size:24px; font-weight:800; line-height:1.3; margin:0 0 8px}
+  .hero p{color:var(--muted); font-size:14.5px; line-height:1.6; margin:0}
+
+  /* Step strip: the three things almost everyone actually needs, front and center */
+  .quickstart{display:grid; grid-template-columns:1fr; gap:10px; margin:20px 0 26px}
+  .qs-item{display:flex; gap:12px; align-items:flex-start; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:13px 14px}
+  .qs-num{flex:0 0 auto; width:26px; height:26px; border-radius:8px; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; font-weight:800; font-size:13px; display:flex; align-items:center; justify-content:center}
+  .qs-body b{display:block; font-size:14px; font-weight:700; margin-bottom:2px}
+  .qs-body span{display:block; font-size:13px; color:var(--muted); line-height:1.5}
+
+  .groups{display:flex; flex-direction:column; gap:10px}
+  .group{background:var(--card); border:1px solid var(--line); border-radius:16px; overflow:hidden}
+  .group summary{list-style:none; cursor:pointer; padding:15px 16px; display:flex; align-items:center; gap:12px; -webkit-tap-highlight-color:transparent}
+  .group summary::-webkit-details-marker{display:none}
+  .group .gic{flex:0 0 auto; width:38px; height:38px; border-radius:11px; display:flex; align-items:center; justify-content:center; font-size:18px; background:var(--chip)}
+  .group .gtext{flex:1; min-width:0}
+  .group .gtitle{font-size:15px; font-weight:800}
+  .group .gsub{font-size:12.5px; color:var(--muted); margin-top:1px}
+  .group .chev{flex:0 0 auto; color:var(--muted); font-size:13px; transition:transform .2s}
+  .group[open] .chev{transform:rotate(180deg)}
+  .group .items{padding:2px 16px 16px}
+  .item{padding:12px 0; border-top:1px solid var(--line)}
+  .item:first-child{border-top:1px solid var(--line); margin-top:2px}
+  .item h3{font-size:14px; font-weight:700; margin:0 0 4px; display:flex; align-items:center; gap:7px}
+  .item p{margin:0; font-size:13.5px; line-height:1.6; color:var(--muted)}
+  .item p b{color:var(--text); font-weight:700}
+  .item code{background:var(--chip); border:1px solid var(--line); border-radius:6px; padding:1px 6px; font-size:12px; color:var(--text); font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .item .ex{margin-top:6px; font-size:12.5px; color:var(--muted)}
+  .item .ex i{color:var(--accent); font-style:normal; font-weight:600}
+
+  footer{margin-top:28px; text-align:center}
+  footer p{color:var(--muted); font-size:12.5px; margin:0}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="top">
+
+  <div class="hero">
+    <p class="eyebrow">Qo'llanma</p>
     <h1>📖 Botdan qanday foydalanish</h1>
-    <p>Kitoblar botining barcha imkoniyatlari shu yerda — har bir bo‘lim qanday ishlashini qisqacha tushuntiramiz.</p>
+    <p>Har bir bo'lim quyida qisqa va tushunarli tarzda yozilgan. Sarlavhaga bosib oching — kerak bo'lgan joyini toping.</p>
   </div>
 
-  <div class="search">
-    <input id="q" type="text" placeholder="🔍 Bo‘lim qidirish… masalan: AI, Qur'on, izoh">
+  <div class="quickstart">
+    <div class="qs-item">
+      <div class="qs-num">1</div>
+      <div class="qs-body"><b>Kitob nomini yozing</b><span>Botga shunchaki kitob nomi yoki muallifini yuboring — qidiruv shu zahoti boshlanadi.</span></div>
+    </div>
+    <div class="qs-item">
+      <div class="qs-num">2</div>
+      <div class="qs-body"><b>Natijadan birini tanlang</b><span>Ro'yxatdan kerakli kitobni bosing — fayl yoki audio darhol shu yerga yuboriladi.</span></div>
+    </div>
+    <div class="qs-item">
+      <div class="qs-num">3</div>
+      <div class="qs-body"><b>Aniq nom bilib bo'lmasa — AI kitobchidan so'rang</b><span><code>/ai</code> yozib, o'qimoqchi bo'lgan mavzuni tasvirlab bering — mos kitobni u topib beradi.</span></div>
+    </div>
   </div>
 
-  <div class="toc" id="toc"></div>
+  <div class="groups" id="groups">
 
-  <div id="list">
+    <details class="group" open>
+      <summary>
+        <div class="gic">🔍</div>
+        <div class="gtext"><div class="gtitle">Qidiruv</div><div class="gsub">Kitob va audiokitob topish yo'llari</div></div>
+        <div class="chev">▾</div>
+      </summary>
+      <div class="items">
+        <div class="item">
+          <h3>💬 Oddiy qidiruv</h3>
+          <p>Botga kitob nomi yoki muallifini yozing. Ovozli xabar yuborib ham qidirsa bo'ladi.</p>
+          <div class="ex">Masalan: <i>Ikki eshik orasi</i></div>
+        </div>
+        <div class="item">
+          <h3>⚡ Istalgan chatda qidirish (inline)</h3>
+          <p>Bot a'zo bo'lmagan guruh yoki shaxsiy chatda ham, xabar maydoniga bot nomini yozib qidirish mumkin — natijalar o'sha yerda chiqadi.</p>
+          <div class="ex">Masalan: <code>@bot_username kitob nomi</code></div>
+        </div>
+        <div class="item">
+          <h3>🎧 Faqat audiokitoblar</h3>
+          <p>Inline qidiruvga <code>audio</code> so'zini qo'shsangiz, faqat audioversiyasi bor kitoblar ko'rsatiladi.</p>
+        </div>
+        <div class="item">
+          <h3>🚀 Aqlli qidiruv (Mini App)</h3>
+          <p>Mavzu, muallif, tur va auditoriya bo'yicha filtrlab qidirish uchun alohida ilova — bot menyusidagi shu tugma orqali ochiladi.</p>
+        </div>
+      </div>
+    </details>
 
-    <div class="section-lbl">Kitob topish</div>
+    <details class="group">
+      <summary>
+        <div class="gic">🤖</div>
+        <div class="gtext"><div class="gtitle">AI kitobchi</div><div class="gsub">Suhbat orqali kitob tavsiyasi</div></div>
+        <div class="chev">▾</div>
+      </summary>
+      <div class="items">
+        <div class="item">
+          <h3>🤖 <code>/ai</code> — tavsiya so'rash</h3>
+          <p>Kutubxonaning haqiqiy kitoblariga asoslangan maslahatchi — mavjud bo'lmagan kitobni hech qachon o'ylab topmaydi. Mavzu yoki qiziqishingizni yozing, mos kitoblarni tavsiya qiladi va tugma orqali darhol yuboradi.</p>
+          <div class="ex">Bo'sh <code>/ai</code> yuboring — savolingizni alohida so'raydi</div>
+        </div>
+        <div class="item">
+          <h3>🧠 Suhbatni eslab qoladi</h3>
+          <p>Avvalgi savol-javoblaringizni eslab turadi, hatto kunlar o'tsa ham — shu sabab davom savollarini alohida tushuntirmasdan bersa ham bo'ladi.</p>
+        </div>
+        <div class="item">
+          <h3>📖 Qur'on bo'limi (<code>/quron</code>)</h3>
+          <p>Alohida audio kutubxona — Qur'on tilovati va o'zbekcha tarjima audiosi, sura nomi bo'yicha qidiriladi. AI kitobchi ham sura haqidagi so'rovlarni tanib, tinglash tugmasini beradi.</p>
+        </div>
+      </div>
+    </details>
 
-    <div class="feat" data-kw="qidiruv qidirish kitob nomi matn search">
-      <h2><span class="ic">🔍</span> Kitob qidirish</h2>
-      <p>Botga kitob nomi yoki muallifini yozing — shunchaki oddiy matn sifatida. Ovozli xabar yuborib ham qidirishingiz mumkin.</p>
-      <div class="ex">Masalan: <i>Ikki eshik orasi</i></div>
-    </div>
+    <details class="group">
+      <summary>
+        <div class="gic">📚</div>
+        <div class="gtext"><div class="gtitle">Kitob bilan ishlash</div><div class="gsub">Sevimlilar, izohlar, sovg'a</div></div>
+        <div class="chev">▾</div>
+      </summary>
+      <div class="items">
+        <div class="item">
+          <h3>⭐ Sevimlilar</h3>
+          <p>Yoqqan kitobni yuborilgan fayl ostidagi tugma orqali saqlang — «⭐ Sevimlilar» bo'limidan istalgan vaqt qaytib toping.</p>
+        </div>
+        <div class="item">
+          <h3>💬 Izohlar</h3>
+          <p>Har bir kitob ostida anonim izoh qoldiring va boshqalarning fikrlarini o'qing. Foydali izohlarni 👍 bilan belgilash mumkin — eng yaxshilari ro'yxat boshida chiqadi.</p>
+        </div>
+        <div class="item">
+          <h3>😊 Reaksiyalar</h3>
+          <p>Yuborilgan kitobga emoji orqali tezkor reaksiya bildiring — bir tugma bosish kifoya.</p>
+        </div>
+        <div class="item">
+          <h3>⭐ Yulduz sovg'a qilish</h3>
+          <p>Kitob foydali bo'lsa, Telegram Stars orqali kichik sovg'a yuboring — kitob ostidagi tugma orqali.</p>
+        </div>
+      </div>
+    </details>
 
-    <div class="feat" data-kw="inline istalgan chatda guruh dostlar ulashish">
-      <h2><span class="ic">⚡</span> Istalgan chatda qidirish (inline)</h2>
-      <p>Botga kirmasdan turib, <b>istalgan</b> chat yoki guruhda xabar maydoniga bot nomini yozib qidirishingiz mumkin — natijalar o‘sha yerda chiqadi va birini tanlab yuborsangiz bo‘ldi. Do‘stlarga yoki guruhga kitob ulashishning eng qulay usuli.</p>
-      <div class="ex">Masalan: <code>@bot_username kitob nomi</code></div>
-    </div>
+    <details class="group">
+      <summary>
+        <div class="gic">🌍</div>
+        <div class="gtext"><div class="gtitle">Jamiyat</div><div class="gsub">Reyting, profil, o'z botingiz</div></div>
+        <div class="chev">▾</div>
+      </summary>
+      <div class="items">
+        <div class="item">
+          <h3>🔥 Top kitoblar</h3>
+          <p>Eng ko'p yuklab olingan kitoblar reytingi — nima o'qishni bilmasangiz, shu yerdan boshlang.</p>
+        </div>
+        <div class="item">
+          <h3>🏆 Top foydalanuvchilar</h3>
+          <p>Eng faol foydalanuvchilar reytingi — qidirish, yuklab olish va do'stlarni taklif qilish orqali ball to'planadi.</p>
+        </div>
+        <div class="item">
+          <h3>👤 Profil va referal dastur</h3>
+          <p>«👤 Mening profilim»da faolligingiz statistikasi va shaxsiy taklif havolangiz orqali topilgan «tanga»lar ko'rinadi. Do'stingiz havola orqali qo'shilsa, sizga tanga qo'shiladi.</p>
+        </div>
+        <div class="item">
+          <h3>🤖 O'z botingizni yaratish</h3>
+          <p>Xuddi shu kutubxonaga ega, o'zingizga tegishli mustaqil bot oching — «🤖 O'z kitob botimni yaratish» tugmasi orqali.</p>
+        </div>
+      </div>
+    </details>
 
-    <div class="feat" data-kw="audio kitob audiokitob tinglash">
-      <h2><span class="ic">🎧</span> Audiokitob qidirish</h2>
-      <p>Inline qidiruvda <code>audio</code> so‘zini qo‘shsangiz, faqat audioversiyasi mavjud kitoblar ko‘rsatiladi. Ko‘p qismli audiokitoblarni qism-qism yoki hammasini birdan tinglash mumkin.</p>
-    </div>
-
-    <div class="feat" data-kw="aqlli qidiruv mini app web app filter saralash mavzu janr audience">
-      <h2><span class="ic">🚀</span> Aqlli qidiruv (bu ilova)</h2>
-      <p>Xuddi shu Mini App — mavzu, muallif, tur va auditoriya bo‘yicha filtrlab qidirish, muqovalarni ko‘rish va qisqacha mazmun bilan tanishish uchun. Bot menyusidagi «🚀 Aqlli qidiruv» tugmasidan ochiladi.</p>
-    </div>
-
-    <div class="section-lbl">AI kitobchi</div>
-
-    <div class="feat" data-kw="ai kitobchi tavsiya suniy intellekt ai librarian robot savol javob">
-      <h2><span class="ic">🤖</span> AI kitobchi (<code>/ai</code>)</h2>
-      <p>Kutubxonaning haqiqiy kitoblariga asoslangan suhbat orqali maslahatchi — hech qachon mavjud bo‘lmagan kitobni o‘ylab topmaydi. Mavzu, kayfiyat yoki qiziqishingizni yozing, u mos kitoblarni tavsiya qiladi va tugma orqali darhol yuboradi.</p>
-      <div class="ex">Bo‘sh <code>/ai</code> yuboring — savolingizni alohida so‘raydi va bir nechta savol berishingiz mumkin bo‘ladi.</div>
-    </div>
-
-    <div class="feat" data-kw="ai xotira eslab qoladi suhbat tarixi">
-      <h2><span class="ic">🧠</span> AI suhbatni eslab qoladi</h2>
-      <p>AI kitobchi bilan avvalgi suhbatlaringizni eslab turadi — hatto kunlar o‘tsa ham. Shu sababli «yana boshqa muallifdan bormi?» kabi davom savollarini alohida tushuntirmasdan berishingiz mumkin.</p>
-    </div>
-
-    <div class="feat" data-kw="quron sura tinglash audio quran">
-      <h2><span class="ic">📖</span> Qur'on bo‘limi (<code>/quron</code>)</h2>
-      <p>Alohida audio kutubxona — Qur'on tilovati va o‘zbekcha tarjima audiosi, sura nomi bo‘yicha qidiriladi. AI kitobchi ham sura haqidagi so‘rovlarni tanib, to‘g‘ridan-to‘g‘ri tinglash tugmasini beradi.</p>
-    </div>
-
-    <div class="section-lbl">Kitob bilan ishlash</div>
-
-    <div class="feat" data-kw="sevimlilar saqlash yoqtirgan favorite">
-      <h2><span class="ic">⭐</span> Sevimlilar</h2>
-      <p>Yoqqan kitobni yuborilgan fayl ostidagi tugma orqali sevimlilarga qo‘shing — keyin «⭐ Sevimlilar» bo‘limidan istalgan vaqt qaytib topasiz.</p>
-    </div>
-
-    <div class="feat" data-kw="izoh comment sharh fikr anonim reply javob">
-      <h2><span class="ic">💬</span> Izohlar</h2>
-      <p>Har bir kitob ostida anonim izoh qoldirishingiz va boshqalarning fikrlarini o‘qishingiz mumkin. Foydali izohlarni 👍 bilan belgilashingiz mumkin, eng yaxshi izohlar ro‘yxat boshida ko‘rinadi.</p>
-    </div>
-
-    <div class="feat" data-kw="reaksiya emoji layk dislayk">
-      <h2><span class="ic">😊</span> Reaksiyalar</h2>
-      <p>Yuborilgan kitobga emoji orqali tezkor reaksiya bildirishingiz mumkin — yoqdimi yoki yo‘qmi, bir tugma bosish kifoya.</p>
-    </div>
-
-    <div class="feat" data-kw="yulduz stars sovga tip pul homiylik">
-      <h2><span class="ic">⭐</span> Yulduz sovg'a qilish</h2>
-      <p>Kitob sizga foydali bo‘lsa, Telegram Stars orqali kichik «sovg'a» yuborishingiz mumkin — kitob ostidagi tegishli tugma orqali.</p>
-    </div>
-
-    <div class="section-lbl">Topilmadimi?</div>
-
-    <div class="feat" data-kw="sorash request kitob yoq topilmadi qoshish">
-      <h2><span class="ic">📝</span> Kitob so‘rash</h2>
-      <p>Qidirgan kitobingiz topilmasa, «📝 Kitob so‘rash» orqali nomini yuboring. Kutubxonaga qo‘shilganda sizga xabar beramiz.</p>
-    </div>
-
-    <div class="feat" data-kw="yuklash upload kitob qoshish fayl">
-      <h2><span class="ic">⬆️</span> Kitob yuklash</h2>
-      <p>Ruxsat berilgan foydalanuvchilar «⬆️ Kitob yuklash» orqali yangi kitob fayllarini kutubxonaga qo‘shishlari mumkin.</p>
-    </div>
-
-    <div class="section-lbl">Jamiyat</div>
-
-    <div class="feat" data-kw="top kitoblar mashhur reyting">
-      <h2><span class="ic">🔥</span> Top kitoblar</h2>
-      <p>Eng ko‘p yuklab olingan kitoblar reytingi — nima o‘qish kerakligini bilmasangiz, shu yerdan boshlang.</p>
-    </div>
-
-    <div class="feat" data-kw="top foydalanuvchilar reyting eng faol">
-      <h2><span class="ic">🏆</span> Top foydalanuvchilar</h2>
-      <p>Eng faol foydalanuvchilar reytingi — qidirish, yuklab olish, sevimlilarga qo‘shish va do‘stlarni taklif qilish orqali ball to‘planadi.</p>
-    </div>
-
-    <div class="feat" data-kw="profil coin tanga referal taklif dostlar link">
-      <h2><span class="ic">👤</span> Mening profilim va referal dastur</h2>
-      <p>«👤 Mening profilim»da qidiruv, yuklab olish va boshqa faolliklaringiz statistikasi hamda shaxsiy taklif havolangiz orqali topilgan «tanga»lar ko‘rsatiladi. Do‘stingiz havola orqali botga qo‘shilsa, sizga tanga qo‘shiladi.</p>
-    </div>
-
-    <div class="feat" data-kw="ozbotim yaratish white label oz kutubxona biznes">
-      <h2><span class="ic">🤖</span> O‘z botingizni yaratish</h2>
-      <p>Xuddi shu kutubxonaga ega, o‘zingizga tegishli mustaqil bot ochishingiz mumkin — «🤖 O‘z kitob botimni yaratish» tugmasi orqali.</p>
-    </div>
-
-    <div class="section-lbl">Yordam</div>
-
-    <div class="feat" data-kw="admin murojaat aloqa yordam savol muammo">
-      <h2><span class="ic">📞</span> Admin bilan aloqa</h2>
-      <p>Savol, taklif yoki muammo bo‘lsa, «📞 Admin bilan aloqa» orqali bot egasiga to‘g‘ridan-to‘g‘ri yozishingiz mumkin.</p>
-    </div>
+    <details class="group">
+      <summary>
+        <div class="gic">🆘</div>
+        <div class="gtext"><div class="gtitle">Yordam</div><div class="gsub">Topilmadi, yuklash, aloqa</div></div>
+        <div class="chev">▾</div>
+      </summary>
+      <div class="items">
+        <div class="item">
+          <h3>📝 Kitob so'rash</h3>
+          <p>Qidirgan kitobingiz topilmasa, «📝 Kitob so'rash» orqali nomini yuboring — qo'shilganda xabar beramiz.</p>
+        </div>
+        <div class="item">
+          <h3>⬆️ Kitob yuklash</h3>
+          <p>Ruxsat berilgan foydalanuvchilar «⬆️ Kitob yuklash» orqali yangi kitob fayllarini kutubxonaga qo'sha oladi.</p>
+        </div>
+        <div class="item">
+          <h3>📞 Admin bilan aloqa</h3>
+          <p>Savol, taklif yoki muammo bo'lsa, «📞 Admin bilan aloqa» orqali bot egasiga to'g'ridan-to'g'ri yozing.</p>
+        </div>
+      </div>
+    </details>
 
   </div>
-
-  <div class="empty" id="empty"><span>🔍</span>Hech narsa topilmadi</div>
 
   <footer>
     <p>Botga qaytish uchun shu oynani yoping 👇</p>
@@ -177,33 +224,15 @@ function applyTheme(){
 }
 if (tg) { tg.ready(); tg.expand(); applyTheme(); tg.onEvent?.('themeChanged', applyTheme); }
 
-// Build a quick jump-to-section chip row from each card's <h2> text.
-const feats = Array.from(document.querySelectorAll('.feat'));
-const toc = document.getElementById('toc');
-feats.forEach((f, i) => {
-  f.id = 'f' + i;
-  const label = f.querySelector('h2').textContent.trim();
-  const a = document.createElement('a');
-  a.href = '#' + f.id;
-  a.textContent = label;
-  toc.appendChild(a);
-});
-
-// Simple in-page filter over section keywords + visible text.
-const input = document.getElementById('q');
-const empty = document.getElementById('empty');
-input.addEventListener('input', () => {
-  const term = input.value.trim().toLowerCase();
-  let visible = 0;
-  document.querySelectorAll('.section-lbl').forEach(l => l.style.display = term ? 'none' : '');
-  toc.style.display = term ? 'none' : '';
-  feats.forEach(f => {
-    const hay = (f.dataset.kw + ' ' + f.textContent).toLowerCase();
-    const match = !term || hay.includes(term);
-    f.classList.toggle('hidden', !match);
-    if (match) visible++;
+// Only one category open at a time — keeps the page short and scannable instead of a
+// long scroll of everything expanded at once.
+document.querySelectorAll('.group').forEach(g => {
+  g.addEventListener('toggle', () => {
+    if (!g.open) return;
+    document.querySelectorAll('.group').forEach(other => {
+      if (other !== g) other.open = false;
+    });
   });
-  empty.style.display = visible === 0 ? 'block' : 'none';
 });
 </script>
 </body>
