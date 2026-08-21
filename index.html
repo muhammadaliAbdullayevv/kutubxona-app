@@ -129,6 +129,10 @@
   .cmeta{font-size:12px; color:var(--muted); font-weight:700}
   /* Profile overlay (streaks/badges) */
   #sheet2{z-index:55}
+  /* Book globe */
+  #globe{align-items:stretch; background:var(--bg)}
+  #globeCanvas{width:100%; height:100%; touch-action:none; display:block}
+  .gclose{position:fixed; top:calc(env(safe-area-inset-top) + 14px); right:14px; width:36px; height:36px; border-radius:50%; background:var(--chip); border:1px solid var(--line); color:var(--text); display:flex; align-items:center; justify-content:center; font-size:16px; cursor:pointer; z-index:1}
   .streakbig{display:flex; align-items:baseline; gap:8px; margin:4px 0 2px}
   .streakbig .n{font-size:40px; font-weight:800; line-height:1}
   .streakbig .u{font-size:14px; color:var(--muted); font-weight:600}
@@ -166,7 +170,7 @@
 <body>
 <div class="wrap">
   <header>
-    <h1>📚 Kutubxona <a href="quran.html" style="float:right; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle">📖 Qur'on</a><a id="btnProfile" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer">👤</a><a id="btnTheme" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer">☀️</a></h1>
+    <h1>📚 Kutubxona <a href="quran.html" style="float:right; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle">📖 Qur'on</a><a id="btnProfile" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer">👤</a><a id="btnTheme" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer">☀️</a><a id="btnGlobe" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer">🌐</a></h1>
     <div class="searchbar">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
       <input id="q" type="search" placeholder="Kitob, muallif, mavzu…" autocomplete="off" enterkeyhint="search">
@@ -198,6 +202,7 @@
 
 <div class="sheet" id="sheet"><div class="sheetc" id="sheetc"></div></div>
 <div class="sheet" id="sheet2"><div class="sheetc" id="sheet2c"></div></div>
+<div class="sheet" id="globe" style="z-index:45"><canvas id="globeCanvas"></canvas><div class="gclose" id="globeClose">✕</div></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -387,6 +392,91 @@ if(!mqReduced){
   window.addEventListener('pointerup',()=>{if(!mqPaused)return;clearTimeout(mqResumeTimer);mqResumeTimer=setTimeout(()=>{mqPaused=false;},2500);});
   window.addEventListener('pointercancel',()=>{if(!mqPaused)return;clearTimeout(mqResumeTimer);mqResumeTimer=setTimeout(()=>{mqPaused=false;},2500);});
 }
+
+// ---- book globe: rotatable 3D sphere of book nodes (Canvas2D, hand-rolled projection) ----
+// STAGE 1 (perf spike): fixed dummy points, drag-to-rotate only. No zoom/LOD/lines/tap yet —
+// this stage exists purely to confirm a hand-rolled canvas globe runs smoothly on a real phone
+// inside Telegram's WebView before any further investment.
+const GOLDEN_ANGLE=Math.PI*(3-Math.sqrt(5));
+function fibSpherePoint(i,N){
+  const y=1-(i/(N-1))*2, rY=Math.sqrt(Math.max(0,1-y*y)), theta=GOLDEN_ANGLE*i;
+  return {x:Math.cos(theta)*rY, y:y, z:Math.sin(theta)*rY};
+}
+const GLOBE={built:false,points:[],yaw:0,pitch:0.3,zoom:1,raf:null};
+function buildGlobeSpike(){
+  const N=180, pts=[];
+  for(let i=0;i<N;i++)pts.push(fibSpherePoint(i,N));
+  GLOBE.points=pts;
+  GLOBE.built=true;
+}
+function globeDraw(){
+  const canvas=$('#globeCanvas');
+  if(!canvas)return;
+  const dpr=Math.min(window.devicePixelRatio||1,2);
+  const w=canvas.clientWidth,h=canvas.clientHeight;
+  if(canvas.width!==Math.round(w*dpr)||canvas.height!==Math.round(h*dpr)){
+    canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);
+  }
+  const ctx=canvas.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);
+  const cx=w/2, cy=h/2, R=Math.min(w,h)*0.34*GLOBE.zoom;
+  const cosY=Math.cos(GLOBE.yaw),sinY=Math.sin(GLOBE.yaw);
+  const cosP=Math.cos(GLOBE.pitch),sinP=Math.sin(GLOBE.pitch);
+  const accent=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#d9a441';
+  for(const p of GLOBE.points){
+    // rotate around Y (yaw) then X (pitch)
+    let x=p.x*cosY - p.z*sinY;
+    let z=p.x*sinY + p.z*cosY;
+    let y=p.y*cosP - z*sinP;
+    z=p.y*sinP + z*cosP;
+    if(z<-0.05)continue; // cull back-facing (weak perspective, camera looking down -z)
+    const scale=0.75+0.25*z; // nearer points render slightly larger
+    const sx=cx+x*R, sy=cy-y*R;
+    ctx.globalAlpha=0.35+0.65*Math.max(0,z);
+    ctx.fillStyle=accent;
+    ctx.beginPath();
+    ctx.arc(sx,sy,3.2*scale,0,Math.PI*2);
+    ctx.fill();
+  }
+  ctx.globalAlpha=1;
+}
+function globeTick(){
+  globeDraw();
+  GLOBE.raf=requestAnimationFrame(globeTick);
+}
+let globeDrag=null;
+function wireGlobeInteraction(){
+  const canvas=$('#globeCanvas');
+  canvas.addEventListener('pointerdown',e=>{
+    canvas.setPointerCapture(e.pointerId);
+    globeDrag={x0:e.clientX,y0:e.clientY,yaw0:GLOBE.yaw,pitch0:GLOBE.pitch,moved:false};
+  });
+  canvas.addEventListener('pointermove',e=>{
+    if(!globeDrag)return;
+    const dx=e.clientX-globeDrag.x0, dy=e.clientY-globeDrag.y0;
+    if(!globeDrag.moved && Math.hypot(dx,dy)>6)globeDrag.moved=true;
+    GLOBE.yaw=globeDrag.yaw0 + dx*0.006;
+    GLOBE.pitch=Math.max(-1.4,Math.min(1.4,globeDrag.pitch0 - dy*0.006));
+  });
+  const endDrag=()=>{globeDrag=null;};
+  canvas.addEventListener('pointerup',endDrag);
+  canvas.addEventListener('pointercancel',endDrag);
+}
+function openGlobe(){
+  if(!GLOBE.built){buildGlobeSpike();wireGlobeInteraction();}
+  $('#globe').classList.add('open');
+  tg?.BackButton?.show();
+  if(!GLOBE.raf)GLOBE.raf=requestAnimationFrame(globeTick);
+}
+function closeGlobe(){
+  $('#globe').classList.remove('open');
+  tg?.BackButton?.hide();
+  if(GLOBE.raf){cancelAnimationFrame(GLOBE.raf);GLOBE.raf=null;}
+}
+$('#btnGlobe').onclick=()=>{haptic();openGlobe();};
+$('#globeClose').onclick=()=>closeGlobe();
+
 function isHome(){return state.view==='browse'&&!state.q&&!state.genre&&!state.audience&&!state.type&&!state.all;}
 function showHome(on){$('#home').style.display=on?'block':'none';$('#grid').style.display=on?'none':'grid';$('.bar').style.display=on?'none':'flex';if(on){$('#more').style.display='none';$('#empty').style.display='none';}}
 function run(){if(isHome()){renderHome();showHome(true);}else{compute();render();showHome(false);}}
@@ -626,7 +716,7 @@ $('#btnTheme').onclick=()=>{
 
 function skeletonShelf(){return `<div class="section"><div class="shead"><h2 class="skel" style="width:140px;height:16px;border-radius:6px"></h2></div><div class="shelf">${Array(4).fill('<div class="si"><div class="skel" style="height:170px;border-radius:14px"></div></div>').join('')}</div></div>`;}
 async function boot(){
-  if(tg){tg.ready();tg.expand();tg.BackButton?.onClick(()=>{if($('#sheet2').classList.contains('open'))closeSheet2();else closeSheet();});applyThemeMode();tg.onEvent?.('themeChanged',()=>{if(themeMode==='system')applyThemeMode();});}
+  if(tg){tg.ready();tg.expand();tg.BackButton?.onClick(()=>{if($('#sheet2').classList.contains('open'))closeSheet2();else if($('#sheet').classList.contains('open'))closeSheet();else if($('#globe').classList.contains('open'))closeGlobe();});applyThemeMode();tg.onEvent?.('themeChanged',()=>{if(themeMode==='system')applyThemeMode();});}
   if('serviceWorker' in navigator)window.addEventListener('load',()=>{
     navigator.serviceWorker.register('./sw.js').catch(()=>{});
     // The shell/data caches are served cache-first-then-refresh, so a stale client can lag a
