@@ -199,5 +199,32 @@
     });
   }
 
+  function wireDeliverButton() {
+    // The "📖 Botda ochish" link is baked into each static page's HTML (a t.me deep link),
+    // not rendered by this script — this intercepts its click so the book gets sent straight
+    // into the user's chat via the API instead of leaving the Mini App. Falls back to the
+    // original deep link if delivery isn't possible (no initData, no cached file, API error).
+    var ctaLink = document.querySelector(".cta .btn.primary");
+    if (!ctaLink || !canAct) return;
+    var originalLabel = ctaLink.textContent;
+    ctaLink.addEventListener("click", function (e) {
+      e.preventDefault();
+      ctaLink.textContent = "Yuborilmoqda...";
+      ctaLink.classList.add("cw-disabled");
+      api("/api/books/" + bookId + "/deliver", { method: "POST" })
+        .then(function () {
+          ctaLink.textContent = "✅ Yuborildi — botdagi chatingizni tekshiring";
+        })
+        .catch(function () {
+          // Couldn't deliver in-app (not cached, bot not started yet, etc.) — fall back to
+          // the original deep link so the user still gets the book.
+          ctaLink.textContent = originalLabel;
+          ctaLink.classList.remove("cw-disabled");
+          window.location.href = ctaLink.href;
+        });
+    });
+  }
+
   refreshStats();
+  wireDeliverButton();
 })();

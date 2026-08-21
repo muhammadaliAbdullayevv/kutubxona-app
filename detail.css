@@ -61,3 +61,5 @@ h1{font-size:22px; font-weight:800; line-height:1.3; margin:0 0 4px}
 .cw-reply-form{display:flex; flex-direction:column; gap:8px; margin-bottom:10px}
 .cw-reply-form textarea{background:var(--bg); border:1px solid var(--line); color:var(--text); border-radius:12px; padding:10px; font:inherit; resize:vertical; min-height:56px}
 .cw-reply-form button{align-self:flex-end; background:var(--chip); color:var(--text); border:1px solid var(--line); border-radius:12px; padding:8px 14px; font-weight:700; cursor:pointer; font-size:13px}
+
+.cta .btn.primary.cw-disabled{opacity:.7; pointer-events:none}
