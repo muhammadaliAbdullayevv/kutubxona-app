@@ -494,7 +494,7 @@ function buildGlobe(){
     }
     if(!parentId)continue;
     const parentIdx=idIndex[parentId];
-    const jAng=(hash31(b.i+'#sat')%6283)/1000, jRad=6+(hash31(b.i+'#satr')%16);
+    const jAng=(hash31(b.i+'#sat')%6283)/1000, jRad=4+(hash31(b.i+'#satr')%10);
     satellites.push({id:b.i,t:b.t,parentIdx,jx:Math.cos(jAng)*jRad,jy:Math.sin(jAng)*jRad,color:nodes[parentIdx].color});
   }
   GLOBE.nodes=nodes;
@@ -521,7 +521,7 @@ function globeSimStep(){
       const B=nodes[j];
       let dx=A.x-B.x, dy=A.y-B.y, distSq=dx*dx+dy*dy;
       if(distSq<1)distSq=1;
-      const dist=Math.sqrt(distSq), force=900/distSq;
+      const dist=Math.sqrt(distSq), force=260/distSq;
       const fx=(dx/dist)*force, fy=(dy/dist)*force;
       A.vx+=fx;A.vy+=fy;B.vx-=fx;B.vy-=fy;
     }
@@ -529,12 +529,14 @@ function globeSimStep(){
   for(const [i,j] of GLOBE.edges){
     const A=nodes[i],B=nodes[j];
     const dx=B.x-A.x,dy=B.y-A.y,dist=Math.sqrt(dx*dx+dy*dy)||0.01;
-    const force=(dist-40)*0.02;
+    const force=(dist-24)*0.03;
     const fx=(dx/dist)*force,fy=(dy/dist)*force;
     A.vx+=fx;A.vy+=fy;B.vx-=fx;B.vy-=fy;
   }
-  for(const A of nodes){A.vx-=A.x*0.002;A.vy-=A.y*0.002;}
-  for(const A of nodes){A.vx*=0.85;A.vy*=0.85;A.x+=A.vx;A.y+=A.vy;}
+  // Centering needs to scale with node count — with ~220 anchors each pushed by ~220 others,
+  // a fixed weak pull loses that tug-of-war and the whole graph drifts apart into empty space.
+  for(const A of nodes){A.vx-=A.x*0.02;A.vy-=A.y*0.02;}
+  for(const A of nodes){A.vx*=0.82;A.vy*=0.82;A.x+=A.vx;A.y+=A.vy;}
 }
 function globeDraw(){
   const canvas=$('#globeCanvas');
