@@ -89,10 +89,9 @@
   .si .sr{font-size:11px; color:var(--muted); margin:2px 1px 0; font-variant-numeric:tabular-nums}
   .si .sr b{color:var(--text)}
   /* Auto-scrolling "recently added" ticker, top of home */
-  .mqwrap{overflow:hidden; padding:2px 0 6px; margin:0 -14px}
-  .mqtrack{display:flex; gap:12px; width:max-content; padding:0 14px; animation:mqscroll linear infinite}
-  @keyframes mqscroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-  @media (prefers-reduced-motion: reduce){.mqtrack{animation:none}}
+  .mqwrap{overflow-x:auto; scrollbar-width:none; padding:2px 0 6px; margin:0 -14px}
+  .mqwrap::-webkit-scrollbar{display:none}
+  .mqtrack{display:flex; gap:12px; width:max-content; padding:0 14px}
   .authchips{display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; padding:2px 14px 4px; margin:0 -14px}
   .authchips::-webkit-scrollbar{display:none}
   .authchip{flex:0 0 auto; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:9px 13px; cursor:pointer; display:flex; flex-direction:column; gap:1px; min-width:110px}
@@ -359,9 +358,8 @@ function shelf(title,books,see){return `<div class="section"><div class="shead">
 function marqueeShelf(title,books,see){
   if(!books.length)return '';
   const cards=books.map((b,i)=>siHtml(b,i)).join('');
-  const dur=(books.length*2.2).toFixed(1);
   return `<div class="section"><div class="shead"><h2>${esc(title)}</h2>${see?`<span class="see" ${see}>Barchasi →</span>`:''}</div>
-    <div class="mqwrap"><div class="mqtrack" style="animation-duration:${dur}s">${cards}${cards}</div></div>
+    <div class="mqwrap"><div class="mqtrack">${cards}${cards}</div></div>
   </div>`;
 }
 function renderHome(){
@@ -375,6 +373,25 @@ function renderHome(){
   h.querySelectorAll('.si').forEach(el=>el.onclick=()=>openDetail(el.dataset.id));
   h.querySelectorAll('[data-auth]').forEach(el=>el.onclick=()=>{state.all=false;$('#q').value=el.dataset.auth;state.q=el.dataset.auth;$('#clr').style.display='block';haptic();run();window.scrollTo(0,0);});
   h.querySelectorAll('[data-see]').forEach(el=>el.onclick=()=>{const s=el.dataset.see;if(s==='newest'){state.all=true;state.sort='newest';$('#sort').value='newest';}else if(s==='audio'){state.type='audio';renderChips();}else if(s==='genre'){state.genre=el.dataset.v;renderChips();}haptic();run();window.scrollTo(0,0);});
+}
+// ---- gentle auto-scroll for the "recently added" ticker, native scroll underneath so a
+// touch/swipe always fully overrides it (pauses the moment a finger touches it, resumes a
+// couple seconds after release) ----
+let mqPaused=false,mqResumeTimer=null;
+const mqReduced=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+if(!mqReduced){
+  (function mqTick(){
+    const el=$('.mqwrap');
+    if(el&&!mqPaused){
+      el.scrollLeft+=0.55;
+      const half=el.scrollWidth/2;
+      if(half>0&&el.scrollLeft>=half)el.scrollLeft-=half;
+    }
+    requestAnimationFrame(mqTick);
+  })();
+  $('#home').addEventListener('pointerdown',e=>{if(e.target.closest('.mqwrap'))mqPaused=true;});
+  window.addEventListener('pointerup',()=>{if(!mqPaused)return;clearTimeout(mqResumeTimer);mqResumeTimer=setTimeout(()=>{mqPaused=false;},2500);});
+  window.addEventListener('pointercancel',()=>{if(!mqPaused)return;clearTimeout(mqResumeTimer);mqResumeTimer=setTimeout(()=>{mqPaused=false;},2500);});
 }
 function isHome(){return state.view==='browse'&&!state.q&&!state.genre&&!state.audience&&!state.type&&!state.all;}
 function showHome(on){$('#home').style.display=on?'block':'none';$('#grid').style.display=on?'none':'grid';$('.bar').style.display=on?'none':'flex';if(on){$('#more').style.display='none';$('#empty').style.display='none';}}
