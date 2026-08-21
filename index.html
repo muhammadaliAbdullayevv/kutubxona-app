@@ -520,8 +520,12 @@ function globeSimStep(){
     for(let j=i+1;j<n;j++){
       const B=nodes[j];
       let dx=A.x-B.x, dy=A.y-B.y, distSq=dx*dx+dy*dy;
-      if(distSq<1)distSq=1;
-      const dist=Math.sqrt(distSq), force=260/distSq;
+      // Softened minimum distance (not just clamped to 1): without this, two nodes that ever
+      // land close together spike the force toward its ceiling and fling both away violently
+      // (exactly what "moving so fast, can't see anything" was — dividing by a near-zero
+      // distSq). Flooring at 100 (~10px) caps the worst-case force instead of letting it blow up.
+      if(distSq<100)distSq=100;
+      const dist=Math.sqrt(distSq), force=140/distSq;
       const fx=(dx/dist)*force, fy=(dy/dist)*force;
       A.vx+=fx;A.vy+=fy;B.vx-=fx;B.vy-=fy;
     }
@@ -529,14 +533,25 @@ function globeSimStep(){
   for(const [i,j] of GLOBE.edges){
     const A=nodes[i],B=nodes[j];
     const dx=B.x-A.x,dy=B.y-A.y,dist=Math.sqrt(dx*dx+dy*dy)||0.01;
-    const force=(dist-24)*0.03;
+    const force=(dist-24)*0.018;
     const fx=(dx/dist)*force,fy=(dy/dist)*force;
     A.vx+=fx;A.vy+=fy;B.vx-=fx;B.vy-=fy;
   }
   // Centering needs to scale with node count — with ~220 anchors each pushed by ~220 others,
-  // a fixed weak pull loses that tug-of-war and the whole graph drifts apart into empty space.
-  for(const A of nodes){A.vx-=A.x*0.02;A.vy-=A.y*0.02;}
-  for(const A of nodes){A.vx*=0.82;A.vy*=0.82;A.x+=A.vx;A.y+=A.vy;}
+  // a fixed weak pull loses that tug-of-war and the whole graph drifts apart into empty space —
+  // but too strong (an earlier attempt) overshoots and oscillates instead of settling.
+  for(const A of nodes){A.vx-=A.x*0.008;A.vy-=A.y*0.008;}
+  // Hard velocity cap: a safety net independent of the exact force constants above — whatever
+  // the net force on a node comes out to, it can never move faster than this per frame, so a
+  // parameter combination that's slightly too strong degrades to "settles a bit slower"
+  // instead of "flies off screen."
+  const MAX_SPEED=5;
+  for(const A of nodes){
+    A.vx*=0.78;A.vy*=0.78;
+    const sp=Math.hypot(A.vx,A.vy);
+    if(sp>MAX_SPEED){A.vx=A.vx/sp*MAX_SPEED;A.vy=A.vy/sp*MAX_SPEED;}
+    A.x+=A.vx;A.y+=A.vy;
+  }
 }
 function globeDraw(){
   const canvas=$('#globeCanvas');
