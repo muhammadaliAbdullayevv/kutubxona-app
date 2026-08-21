@@ -689,11 +689,10 @@ function globeDraw(){
   }
 }
 function globeTick(){
-  // Pause the physics while a finger/mouse is actively dragging or pinching — otherwise the
-  // nodes keep drifting under the user's touch at the same time their gesture is panning/
-  // zooming the camera, and the combined motion reads as the map "auto-scrolling" on its own.
-  // Resumes (gently, same settle speed as always) the instant they let go.
-  if(!globeDrag && !globePinch)globeSimStep();
+  // Physics stays paused for a few seconds of stillness after any touch, not just during the
+  // touch itself — resuming the instant a finger lifts made it hard to actually tap a book
+  // right after zooming/panning to it, since the nodes would already be sliding away again.
+  if(!globeSimPaused)globeSimStep();
   globeDraw();
   GLOBE.raf=requestAnimationFrame(globeTick);
 }
@@ -724,12 +723,16 @@ function onGlobeTap(id){
   else onGlobeNodeTap(id);
 }
 const globePointers=new Map();
-let globeDrag=null, globePinch=null;
+let globeDrag=null, globePinch=null, globeSimPaused=false, globeResumeTimer=null;
+const GLOBE_RESUME_DELAY=3000; // how long the map holds still after you let go, so there's a
+                                 // real window to actually tap a book before it drifts again
 function wireGlobeInteraction(){
   const canvas=$('#globeCanvas');
   function pinchDist(){const pts=[...globePointers.values()];return pts.length<2?0:Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);}
   canvas.addEventListener('pointerdown',e=>{
     canvas.setPointerCapture(e.pointerId);
+    globeSimPaused=true;
+    clearTimeout(globeResumeTimer);
     globePointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
     if(globePointers.size===1){
       globeDrag={x0:e.clientX,y0:e.clientY,panX0:GLOBE.panX,panY0:GLOBE.panY,moved:false};
@@ -774,11 +777,20 @@ function wireGlobeInteraction(){
     } else {
       globePinch=null;
       globeDrag=null;
+      // Fully released — hold still a bit longer before the simulation starts drifting again.
+      clearTimeout(globeResumeTimer);
+      globeResumeTimer=setTimeout(()=>{globeSimPaused=false;},GLOBE_RESUME_DELAY);
     }
   }
   canvas.addEventListener('pointerup',release);
   canvas.addEventListener('pointercancel',release);
-  canvas.addEventListener('wheel',e=>{GLOBE.zoom=Math.max(0.4,Math.min(26,GLOBE.zoom-e.deltaY*0.0015));e.preventDefault();},{passive:false});
+  canvas.addEventListener('wheel',e=>{
+    GLOBE.zoom=Math.max(0.4,Math.min(26,GLOBE.zoom-e.deltaY*0.0015));
+    e.preventDefault();
+    globeSimPaused=true;
+    clearTimeout(globeResumeTimer);
+    globeResumeTimer=setTimeout(()=>{globeSimPaused=false;},GLOBE_RESUME_DELAY);
+  },{passive:false});
 }
 function openGlobe(){
   if(!DB.books.length){toast('Kutubxona hali yuklanmoqda...');return;}
@@ -860,13 +872,22 @@ function openDetail(id){
   $('#dFav').onclick=()=>toggleFav(b.i);
   $('#dShare').onclick=()=>{const txt=`📚 ${b.t}${b.a?' — '+b.a:''}`;const s=`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(txt)}`;tg?.openTelegramLink?tg.openTelegramLink(s):navigator.share?.({title:b.t,url});};
   const dBackGlobe=$('#dBackGlobe');
-  if(dBackGlobe)dBackGlobe.onclick=()=>{closeSheet();if(!GLOBE.raf)GLOBE.raf=requestAnimationFrame(globeTick);};
+  if(dBackGlobe)dBackGlobe.onclick=()=>closeSheet();
   c.querySelectorAll('[data-sub]').forEach(el=>el.onclick=()=>{closeSheet();$('#q').value=el.dataset.sub;state.q=el.dataset.sub;$('#clr').style.display='block';if(state.view!=='browse'){state.view='browse';setTabs();}run();window.scrollTo(0,0);});
   c.querySelectorAll('.si').forEach(el=>el.onclick=()=>openDetail(el.dataset.id));
   loadRating(b.i);
   c.scrollTop=0;
 }
-function closeSheet(){$('#sheet').classList.remove('open');tg?.BackButton?.hide();openedFromGlobe=false;}
+function closeSheet(){
+  $('#sheet').classList.remove('open');
+  tg?.BackButton?.hide();
+  // Resuming the paused globe belongs here, not just on the explicit "back to map" button —
+  // closing via the native/Telegram back button, the backdrop tap, or a swipe all bypass that
+  // button entirely, and previously left the map's render loop frozen (paused, never resumed)
+  // whenever the sheet was opened from it and closed any other way.
+  if(openedFromGlobe && !GLOBE.raf)GLOBE.raf=requestAnimationFrame(globeTick);
+  openedFromGlobe=false;
+}
 
 // ---- profile overlay (reading streak/badges) ----
 function openSheet2(html){$('#sheet2c').innerHTML=html;$('#sheet2').classList.add('open');tg?.BackButton?.show();}
