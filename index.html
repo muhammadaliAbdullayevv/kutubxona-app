@@ -412,6 +412,9 @@ if(!mqReduced){
 // array order.
 function popScore(b){return (b.dl||0)*3 + (b.rc?b.rt*b.rc:0) + (b.hc?2:0);}
 function hash31(s){let h=0;s=String(s||'');for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;return h;}
+// "Unknown"/"Noma'lum" isn't a real author identity — 1023+ books share it, so treating it as
+// one would falsely cluster a fifth of the catalog onto a single node.
+function isKnownAuthor(a){return !!a && !/unknown|noma.?lum/i.test(a);}
 const CLUSTER_COLORS=['#4f8fd9','#e0824a','#4caf7d','#a066c9','#2fa6a6','#d9527a','#c9a227','#7d6ad9','#5ba64f','#4aa8c9','#c96f3f','#8f9bb3','#b3853f','#5f9bd9','#6fae8f'];
 const GLOBE={built:false,nodes:[],edges:[],projected:[],genreColor:{},panX:0,panY:0,zoom:1,raf:null};
 function buildGlobe(){
@@ -460,7 +463,7 @@ function buildGlobe(){
     }
   }
   const byAuthorAnchor={};
-  for(const b of anchors){if(b.a)(byAuthorAnchor[b.a]=byAuthorAnchor[b.a]||[]).push(b);}
+  for(const b of anchors){if(isKnownAuthor(b.a))(byAuthorAnchor[b.a]=byAuthorAnchor[b.a]||[]).push(b);}
   for(const a in byAuthorAnchor){
     const arr=byAuthorAnchor[a];
     for(let i=1;i<arr.length;i++)addEdge(idIndex[arr[0].i],idIndex[arr[i].i]);
@@ -472,16 +475,23 @@ function buildGlobe(){
   // globeDraw), matching "popular books by default, more as you zoom into a cluster."
   const anchorIdSet=new Set(anchors.map(a=>a.i));
   const primaryAnchorByAuthor={};
-  for(const b of anchors){if(b.a && !(b.a in primaryAnchorByAuthor))primaryAnchorByAuthor[b.a]=b.i;}
-  const primaryAnchorByGenre={};
+  for(const b of anchors){if(isKnownAuthor(b.a) && !(b.a in primaryAnchorByAuthor))primaryAnchorByAuthor[b.a]=b.i;}
+  // Genre fallback: a book whose author has no anchor gets hash-distributed across ALL of its
+  // genre's anchors (not dumped onto a single "top" one) — otherwise nearly every satellite in
+  // a genre piles onto one node, since most authors only have 1-2 books and rarely have an
+  // anchor of their own.
+  const anchorsByGenre={};
   for(const g in byGenre){
-    const bucketAnchors=anchors.filter(a=>(a.g||'?')===g); // already popScore-sorted from above
-    if(bucketAnchors.length)primaryAnchorByGenre[g]=bucketAnchors[0].i;
+    anchorsByGenre[g]=anchors.filter(a=>(a.g||'?')===g); // already popScore-sorted from above
   }
   const satellites=[];
   for(const b of DB.books){
     if(anchorIdSet.has(b.i))continue;
-    const parentId=(b.a && primaryAnchorByAuthor[b.a]) || primaryAnchorByGenre[b.g||'?'];
+    let parentId=isKnownAuthor(b.a) && primaryAnchorByAuthor[b.a];
+    if(!parentId){
+      const bucket=anchorsByGenre[b.g||'?'];
+      if(bucket && bucket.length)parentId=bucket[hash31(b.i+'#gp')%bucket.length].i;
+    }
     if(!parentId)continue;
     const parentIdx=idIndex[parentId];
     const jAng=(hash31(b.i+'#sat')%6283)/1000, jRad=6+(hash31(b.i+'#satr')%16);
