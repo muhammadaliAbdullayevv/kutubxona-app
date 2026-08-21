@@ -72,6 +72,8 @@
   .si .sc .aud{position:absolute; top:7px; right:7px; background:rgba(0,0,0,.35); border-radius:7px; padding:2px 6px; font-size:11px}
   .si .st{font-size:12.5px; font-weight:700; line-height:1.25; margin:7px 1px 1px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
   .si .sa{font-size:11px; color:var(--muted); margin:0 1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .si .sr{font-size:11px; color:var(--muted); margin:2px 1px 0; font-variant-numeric:tabular-nums}
+  .si .sr b{color:var(--text)}
   .authchips{display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; padding:2px 14px 4px; margin:0 -14px}
   .authchips::-webkit-scrollbar{display:none}
   .authchip{flex:0 0 auto; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:9px 13px; cursor:pointer; display:flex; flex-direction:column; gap:1px; min-width:110px}
@@ -333,7 +335,7 @@ function buildHome(){
   HOME.authors=Object.entries(ac).filter(([a,c])=>c>=2).sort((x,y)=>y[1]-x[1]).slice(0,16).map(([a,c])=>({a,c}));
   HOME.genres=DB.genres.slice(0,5).map(g=>({v:g.v,c:g.c,books:DB.books.filter(b=>b.g===g.v).slice(0,18)}));
 }
-function siHtml(b){const[c1,c2]=coverFor(b.i);return `<div class="si" data-id="${esc(b.i)}"><div class="sc" style="background:linear-gradient(135deg,${c1},${c2})">${b.hc?`<img class="ci" src="covers/${encodeURIComponent(b.i)}.jpg" loading="lazy" onerror="this.remove()">`:''}${b.ha?'<span class="aud">🎧</span>':''}<span class="ini">${esc(initials(b.t))}</span></div><div class="st">${esc(b.t)}</div><div class="sa">${esc(b.a||'')}</div></div>`;}
+function siHtml(b){const[c1,c2]=coverFor(b.i);return `<div class="si" data-id="${esc(b.i)}"><div class="sc" style="background:linear-gradient(135deg,${c1},${c2})">${b.hc?`<img class="ci" src="covers/${encodeURIComponent(b.i)}.jpg" loading="lazy" onerror="this.remove()">`:''}${b.ha?'<span class="aud">🎧</span>':''}<span class="ini">${esc(initials(b.t))}</span></div><div class="st">${esc(b.t)}</div><div class="sa">${esc(b.a||'')}</div>${b.rc?`<div class="sr">⭐ <b>${b.rt}</b> (${b.rc})</div>`:''}</div>`;}
 function shelf(title,books,see){return `<div class="section"><div class="shead"><h2>${esc(title)}</h2>${see?`<span class="see" ${see}>Barchasi →</span>`:''}</div><div class="shelf">${books.map(siHtml).join('')}</div></div>`;}
 function renderHome(){
   const h=$('#home');let html='';
