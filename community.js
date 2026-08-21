@@ -200,31 +200,36 @@
   }
 
   function wireDeliverButton() {
-    // The "📖 Botda ochish" link is baked into each static page's HTML as <a href="t.me/...">.
-    // Telegram's WebView can intercept clicks on t.me links at the native level — closing the
-    // Mini App — even if page JS calls preventDefault(). So the href is removed up front
-    // (the element stops looking like a t.me link at all) and only restored, right before a
-    // real navigation, if in-app delivery actually fails.
-    var ctaLink = document.querySelector(".cta .btn.primary");
-    if (!ctaLink || !canAct) return;
-    var fallbackHref = ctaLink.getAttribute("href");
-    ctaLink.removeAttribute("href");
-    var originalLabel = ctaLink.textContent;
-    ctaLink.addEventListener("click", function (e) {
-      e.preventDefault();
-      ctaLink.textContent = "Yuborilmoqda...";
-      ctaLink.classList.add("cw-disabled");
+    // The "📖 Botda ochish" control is a plain <button> in the static HTML now — NOT an
+    // <a href="t.me/...">. Telegram's Mini App WebView can intercept a t.me link at the
+    // native level, based on the raw page source, before this script ever runs — so removing
+    // an href via JS (the previous approach) was too late; the link had to never exist in the
+    // HTML at all. The deep link is only ever constructed here, in memory, as a fallback.
+    var ctaBtn = document.getElementById("cta-open-bot");
+    if (!ctaBtn) return;
+    var fallbackHref = "https://t.me/pdf_audio_kitoblar_bot?start=b_" + bookId;
+    var originalLabel = ctaBtn.textContent;
+    if (!canAct) {
+      // No initData (opened outside Telegram) — can't call the authenticated deliver API,
+      // so this is just a normal deep-link button in that context.
+      ctaBtn.addEventListener("click", function () {
+        window.location.href = fallbackHref;
+      });
+      return;
+    }
+    ctaBtn.addEventListener("click", function () {
+      ctaBtn.textContent = "Yuborilmoqda...";
+      ctaBtn.classList.add("cw-disabled");
       api("/api/books/" + bookId + "/deliver", { method: "POST" })
         .then(function () {
-          ctaLink.textContent = "✅ Yuborildi — botdagi chatingizni tekshiring";
-          ctaLink.classList.remove("cw-disabled");
+          ctaBtn.textContent = "✅ Yuborildi — botdagi chatingizni tekshiring";
+          ctaBtn.classList.remove("cw-disabled");
         })
         .catch(function () {
           // Couldn't deliver in-app (not cached, bot not started yet, etc.) — only now does
-          // this become a real t.me link, so only a genuine failure ever leaves the Mini App.
-          ctaLink.textContent = originalLabel;
-          ctaLink.classList.remove("cw-disabled");
-          ctaLink.setAttribute("href", fallbackHref);
+          // a real t.me navigation happen, so only a genuine failure ever leaves the Mini App.
+          ctaBtn.textContent = originalLabel;
+          ctaBtn.classList.remove("cw-disabled");
           window.location.href = fallbackHref;
         });
     });
