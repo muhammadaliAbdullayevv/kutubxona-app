@@ -727,7 +727,7 @@ function wireGlobeInteraction(){
     globePointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
     if(globePinch && globePointers.size>=2){
       const d=pinchDist();
-      if(d>0&&globePinch.d0>0)GLOBE.zoom=Math.max(0.4,Math.min(3,globePinch.zoom0*(d/globePinch.d0)));
+      if(d>0&&globePinch.d0>0)GLOBE.zoom=Math.max(0.4,Math.min(10,globePinch.zoom0*(d/globePinch.d0)));
       return;
     }
     if(!globeDrag)return;
@@ -749,7 +749,7 @@ function wireGlobeInteraction(){
   }
   canvas.addEventListener('pointerup',release);
   canvas.addEventListener('pointercancel',release);
-  canvas.addEventListener('wheel',e=>{GLOBE.zoom=Math.max(0.4,Math.min(3,GLOBE.zoom-e.deltaY*0.0015));e.preventDefault();},{passive:false});
+  canvas.addEventListener('wheel',e=>{GLOBE.zoom=Math.max(0.4,Math.min(10,GLOBE.zoom-e.deltaY*0.0015));e.preventDefault();},{passive:false});
 }
 function openGlobe(){
   if(!DB.books.length){toast('Kutubxona hali yuklanmoqda...');return;}
