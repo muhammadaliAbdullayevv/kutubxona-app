@@ -600,9 +600,10 @@ function globeDraw(){
   }
   // Layer-2 <-> Layer-2 edges (same-genre neighbors / same-author pairs)
   ctx.strokeStyle=lineColor;
+  const edgeBase=Math.min(0.4,0.18+(s-1)*0.08); // fainter overview, fuller once zoomed in
   for(const [i,j] of GLOBE.edges){
     const A=GLOBE.nodes[i],B=GLOBE.nodes[j];
-    ctx.globalAlpha=dim(A.g)?0.05:(GLOBE.highlightGenre===A.g?0.6:0.4);
+    ctx.globalAlpha=dim(A.g)?0.05:(GLOBE.highlightGenre===A.g?0.6:edgeBase);
     const pa=proj[A.id],pb=proj[B.id];
     ctx.beginPath();ctx.moveTo(pa.sx,pa.sy);ctx.lineTo(pb.sx,pb.sy);ctx.stroke();
   }
@@ -620,14 +621,18 @@ function globeDraw(){
   }
   ctx.globalAlpha=1;
 
-  // Layer 3: the rest of the catalog, riding along at their live parent's position — shown as
-  // plain dots (no physics cost of their own), titles only become readable once zoomed in.
+  // Layer 3: the rest of the catalog, riding along at their live parent's position. Every book
+  // is always technically present (so it's reachable/tappable), but faded low at the overview
+  // zoom and fading in as you zoom toward a cluster — full dot-clutter right from the default
+  // view was what made it feel messy; a gradual reveal keeps "all books are there" true while
+  // the overview itself stays calm.
+  const satAlpha=Math.min(0.65,0.1+(s-1)*0.12);
   for(const S of GLOBE.satellites){
     const P=GLOBE.nodes[S.parentIdx];
     const sx=cx+(P.x+S.jx)*s, sy=cy+(P.y+S.jy)*s;
     if(sx<-30||sx>w+30||sy<-30||sy>h+30)continue; // cheap off-screen cull
     const r=1.6*Math.min(1.5,Math.max(0.6,s));
-    ctx.globalAlpha=dim(P.g)?0.12:0.6;
+    ctx.globalAlpha=dim(P.g)?0.08:satAlpha;
     ctx.fillStyle=S.color;
     ctx.beginPath();ctx.arc(sx,sy,r,0,Math.PI*2);ctx.fill();
     GLOBE.projected.push({id:S.id,sx,sy,r:Math.max(r,8)}); // generous tap radius despite tiny draw size
@@ -651,10 +656,13 @@ function globeDraw(){
     GLOBE.projected.unshift({id:'hub:'+H.g,sx:hx,sy:hy,r:16}); // unshift: hubs win hit-test ties
   }
 
-  // book titles: Layer-2 anchors labeled by default (top-15, or all once zoomed), Layer-3
-  // satellites only become readable once zoomed in further — "dots until you zoom in."
+  // book titles: a small, readable set at the overview zoom, growing gradually as you zoom
+  // in — jumping straight from "top 15" to "all 221" at a small zoom was the main source of
+  // clutter, since 221 labels can't all be readable at once regardless of how sparse the dots
+  // are. Layer-3 satellite titles only start appearing once zoomed in well past that.
   ctx.font='11px -apple-system,BlinkMacSystemFont,sans-serif';ctx.fillStyle=textColor;
-  const anchorPool=s>1.3?GLOBE.nodes:GLOBE.nodes.slice().sort((a,b)=>b.pop-a.pop).slice(0,15);
+  const anchorLabelCount=Math.round(Math.min(221,12+Math.max(0,s-1)*55));
+  const anchorPool=GLOBE.nodes.slice().sort((a,b)=>b.pop-a.pop).slice(0,anchorLabelCount);
   for(const A of anchorPool){
     if(dim(A.g))continue;
     const p=proj[A.id];
@@ -662,10 +670,11 @@ function globeDraw(){
     let title=A.t||'';if(title.length>16)title=title.slice(0,15)+'…';
     ctx.fillText(title,p.sx,p.sy+13);
   }
-  if(s>1.8){
+  if(s>2.4){
+    const satLabelCap=Math.round(Math.min(60,(s-2.4)*22));
     let labeled=0;
     for(const S of GLOBE.satellites){
-      if(labeled>=50)break;
+      if(labeled>=satLabelCap)break;
       const P=GLOBE.nodes[S.parentIdx];
       if(dim(P.g))continue;
       const sx=cx+(P.x+S.jx)*s, sy=cy+(P.y+S.jy)*s;
