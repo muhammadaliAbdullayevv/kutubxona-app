@@ -249,10 +249,6 @@ const PAGE=24;
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),1800);}
 function haptic(x='light'){try{tg?.HapticFeedback?.impactOccurred(x)}catch(e){}}
 
-// ---- recently viewed (localStorage only — purely a local browsing convenience) ----
-function loadRecent(){try{return JSON.parse(localStorage.getItem('recent')||'[]');}catch(e){return [];}}
-function pushRecent(id){try{let r=loadRecent().filter(x=>x!==id);r.unshift(id);localStorage.setItem('recent',JSON.stringify(r.slice(0,20)));}catch(e){}}
-
 // ---- favourites via Telegram CloudStorage (fallback: localStorage) ----
 function cloudGet(){return new Promise(res=>{
   if(tg?.CloudStorage?.getItem){tg.CloudStorage.getItem('favs',(e,v)=>res(e?null:v));}
@@ -345,7 +341,6 @@ function render(){
 }
 // ---- discovery homepage (shown when browsing with no query/filter) ----
 function buildHome(){
-  HOME.recent=loadRecent().map(id=>byId[id]).filter(Boolean).slice(0,18);
   HOME.newest=DB.books.slice(0,18);
   HOME.audio=DB.books.filter(b=>b.ha).slice(0,18);
   const ac={};
@@ -364,7 +359,6 @@ function marqueeShelf(title,books,see){
 }
 function renderHome(){
   const h=$('#home');let html='';
-  if(HOME.recent.length)html+=shelf("🕘 Yaqinda ko'rilgan",HOME.recent,null);
   if(HOME.newest.length)html+=marqueeShelf("🆕 Yangi qo'shilgan",HOME.newest,'data-see="newest"');
   if(HOME.authors.length)html+=`<div class="section"><div class="shead"><h2>✍️ Mashhur mualliflar</h2></div><div class="authchips">${HOME.authors.map(a=>`<div class="authchip" data-auth="${esc(a.a)}"><span class="an">${esc(a.a)}</span><span class="ac">${a.c} ta kitob</span></div>`).join('')}</div></div>`;
   if(HOME.audio.length)html+=shelf("🎧 Audiokitoblar",HOME.audio,'data-see="audio"');
@@ -416,7 +410,6 @@ function relatedShelf(b){
 }
 function openDetail(id){
   const b=byId[id];if(!b)return;haptic();
-  pushRecent(b.i);
   const sh=$('#sheet'),c=$('#sheetc');sh.classList.add('open');tg?.BackButton?.show();
   const[c1,c2]=coverFor(b.i);const fav=favs.has(b.i);
   const pill=(l,v)=>v?`<span class="pill">${l} <b>${esc(v)}</b></span>`:'';
