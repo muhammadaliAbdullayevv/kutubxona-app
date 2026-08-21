@@ -133,6 +133,10 @@
   #globe{align-items:stretch; background:var(--bg)}
   #globeCanvas{width:100%; height:100%; touch-action:none; display:block}
   .gclose{position:fixed; top:calc(env(safe-area-inset-top) + 14px); right:14px; width:36px; height:36px; border-radius:50%; background:var(--chip); border:1px solid var(--line); color:var(--text); display:flex; align-items:center; justify-content:center; font-size:16px; cursor:pointer; z-index:1}
+  .glegend{position:absolute; left:12px; bottom:calc(env(safe-area-inset-bottom) + 12px); display:flex; flex-direction:column; gap:4px; font-size:11px; color:var(--muted); max-height:44vh; overflow-y:auto; pointer-events:none; max-width:56%}
+  .glegend .lg-row{display:flex; align-items:center; gap:6px; white-space:nowrap; text-shadow:0 1px 3px var(--bg)}
+  .glegend .lg-row b{color:var(--text)}
+  .glegend .lg-dot{width:8px; height:8px; border-radius:50%; flex:0 0 auto}
   .streakbig{display:flex; align-items:baseline; gap:8px; margin:4px 0 2px}
   .streakbig .n{font-size:40px; font-weight:800; line-height:1}
   .streakbig .u{font-size:14px; color:var(--muted); font-weight:600}
@@ -202,7 +206,7 @@
 
 <div class="sheet" id="sheet"><div class="sheetc" id="sheetc"></div></div>
 <div class="sheet" id="sheet2"><div class="sheetc" id="sheet2c"></div></div>
-<div class="sheet" id="globe" style="z-index:45"><canvas id="globeCanvas"></canvas><div class="gclose" id="globeClose">✕</div></div>
+<div class="sheet" id="globe" style="z-index:45"><canvas id="globeCanvas"></canvas><div class="gclose" id="globeClose">✕</div><div class="glegend" id="globeLegend"></div></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -393,15 +397,13 @@ if(!mqReduced){
   window.addEventListener('pointercancel',()=>{if(!mqPaused)return;clearTimeout(mqResumeTimer);mqResumeTimer=setTimeout(()=>{mqPaused=false;},2500);});
 }
 
-// ---- book globe: rotatable 3D sphere of book nodes (Canvas2D, hand-rolled projection) ----
-// STAGE 2: real anchor books (popularity+genre-diversity picked), tap-to-open wired to the
-// real openDetail(), "back to map" round-trip. Still no zoom/LOD/lines/labels — those are
-// later stages, once this integration seam is proven solid.
-const GOLDEN_ANGLE=Math.PI*(3-Math.sqrt(5));
-function fibSpherePoint(i,N){
-  const y=1-(i/(N-1))*2, rY=Math.sqrt(Math.max(0,1-y*y)), theta=GOLDEN_ANGLE*i;
-  return {x:Math.cos(theta)*rY, y:y, z:Math.sin(theta)*rY};
-}
+// ---- book graph: live force-directed 2D cluster map of books (Canvas2D + hand-rolled
+// physics — like an Obsidian/wiki graph view: nodes repel, edges spring-pull, genre-colored
+// clusters emerge live on device). Node count is capped the same way the earlier sphere
+// prototype was (~200-230 "anchor" books via popularity+genre-floor selection) specifically
+// so the live O(n²) repulsion stays cheap (n≈220 => ~24k pairs/frame, trivial) regardless of
+// the full ~5359-book catalog size — simulating the whole catalog live would not be safe on a
+// phone, simulating this capped subset is.
 // Popularity is extremely sparse in this catalog (most books have 0 downloads, almost none
 // have ratings yet), so raw popularity alone would collapse into one giant tie-block and
 // silently exclude sparse genres. hash31 (duplicated from coverFor()'s own formula, not
@@ -410,7 +412,8 @@ function fibSpherePoint(i,N){
 // array order.
 function popScore(b){return (b.dl||0)*3 + (b.rc?b.rt*b.rc:0) + (b.hc?2:0);}
 function hash31(s){let h=0;s=String(s||'');for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;return h;}
-const GLOBE={built:false,points:[],projected:[],yaw:0,pitch:0.3,zoom:1,raf:null};
+const CLUSTER_COLORS=['#4f8fd9','#e0824a','#4caf7d','#a066c9','#2fa6a6','#d9527a','#c9a227','#7d6ad9','#5ba64f','#4aa8c9','#c96f3f','#8f9bb3','#b3853f','#5f9bd9','#6fae8f'];
+const GLOBE={built:false,nodes:[],edges:[],projected:[],genreColor:{},panX:0,panY:0,zoom:1,raf:null};
 function buildGlobe(){
   const byGenre={};
   for(const b of DB.books){(byGenre[b.g||'?']=byGenre[b.g||'?']||[]).push(b);}
@@ -425,12 +428,80 @@ function buildGlobe(){
     });
     anchors=anchors.concat(sorted.slice(0,k));
   }
-  const N=anchors.length;
-  GLOBE.points=anchors.map((b,i)=>{
-    const p=fibSpherePoint(i,N);
-    return {id:b.i, t:b.t, x:p.x, y:p.y, z:p.z};
+  const genreColor={};
+  let colorIdx=0;
+  for(const b of anchors){
+    const g=b.g||'?';
+    if(!(g in genreColor)){genreColor[g]=CLUSTER_COLORS[colorIdx%CLUSTER_COLORS.length];colorIdx++;}
+  }
+  const idIndex={};
+  const nodes=anchors.map((b,i)=>{
+    idIndex[b.i]=i;
+    const ang=(hash31(b.i)%6283)/1000, rad=20+(hash31(b.i+'#r')%120);
+    return {id:b.i,t:b.t,g:b.g||'?',pop:popScore(b),
+      x:Math.cos(ang)*rad,y:Math.sin(ang)*rad,vx:0,vy:0,color:genreColor[b.g||'?']};
   });
+  // Edges: within each genre bucket (sorted by popularity), connect each anchor to its 2
+  // nearest neighbors in that ordering — gives every node a couple of same-genre "cousins"
+  // without an O(bucket²) all-to-all hairball. Plus same-author pairs across genres, if any.
+  const edges=[], seen=new Set();
+  function addEdge(i,j){
+    if(i===j||i==null||j==null)return;
+    const key=i<j?i+'_'+j:j+'_'+i;
+    if(seen.has(key))return;
+    seen.add(key);edges.push([i,j]);
+  }
+  for(const g in byGenre){
+    const bucket=byGenre[g].filter(b=>idIndex[b.i]!==undefined).sort((x,y)=>popScore(y)-popScore(x));
+    for(let i=0;i<bucket.length;i++){
+      const a=idIndex[bucket[i].i];
+      if(i+1<bucket.length)addEdge(a,idIndex[bucket[i+1].i]);
+      if(i+2<bucket.length)addEdge(a,idIndex[bucket[i+2].i]);
+    }
+  }
+  const byAuthorAnchor={};
+  for(const b of anchors){if(b.a)(byAuthorAnchor[b.a]=byAuthorAnchor[b.a]||[]).push(b);}
+  for(const a in byAuthorAnchor){
+    const arr=byAuthorAnchor[a];
+    for(let i=1;i<arr.length;i++)addEdge(idIndex[arr[0].i],idIndex[arr[i].i]);
+  }
+  GLOBE.nodes=nodes;
+  GLOBE.edges=edges;
+  GLOBE.genreColor=genreColor;
   GLOBE.built=true;
+  renderGlobeLegend(byGenre);
+}
+function renderGlobeLegend(byGenre){
+  const el=$('#globeLegend');
+  if(!el)return;
+  const rows=Object.keys(GLOBE.genreColor)
+    .sort((a,b)=>(byGenre[b]?.length||0)-(byGenre[a]?.length||0))
+    .map(g=>`<div class="lg-row"><span class="lg-dot" style="background:${GLOBE.genreColor[g]}"></span>${esc(g)} <b>${byGenre[g]?byGenre[g].length:0}</b></div>`)
+    .join('');
+  el.innerHTML=rows;
+}
+function globeSimStep(){
+  const nodes=GLOBE.nodes, n=nodes.length;
+  for(let i=0;i<n;i++){
+    const A=nodes[i];
+    for(let j=i+1;j<n;j++){
+      const B=nodes[j];
+      let dx=A.x-B.x, dy=A.y-B.y, distSq=dx*dx+dy*dy;
+      if(distSq<1)distSq=1;
+      const dist=Math.sqrt(distSq), force=900/distSq;
+      const fx=(dx/dist)*force, fy=(dy/dist)*force;
+      A.vx+=fx;A.vy+=fy;B.vx-=fx;B.vy-=fy;
+    }
+  }
+  for(const [i,j] of GLOBE.edges){
+    const A=nodes[i],B=nodes[j];
+    const dx=B.x-A.x,dy=B.y-A.y,dist=Math.sqrt(dx*dx+dy*dy)||0.01;
+    const force=(dist-40)*0.02;
+    const fx=(dx/dist)*force,fy=(dy/dist)*force;
+    A.vx+=fx;A.vy+=fy;B.vx-=fx;B.vy-=fy;
+  }
+  for(const A of nodes){A.vx-=A.x*0.002;A.vy-=A.y*0.002;}
+  for(const A of nodes){A.vx*=0.85;A.vy*=0.85;A.x+=A.vx;A.y+=A.vy;}
 }
 function globeDraw(){
   const canvas=$('#globeCanvas');
@@ -443,31 +514,37 @@ function globeDraw(){
   const ctx=canvas.getContext('2d');
   ctx.setTransform(dpr,0,0,dpr,0,0);
   ctx.clearRect(0,0,w,h);
-  const cx=w/2, cy=h/2, R=Math.min(w,h)*0.34*GLOBE.zoom;
-  const cosY=Math.cos(GLOBE.yaw),sinY=Math.sin(GLOBE.yaw);
-  const cosP=Math.cos(GLOBE.pitch),sinP=Math.sin(GLOBE.pitch);
-  const accent=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#d9a441';
-  GLOBE.projected=[];
-  for(const p of GLOBE.points){
-    // rotate around Y (yaw) then X (pitch)
-    let x=p.x*cosY - p.z*sinY;
-    let z=p.x*sinY + p.z*cosY;
-    let y=p.y*cosP - z*sinP;
-    z=p.y*sinP + z*cosP;
-    if(z<-0.05)continue; // cull back-facing (weak perspective, camera looking down -z)
-    const scale=0.75+0.25*z; // nearer points render slightly larger
-    const sx=cx+x*R, sy=cy-y*R;
-    const r=3.6*scale;
-    ctx.globalAlpha=0.35+0.65*Math.max(0,z);
-    ctx.fillStyle=accent;
-    ctx.beginPath();
-    ctx.arc(sx,sy,r,0,Math.PI*2);
-    ctx.fill();
-    GLOBE.projected.push({id:p.id,sx,sy,r});
+  const cx=w/2+GLOBE.panX, cy=h/2+GLOBE.panY, s=GLOBE.zoom;
+  const style=getComputedStyle(document.documentElement);
+  const lineColor=style.getPropertyValue('--line').trim()||'#34281a';
+  const textColor=style.getPropertyValue('--text').trim()||'#f4ecdc';
+  const proj={};
+  for(const A of GLOBE.nodes)proj[A.id]={sx:cx+A.x*s,sy:cy+A.y*s};
+  ctx.strokeStyle=lineColor;ctx.globalAlpha=0.4;ctx.lineWidth=1;
+  for(const [i,j] of GLOBE.edges){
+    const pa=proj[GLOBE.nodes[i].id],pb=proj[GLOBE.nodes[j].id];
+    ctx.beginPath();ctx.moveTo(pa.sx,pa.sy);ctx.lineTo(pb.sx,pb.sy);ctx.stroke();
   }
   ctx.globalAlpha=1;
+  GLOBE.projected=[];
+  for(const A of GLOBE.nodes){
+    const p=proj[A.id];
+    const r=(2.6+Math.min(3,Math.sqrt(A.pop+1)*0.6))*Math.min(1.5,Math.max(0.55,s));
+    ctx.fillStyle=A.color;
+    ctx.beginPath();ctx.arc(p.sx,p.sy,r,0,Math.PI*2);ctx.fill();
+    GLOBE.projected.push({id:A.id,sx:p.sx,sy:p.sy,r});
+  }
+  ctx.font='11px -apple-system,BlinkMacSystemFont,sans-serif';ctx.fillStyle=textColor;ctx.textAlign='center';
+  const pool=s>1.3?GLOBE.nodes:GLOBE.nodes.slice().sort((a,b)=>b.pop-a.pop).slice(0,15);
+  for(const A of pool){
+    const p=proj[A.id];
+    if(p.sx<-20||p.sx>w+20||p.sy<-20||p.sy>h+20)continue;
+    let title=A.t||'';if(title.length>16)title=title.slice(0,15)+'…';
+    ctx.fillText(title,p.sx,p.sy+13);
+  }
 }
 function globeTick(){
+  globeSimStep();
   globeDraw();
   GLOBE.raf=requestAnimationFrame(globeTick);
 }
@@ -489,28 +566,49 @@ function onGlobeNodeTap(id){
   openedFromGlobe=true;
   openDetail(id);
 }
-let globeDrag=null;
+const globePointers=new Map();
+let globeDrag=null, globePinch=null;
 function wireGlobeInteraction(){
   const canvas=$('#globeCanvas');
+  function pinchDist(){const pts=[...globePointers.values()];return pts.length<2?0:Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);}
   canvas.addEventListener('pointerdown',e=>{
     canvas.setPointerCapture(e.pointerId);
-    globeDrag={x0:e.clientX,y0:e.clientY,yaw0:GLOBE.yaw,pitch0:GLOBE.pitch,moved:false};
+    globePointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(globePointers.size===1){
+      globeDrag={x0:e.clientX,y0:e.clientY,panX0:GLOBE.panX,panY0:GLOBE.panY,moved:false};
+    } else if(globePointers.size===2){
+      globeDrag=null;
+      globePinch={d0:pinchDist(),zoom0:GLOBE.zoom};
+    }
   });
   canvas.addEventListener('pointermove',e=>{
+    if(!globePointers.has(e.pointerId))return;
+    globePointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(globePinch && globePointers.size>=2){
+      const d=pinchDist();
+      if(d>0&&globePinch.d0>0)GLOBE.zoom=Math.max(0.4,Math.min(3,globePinch.zoom0*(d/globePinch.d0)));
+      return;
+    }
     if(!globeDrag)return;
     const dx=e.clientX-globeDrag.x0, dy=e.clientY-globeDrag.y0;
     if(!globeDrag.moved && Math.hypot(dx,dy)>6)globeDrag.moved=true;
-    GLOBE.yaw=globeDrag.yaw0 + dx*0.006;
-    GLOBE.pitch=Math.max(-1.4,Math.min(1.4,globeDrag.pitch0 - dy*0.006));
+    GLOBE.panX=globeDrag.panX0+dx;
+    GLOBE.panY=globeDrag.panY0+dy;
   });
-  canvas.addEventListener('pointerup',e=>{
-    if(globeDrag && !globeDrag.moved){
-      const hit=hitTestGlobe(e.clientX,e.clientY);
-      if(hit)onGlobeNodeTap(hit.id);
+  function release(e){
+    if(globePointers.has(e.pointerId)){
+      if(globePointers.size===1 && globeDrag && !globeDrag.moved){
+        const hit=hitTestGlobe(e.clientX,e.clientY);
+        if(hit)onGlobeNodeTap(hit.id);
+      }
+      globePointers.delete(e.pointerId);
     }
-    globeDrag=null;
-  });
-  canvas.addEventListener('pointercancel',()=>{globeDrag=null;});
+    if(globePointers.size<2)globePinch=null;
+    if(globePointers.size===0)globeDrag=null;
+  }
+  canvas.addEventListener('pointerup',release);
+  canvas.addEventListener('pointercancel',release);
+  canvas.addEventListener('wheel',e=>{GLOBE.zoom=Math.max(0.4,Math.min(3,GLOBE.zoom-e.deltaY*0.0015));e.preventDefault();},{passive:false});
 }
 function openGlobe(){
   if(!DB.books.length){toast('Kutubxona hali yuklanmoqda...');return;}
