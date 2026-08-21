@@ -37,6 +37,8 @@
   .searchbar svg{flex:0 0 auto; opacity:.7}
   .searchbar input{flex:1; background:none; border:0; outline:none; color:var(--text); font-size:15px}
   .searchbar .clr{opacity:.5; padding:2px 4px; display:none; cursor:pointer}
+  .mapbtn{display:flex; align-items:center; justify-content:center; gap:8px; width:100%; margin-top:10px; padding:13px; border:0; border-radius:14px; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; font-weight:800; font-size:14.5px; font-family:inherit; cursor:pointer; box-shadow:var(--shadow); transition:transform .15s}
+  .mapbtn:active{transform:scale(.97)}
   .row{display:flex; gap:8px; align-items:center; overflow-x:auto; scrollbar-width:none; padding:10px 14px 2px; margin:0 -14px}
   .row::-webkit-scrollbar{display:none}
   .chip{flex:0 0 auto; background:var(--chip); border:1px solid var(--line); color:var(--muted); padding:7px 13px; border-radius:999px; font-size:13px; font-weight:600; white-space:nowrap; cursor:pointer; transition:.15s}
@@ -174,12 +176,13 @@
 <body>
 <div class="wrap">
   <header>
-    <h1>📚 Kutubxona <a href="quran.html" style="float:right; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle">📖 Qur'on</a><a id="btnProfile" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer">👤</a><a id="btnTheme" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer">☀️</a><a id="btnGlobe" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer">🌐</a></h1>
+    <h1>📚 Kutubxona <a href="quran.html" style="float:right; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle">📖 Qur'on</a><a id="btnProfile" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer">👤</a><a id="btnTheme" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer">☀️</a></h1>
     <div class="searchbar">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
       <input id="q" type="search" placeholder="Kitob, muallif, mavzu…" autocomplete="off" enterkeyhint="search">
       <span class="clr" id="clr">✕</span>
     </div>
+    <button class="mapbtn" id="btnGlobe">🌐 Kitoblar xaritasi</button>
     <div class="tabs">
       <div class="tab on" id="tabBrowse">Barchasi</div>
       <div class="tab" id="tabFav">❤️ Saqlanganlar</div>
