@@ -55,7 +55,7 @@
   .book,.si{animation:cardIn .4s cubic-bezier(.2,.8,.2,1) backwards; animation-delay:var(--d,0ms)}
   .book,.si,.chip,.tab,.btn,.authchip,.gtile{transition:transform .15s}
   .book:active,.si:active,.chip:active,.tab:active,.btn:active,.authchip:active,.gtile:active{transform:scale(.96)}
-  @media (prefers-reduced-motion: reduce){.book,.si,.fbook{animation:none!important}}
+  @media (prefers-reduced-motion: reduce){.book,.si{animation:none!important}}
   .book{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; cursor:pointer; position:relative; display:flex; flex-direction:column}
   .cover{height:118px; display:flex; align-items:flex-end; padding:10px; position:relative}
   .cover .ini{font-size:30px; font-weight:800; color:rgba(255,255,255,.92); line-height:1; text-shadow:0 2px 8px rgba(0,0,0,.3)}
@@ -88,14 +88,11 @@
   .si .sa{font-size:11px; color:var(--muted); margin:0 1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
   .si .sr{font-size:11px; color:var(--muted); margin:2px 1px 0; font-variant-numeric:tabular-nums}
   .si .sr b{color:var(--text)}
-  /* Floating "just added" books hero, top of home */
-  .floatband{display:flex; justify-content:center; gap:16px; padding:10px 4px 22px; overflow-x:auto; scrollbar-width:none}
-  .floatband::-webkit-scrollbar{display:none}
-  .fbook{flex:0 0 auto; width:60px; height:60px; border-radius:50%; overflow:hidden; position:relative; cursor:pointer; box-shadow:var(--shadow); animation:floaty ease-in-out infinite; border:2px solid var(--line)}
-  .fbook img{width:100%; height:100%; object-fit:cover}
-  .fbook .fini{width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:18px; color:rgba(255,255,255,.92); text-shadow:0 1px 4px rgba(0,0,0,.3)}
-  @keyframes floaty{0%,100%{transform:translateY(0) rotate(0deg)}50%{transform:translateY(-9px) rotate(-4deg)}}
-  @media (prefers-reduced-motion: reduce){.fbook{animation:none}}
+  /* Auto-scrolling "recently added" ticker, top of home */
+  .mqwrap{overflow:hidden; padding:2px 0 6px; margin:0 -14px}
+  .mqtrack{display:flex; gap:12px; width:max-content; padding:0 14px; animation:mqscroll linear infinite}
+  @keyframes mqscroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+  @media (prefers-reduced-motion: reduce){.mqtrack{animation:none}}
   .authchips{display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; padding:2px 14px 4px; margin:0 -14px}
   .authchips::-webkit-scrollbar{display:none}
   .authchip{flex:0 0 auto; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:9px 13px; cursor:pointer; display:flex; flex-direction:column; gap:1px; min-width:110px}
@@ -359,26 +356,22 @@ function buildHome(){
 }
 function siHtml(b,i){const[c1,c2]=coverFor(b.i);return `<div class="si" data-id="${esc(b.i)}" style="--d:${Math.min(i||0,12)*30}ms"><div class="sc" style="background:linear-gradient(135deg,${c1},${c2})">${b.hc?`<img class="ci" src="covers/${encodeURIComponent(b.i)}.jpg" loading="lazy" onerror="this.remove()">`:''}${b.ha?'<span class="aud">🎧</span>':''}<span class="ini">${esc(initials(b.t))}</span></div><div class="st">${esc(b.t)}</div><div class="sa">${esc(b.a||'')}</div>${b.rc?`<div class="sr">⭐ <b>${b.rt}</b> (${b.rc})</div>`:''}</div>`;}
 function shelf(title,books,see){return `<div class="section"><div class="shead"><h2>${esc(title)}</h2>${see?`<span class="see" ${see}>Barchasi →</span>`:''}</div><div class="shelf">${books.map((b,i)=>siHtml(b,i)).join('')}</div></div>`;}
-function floatBandHtml(){
-  const items=DB.books.slice(0,6);
-  if(!items.length)return '';
-  return `<div class="floatband">${items.map((b,i)=>{
-    const[c1,c2]=coverFor(b.i);
-    return `<div class="fbook" data-id="${esc(b.i)}" style="background:linear-gradient(135deg,${c1},${c2}); animation-delay:${(i*0.35).toFixed(2)}s; animation-duration:${(3.2+(i%3)*0.5).toFixed(1)}s">
-      ${b.hc?`<img src="covers/${encodeURIComponent(b.i)}.jpg" loading="lazy" onerror="this.remove()">`:''}
-      <span class="fini">${esc(initials(b.t))}</span>
-    </div>`;
-  }).join('')}</div>`;
+function marqueeShelf(title,books,see){
+  if(!books.length)return '';
+  const cards=books.map((b,i)=>siHtml(b,i)).join('');
+  const dur=(books.length*2.2).toFixed(1);
+  return `<div class="section"><div class="shead"><h2>${esc(title)}</h2>${see?`<span class="see" ${see}>Barchasi →</span>`:''}</div>
+    <div class="mqwrap"><div class="mqtrack" style="animation-duration:${dur}s">${cards}${cards}</div></div>
+  </div>`;
 }
 function renderHome(){
-  const h=$('#home');let html=floatBandHtml();
+  const h=$('#home');let html='';
   if(HOME.recent.length)html+=shelf("🕘 Yaqinda ko'rilgan",HOME.recent,null);
-  if(HOME.newest.length)html+=shelf("🆕 Yangi qo'shilgan",HOME.newest,'data-see="newest"');
+  if(HOME.newest.length)html+=marqueeShelf("🆕 Yangi qo'shilgan",HOME.newest,'data-see="newest"');
   if(HOME.authors.length)html+=`<div class="section"><div class="shead"><h2>✍️ Mashhur mualliflar</h2></div><div class="authchips">${HOME.authors.map(a=>`<div class="authchip" data-auth="${esc(a.a)}"><span class="an">${esc(a.a)}</span><span class="ac">${a.c} ta kitob</span></div>`).join('')}</div></div>`;
   if(HOME.audio.length)html+=shelf("🎧 Audiokitoblar",HOME.audio,'data-see="audio"');
   for(const g of HOME.genres)html+=shelf(g.v,g.books,`data-see="genre" data-v="${esc(g.v)}"`);
   h.innerHTML=html;
-  h.querySelectorAll('.fbook').forEach(el=>el.onclick=()=>openDetail(el.dataset.id));
   h.querySelectorAll('.si').forEach(el=>el.onclick=()=>openDetail(el.dataset.id));
   h.querySelectorAll('[data-auth]').forEach(el=>el.onclick=()=>{state.all=false;$('#q').value=el.dataset.auth;state.q=el.dataset.auth;$('#clr').style.display='block';haptic();run();window.scrollTo(0,0);});
   h.querySelectorAll('[data-see]').forEach(el=>el.onclick=()=>{const s=el.dataset.see;if(s==='newest'){state.all=true;state.sort='newest';$('#sort').value='newest';}else if(s==='audio'){state.type='audio';renderChips();}else if(s==='genre'){state.genre=el.dataset.v;renderChips();}haptic();run();window.scrollTo(0,0);});
