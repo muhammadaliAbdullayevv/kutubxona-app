@@ -416,7 +416,7 @@ function hash31(s){let h=0;s=String(s||'');for(let i=0;i<s.length;i++)h=(h*31+s.
 // one would falsely cluster a fifth of the catalog onto a single node.
 function isKnownAuthor(a){return !!a && !/unknown|noma.?lum/i.test(a);}
 const CLUSTER_COLORS=['#4f8fd9','#e0824a','#4caf7d','#a066c9','#2fa6a6','#d9527a','#c9a227','#7d6ad9','#5ba64f','#4aa8c9','#c96f3f','#8f9bb3','#b3853f','#5f9bd9','#6fae8f'];
-const GLOBE={built:false,nodes:[],edges:[],projected:[],genreColor:{},panX:0,panY:0,zoom:1,raf:null};
+const GLOBE={built:false,nodes:[],edges:[],hubs:[],projected:[],genreColor:{},highlightGenre:null,panX:0,panY:0,zoom:1,raf:null};
 function buildGlobe(){
   const byGenre={};
   for(const b of DB.books){(byGenre[b.g||'?']=byGenre[b.g||'?']||[]).push(b);}
@@ -553,42 +553,110 @@ function globeDraw(){
   const textColor=style.getPropertyValue('--text').trim()||'#f4ecdc';
   const proj={};
   for(const A of GLOBE.nodes)proj[A.id]={sx:cx+A.x*s,sy:cy+A.y*s};
-  ctx.strokeStyle=lineColor;ctx.globalAlpha=0.4;ctx.lineWidth=1;
+  const dim=g=>GLOBE.highlightGenre && g!==GLOBE.highlightGenre;
+
+  // Layer 1: one hub per genre/type ("the main header"), positioned at the live centroid of
+  // that genre's anchors (Layer 2) — recomputed fresh each frame (cheap: ~18 genres), so it
+  // naturally stays in the middle of its cluster without its own physics. Tapping a hub
+  // toggles a highlight (see onHubTap) that traces its lines/books, dimming everything else.
+  const byGenreNodes={};
+  for(const A of GLOBE.nodes)(byGenreNodes[A.g]=byGenreNodes[A.g]||[]).push(A);
+  const hubs=[];
+  for(const g in byGenreNodes){
+    const arr=byGenreNodes[g];
+    let hx=0,hy=0;
+    for(const A of arr){hx+=A.x;hy+=A.y;}
+    hubs.push({g,x:hx/arr.length,y:hy/arr.length,color:GLOBE.genreColor[g],anchors:arr});
+  }
+  GLOBE.hubs=hubs;
+
+  // hub -> Layer-2 (anchor) spokes
+  ctx.lineWidth=1;
+  for(const H of hubs){
+    const hx=cx+H.x*s, hy=cy+H.y*s, on=GLOBE.highlightGenre===H.g;
+    ctx.globalAlpha=dim(H.g)?0.05:(on?0.55:0.22);
+    ctx.strokeStyle=H.color;
+    for(const A of H.anchors){
+      const p=proj[A.id];
+      ctx.beginPath();ctx.moveTo(hx,hy);ctx.lineTo(p.sx,p.sy);ctx.stroke();
+    }
+  }
+  // Layer-2 <-> Layer-2 edges (same-genre neighbors / same-author pairs)
+  ctx.strokeStyle=lineColor;
   for(const [i,j] of GLOBE.edges){
-    const pa=proj[GLOBE.nodes[i].id],pb=proj[GLOBE.nodes[j].id];
+    const A=GLOBE.nodes[i],B=GLOBE.nodes[j];
+    ctx.globalAlpha=dim(A.g)?0.05:(GLOBE.highlightGenre===A.g?0.6:0.4);
+    const pa=proj[A.id],pb=proj[B.id];
     ctx.beginPath();ctx.moveTo(pa.sx,pa.sy);ctx.lineTo(pb.sx,pb.sy);ctx.stroke();
   }
   ctx.globalAlpha=1;
+
+  // Layer 2: anchor books
   GLOBE.projected=[];
   for(const A of GLOBE.nodes){
     const p=proj[A.id];
     const r=(2.6+Math.min(3,Math.sqrt(A.pop+1)*0.6))*Math.min(1.5,Math.max(0.55,s));
+    ctx.globalAlpha=dim(A.g)?0.15:1;
     ctx.fillStyle=A.color;
     ctx.beginPath();ctx.arc(p.sx,p.sy,r,0,Math.PI*2);ctx.fill();
     GLOBE.projected.push({id:A.id,sx:p.sx,sy:p.sy,r});
   }
-  // satellites: the rest of the catalog, riding along at their live parent's position. Always
-  // drawn — they have no physics cost of their own regardless of zoom (only the ~221 anchors
-  // are simulated), so gating them behind a zoom threshold only ever bought visual tidiness,
-  // never real performance headroom.
-  ctx.globalAlpha=0.6;
+  ctx.globalAlpha=1;
+
+  // Layer 3: the rest of the catalog, riding along at their live parent's position — shown as
+  // plain dots (no physics cost of their own), titles only become readable once zoomed in.
   for(const S of GLOBE.satellites){
     const P=GLOBE.nodes[S.parentIdx];
     const sx=cx+(P.x+S.jx)*s, sy=cy+(P.y+S.jy)*s;
     if(sx<-30||sx>w+30||sy<-30||sy>h+30)continue; // cheap off-screen cull
     const r=1.6*Math.min(1.5,Math.max(0.6,s));
+    ctx.globalAlpha=dim(P.g)?0.12:0.6;
     ctx.fillStyle=S.color;
     ctx.beginPath();ctx.arc(sx,sy,r,0,Math.PI*2);ctx.fill();
     GLOBE.projected.push({id:S.id,sx,sy,r:Math.max(r,8)}); // generous tap radius despite tiny draw size
   }
   ctx.globalAlpha=1;
-  ctx.font='11px -apple-system,BlinkMacSystemFont,sans-serif';ctx.fillStyle=textColor;ctx.textAlign='center';
-  const pool=s>1.3?GLOBE.nodes:GLOBE.nodes.slice().sort((a,b)=>b.pop-a.pop).slice(0,15);
-  for(const A of pool){
+
+  // hub circles + names, drawn last so they always sit on top as the permanent "headers"
+  ctx.textAlign='center';
+  for(const H of hubs){
+    const hx=cx+H.x*s, hy=cy+H.y*s;
+    if(hx<-40||hx>w+40||hy<-40||hy>h+40)continue;
+    const on=GLOBE.highlightGenre===H.g, r=on?9:7;
+    ctx.globalAlpha=1;
+    ctx.fillStyle=H.color;
+    ctx.beginPath();ctx.arc(hx,hy,r,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle=textColor;ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.arc(hx,hy,r,0,Math.PI*2);ctx.stroke();
+    ctx.font='bold 12px -apple-system,BlinkMacSystemFont,sans-serif';
+    ctx.fillStyle=textColor;
+    ctx.fillText(H.g,hx,hy-r-6);
+    GLOBE.projected.unshift({id:'hub:'+H.g,sx:hx,sy:hy,r:16}); // unshift: hubs win hit-test ties
+  }
+
+  // book titles: Layer-2 anchors labeled by default (top-15, or all once zoomed), Layer-3
+  // satellites only become readable once zoomed in further — "dots until you zoom in."
+  ctx.font='11px -apple-system,BlinkMacSystemFont,sans-serif';ctx.fillStyle=textColor;
+  const anchorPool=s>1.3?GLOBE.nodes:GLOBE.nodes.slice().sort((a,b)=>b.pop-a.pop).slice(0,15);
+  for(const A of anchorPool){
+    if(dim(A.g))continue;
     const p=proj[A.id];
     if(p.sx<-20||p.sx>w+20||p.sy<-20||p.sy>h+20)continue;
     let title=A.t||'';if(title.length>16)title=title.slice(0,15)+'…';
     ctx.fillText(title,p.sx,p.sy+13);
+  }
+  if(s>1.8){
+    let labeled=0;
+    for(const S of GLOBE.satellites){
+      if(labeled>=50)break;
+      const P=GLOBE.nodes[S.parentIdx];
+      if(dim(P.g))continue;
+      const sx=cx+(P.x+S.jx)*s, sy=cy+(P.y+S.jy)*s;
+      if(sx<-10||sx>w+10||sy<-10||sy>h+10)continue;
+      let title=S.t||'';if(title.length>14)title=title.slice(0,13)+'…';
+      ctx.fillText(title,sx,sy+9);
+      labeled++;
+    }
   }
 }
 function globeTick(){
@@ -613,6 +681,14 @@ function onGlobeNodeTap(id){
   if(GLOBE.raf){cancelAnimationFrame(GLOBE.raf);GLOBE.raf=null;} // pause while the sheet covers it
   openedFromGlobe=true;
   openDetail(id);
+}
+function onHubTap(genre){
+  haptic();
+  GLOBE.highlightGenre = GLOBE.highlightGenre===genre ? null : genre;
+}
+function onGlobeTap(id){
+  if(id.startsWith('hub:'))onHubTap(id.slice(4));
+  else onGlobeNodeTap(id);
 }
 const globePointers=new Map();
 let globeDrag=null, globePinch=null;
@@ -647,7 +723,7 @@ function wireGlobeInteraction(){
     if(globePointers.has(e.pointerId)){
       if(globePointers.size===1 && globeDrag && !globeDrag.moved){
         const hit=hitTestGlobe(e.clientX,e.clientY);
-        if(hit)onGlobeNodeTap(hit.id);
+        if(hit)onGlobeTap(hit.id);
       }
       globePointers.delete(e.pointerId);
     }
