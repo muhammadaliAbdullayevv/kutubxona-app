@@ -199,6 +199,13 @@
     });
   }
 
+  function diag(msg) {
+    // TEMPORARY diagnostic — shows a native Telegram popup instead of just logging, since the
+    // real device's console isn't reachable. Safe to remove once the root cause is confirmed.
+    if (tg && tg.showAlert) tg.showAlert(msg);
+    else window.alert(msg);
+  }
+
   function wireDeliverButton() {
     // The "📖 Botda ochish" control is a plain <button> in the static HTML now — NOT an
     // <a href="t.me/...">. Telegram's Mini App WebView can intercept a t.me link at the
@@ -210,9 +217,11 @@
     var fallbackHref = "https://t.me/pdf_audio_kitoblar_bot?start=b_" + bookId;
     var originalLabel = ctaBtn.textContent;
     if (!canAct) {
-      // No initData (opened outside Telegram) — can't call the authenticated deliver API,
-      // so this is just a normal deep-link button in that context.
+      // No initData (opened outside Telegram, or Telegram didn't provide it for this launch
+      // method) — can't call the authenticated deliver API, so this is just a normal deep-link
+      // button in that context.
       ctaBtn.addEventListener("click", function () {
+        diag("DEBUG: canAct=false — tg exists=" + (!!tg) + ", initData empty. Falling back to deep link.");
         window.location.href = fallbackHref;
       });
       return;
@@ -225,9 +234,10 @@
           ctaBtn.textContent = "✅ Yuborildi — botdagi chatingizni tekshiring";
           ctaBtn.classList.remove("cw-disabled");
         })
-        .catch(function () {
+        .catch(function (err) {
           // Couldn't deliver in-app (not cached, bot not started yet, etc.) — only now does
           // a real t.me navigation happen, so only a genuine failure ever leaves the Mini App.
+          diag("DEBUG: deliver call failed — " + (err && err.message ? err.message : String(err)));
           ctaBtn.textContent = originalLabel;
           ctaBtn.classList.remove("cw-disabled");
           window.location.href = fallbackHref;
