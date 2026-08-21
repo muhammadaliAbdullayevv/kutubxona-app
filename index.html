@@ -118,7 +118,7 @@
   #cForm,.creply-form{margin-top:10px}
   #cForm textarea,.creply-form textarea{width:100%; background:var(--card); border:1px solid var(--line); border-radius:10px; color:var(--text); padding:9px; font:inherit; resize:vertical; min-height:56px}
   #cForm button,.creply-form button{margin-top:6px; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border:0; border-radius:10px; padding:8px 14px; font-weight:700; cursor:pointer}
-  /* Profile overlay (streaks/badges, reading lists) */
+  /* Profile overlay (streaks/badges) */
   #sheet2{z-index:55}
   .streakbig{display:flex; align-items:baseline; gap:8px; margin:4px 0 2px}
   .streakbig .n{font-size:40px; font-weight:800; line-height:1}
@@ -128,9 +128,30 @@
   .statgrid .st .sv{font-size:18px; font-weight:800; font-variant-numeric:tabular-nums}
   .statgrid .st .sl{font-size:11.5px; color:var(--muted); font-weight:600}
   .pill.locked{opacity:.35}
-  .lrow{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px; background:var(--card); border:1px solid var(--line); border-radius:12px; margin-bottom:8px; cursor:pointer}
-  .lrow .lt{font-weight:700; font-size:14px}
-  .lrow .lm{font-size:12px; color:var(--muted); margin-top:2px}
+  /* Ratings (Play-Store-style 1-5 stars + review) */
+  .ratehead{display:flex; align-items:center; gap:16px; margin-bottom:12px}
+  .ratebig{font-size:36px; font-weight:800; line-height:1}
+  .ratebig .of5{font-size:15px; color:var(--muted); font-weight:600}
+  .ratestars{color:#ffb100; font-size:15px; letter-spacing:1px}
+  .ratecount{font-size:12px; color:var(--muted)}
+  .ratedist{flex:1; display:flex; flex-direction:column; gap:3px}
+  .ratedist .drow{display:flex; align-items:center; gap:6px; font-size:11px; color:var(--muted)}
+  .ratedist .dbar{flex:1; height:6px; border-radius:3px; background:var(--chip); overflow:hidden}
+  .ratedist .dbar i{display:block; height:100%; background:#ffb100; border-radius:3px}
+  .starpick{font-size:26px; letter-spacing:4px; cursor:pointer; user-select:none}
+  .starpick span{opacity:.3}
+  .starpick span.on{opacity:1}
+  #rForm{margin-top:10px}
+  #rForm textarea{width:100%; background:var(--card); border:1px solid var(--line); border-radius:10px; color:var(--text); padding:9px; font:inherit; resize:vertical; min-height:50px; margin-top:8px; box-sizing:border-box}
+  #rForm button{margin-top:6px; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border:0; border-radius:10px; padding:8px 14px; font-weight:700; cursor:pointer}
+  #rForm .rdel{margin-left:10px; background:none; color:var(--danger); border:0; font-weight:700; cursor:pointer; padding:8px 4px}
+  .rrow{padding:10px 0; border-top:1px solid var(--line)}
+  .rrow:first-child{border-top:0}
+  .rrow .rstars{color:#ffb100; font-size:13px}
+  .rrow .rtext{font-size:14px; margin:4px 0 6px; white-space:pre-wrap}
+  .rrow .rvote{display:flex; gap:14px; font-size:12.5px; color:var(--muted)}
+  .rrow .rvote span{cursor:pointer}
+  .rrow .rvote span.on{color:var(--accent)}
 </style>
 </head>
 <body>
@@ -298,7 +319,7 @@ function cardHtml(b){
     </div>
     <div class="meta"><div class="t">${esc(b.t)}</div>
       <div class="a">${esc(b.a||'Noma\'lum muallif')}</div>
-      ${b.dl?`<div class="stats">⬇️ <b>${fmtNum(b.dl)}</b></div>`:''}
+      ${(b.dl||b.rc)?`<div class="stats">${b.rc?`⭐ <b>${b.rt}</b> (${b.rc})`:''}${b.dl?`${b.rc?' · ':''}⬇️ <b>${fmtNum(b.dl)}</b>`:''}</div>`:''}
       <div class="g">${esc(b.g||'')}</div></div></div>`;
 }
 function fmtNum(n){n=n||0;return n>=1000?(n/1000).toFixed(n>=10000?0:1).replace(/\.0$/,'')+'k':String(n);}
@@ -376,6 +397,7 @@ function openDetail(id){
       ${b.d?`<div class="sec"><h3>Tavsif</h3><p>${esc(b.d)}</p></div>`:''}
       ${(b.s&&b.s.length)?`<div class="sec"><h3>Mavzular</h3><div class="subs">${b.s.map(s=>`<span class="sub" data-sub="${esc(s)}">${esc(s)}</span>`).join('')}</div></div>`:''}
       ${relatedShelf(b)}
+      <div class="sec" id="rSec"><h3>⭐ Reyting</h3><div id="rBody">Yuklanmoqda...</div></div>
       <div class="sec" id="cSec"><h3>💬 Muhokama</h3><div id="cList">Yuklanmoqda...</div>
         ${canAct()?'<form id="cForm"><textarea id="cText" maxlength="2000" placeholder="Fikringizni yozing..." required></textarea><button type="submit">Yuborish</button></form>':'<p class="hint">Izoh qoldirish uchun botda oching.</p>'}
       </div>
@@ -383,7 +405,6 @@ function openDetail(id){
     <div class="actions">
       <button class="btn primary" id="openBot">📖 Botda o'qish</button>
       <button class="btn ghost ${fav?'on':''}" id="dFav">${fav?'❤️':'🤍'}</button>
-      ${canAct()?'<button class="btn ghost" id="dList">🗂</button>':''}
       <button class="btn ghost" id="dShare">↗️</button>
     </div>`;
   const url=`https://t.me/${DB.bot}?start=b_${encodeURIComponent(b.i)}`;
@@ -403,8 +424,6 @@ function openDetail(id){
     });
   };
   $('#dFav').onclick=()=>toggleFav(b.i);
-  const dListBtn=$('#dList');
-  if(dListBtn)dListBtn.onclick=()=>{haptic();openSheet2(listPickerHtml(b.i,b.t));loadListPicker(b.i);};
   $('#dShare').onclick=()=>{const txt=`📚 ${b.t}${b.a?' — '+b.a:''}`;const s=`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(txt)}`;tg?.openTelegramLink?tg.openTelegramLink(s):navigator.share?.({title:b.t,url});};
   c.querySelectorAll('[data-sub]').forEach(el=>el.onclick=()=>{closeSheet();$('#q').value=el.dataset.sub;state.q=el.dataset.sub;$('#clr').style.display='block';if(state.view!=='browse'){state.view='browse';setTabs();}run();window.scrollTo(0,0);});
   c.querySelectorAll('.si').forEach(el=>el.onclick=()=>openDetail(el.dataset.id));
@@ -417,11 +436,12 @@ function openDetail(id){
     }).catch(()=>{});
   });
   loadComments(b.i);
+  loadRating(b.i);
   c.scrollTop=0;
 }
 function closeSheet(){$('#sheet').classList.remove('open');tg?.BackButton?.hide();}
 
-// ---- profile overlay (reading streak/badges, my lists, public lists) ----
+// ---- profile overlay (reading streak/badges) ----
 function openSheet2(html){$('#sheet2c').innerHTML=html;$('#sheet2').classList.add('open');tg?.BackButton?.show();}
 function closeSheet2(){$('#sheet2').classList.remove('open');tg?.BackButton?.hide();}
 const _BADGE_META={
@@ -430,29 +450,16 @@ const _BADGE_META={
   bookworm:{emoji:'📚',label:'Kitobxon'},
   collector:{emoji:'⭐',label:"To'plovchi"},
   voice:{emoji:'💬',label:"Faol a'zo"},
-  curator:{emoji:'🗂',label:'Kutubxonachi'},
 };
 function profileShellHtml(){
   return `<div class="dbody" style="padding-top:20px">
     <h2 class="dtitle">👤 Profil</h2>
-    <div class="tabs" style="margin:10px 0 14px">
-      <div class="tab on" id="ptabMe">📊 Men</div>
-      <div class="tab" id="ptabMine">🗂 Ro'yxatlarim</div>
-      <div class="tab" id="ptabPublic">🌍 Kashfiyot</div>
-    </div>
     <div id="pBody">Yuklanmoqda...</div>
   </div>`;
 }
-function setProfileTab(which){
-  $('#ptabMe').classList.toggle('on',which==='me');
-  $('#ptabMine').classList.toggle('on',which==='mine');
-  $('#ptabPublic').classList.toggle('on',which==='public');
-}
 function loadProfile(){
-  setProfileTab('me');
   const body=$('#pBody');if(!body)return;
   if(!canAct()){body.innerHTML='<p class="hint">Profilingizni ko\'rish uchun botda oching.</p>';return;}
-  body.innerHTML='Yuklanmoqda...';
   api('/api/profile/me').then(r=>{
     const s=r.streak,st=r.stats;
     const badges=r.badges.map(b=>{const m=_BADGE_META[b.code]||{emoji:'🏅',label:b.code};return `<span class="pill${b.achieved?'':' locked'}">${m.emoji} <b>${esc(m.label)}</b></span>`;}).join('');
@@ -467,100 +474,7 @@ function loadProfile(){
       <div class="sec"><h3>Nishonlar</h3><div class="pills">${badges}</div></div>`;
   }).catch(()=>{body.innerHTML='<p class="hint">Ma\'lumot yuklanmadi.</p>';});
 }
-function listRowHtml(l){
-  return `<div class="lrow" data-id="${esc(l.id)}">
-    <div><div class="lt">${esc(l.title)}</div><div class="lm">${l.item_count} ta kitob · ${l.follower_count} ta obunachi</div></div>
-    ${l.is_owner?'':`<button class="btn ghost lfollow${l.is_following?' on':''}" data-id="${esc(l.id)}" style="width:44px; height:36px; padding:0; flex:0 0 auto">${l.is_following?'✓':'+'}</button>`}
-  </div>`;
-}
-function loadMyLists(){
-  setProfileTab('mine');
-  const body=$('#pBody');if(!body)return;
-  if(!canAct()){body.innerHTML='<p class="hint">Ro\'yxatlaringizni ko\'rish uchun botda oching.</p>';return;}
-  body.innerHTML='Yuklanmoqda...';
-  api('/api/lists/mine').then(r=>{
-    const rows=r.lists.map(listRowHtml).join('')||'<p class="hint">Hali ro\'yxat yaratmagansiz.</p>';
-    body.innerHTML=`
-      <form id="pNewList" style="margin-bottom:14px">
-        <input id="pNewListTitle" maxlength="120" placeholder="Yangi ro'yxat nomi..." required style="width:100%; background:var(--card); border:1px solid var(--line); border-radius:10px; color:var(--text); padding:9px; font:inherit; box-sizing:border-box">
-        <button type="submit" style="margin-top:6px; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border:0; border-radius:10px; padding:8px 14px; font-weight:700; cursor:pointer">+ Yaratish</button>
-      </form>
-      <div id="pMyListRows">${rows}</div>`;
-    $('#pNewList').addEventListener('submit',e=>{
-      e.preventDefault();
-      const t=$('#pNewListTitle').value.trim();if(!t)return;
-      api('/api/lists',{method:'POST',body:JSON.stringify({title:t,is_public:false})}).then(()=>{loadMyLists();}).catch(()=>toast('Xatolik yuz berdi'));
-    });
-    body.querySelectorAll('.lrow').forEach(el=>el.onclick=e=>{if(e.target.closest('.lfollow'))return;openListDetail(el.dataset.id,'mine');});
-  }).catch(()=>{body.innerHTML='<p class="hint">Yuklanmadi.</p>';});
-}
-function loadPublicLists(){
-  setProfileTab('public');
-  const body=$('#pBody');if(!body)return;
-  body.innerHTML='Yuklanmoqda...';
-  api('/api/lists/public').then(r=>{
-    body.innerHTML=r.lists.length?r.lists.map(listRowHtml).join(''):'<p class="hint">Hali ochiq ro\'yxatlar yo\'q.</p>';
-    body.querySelectorAll('.lfollow').forEach(el=>el.onclick=e=>{
-      e.stopPropagation();
-      if(!canAct()){toast('Botda oching');return;}
-      api('/api/lists/'+encodeURIComponent(el.dataset.id)+'/follow',{method:'POST'}).then(r=>{
-        el.classList.toggle('on',r.following);el.textContent=r.following?'✓':'+';
-      }).catch(()=>{});
-    });
-    body.querySelectorAll('.lrow').forEach(el=>el.onclick=e=>{if(e.target.closest('.lfollow'))return;openListDetail(el.dataset.id,'public');});
-  }).catch(()=>{body.innerHTML='<p class="hint">Yuklanmadi.</p>';});
-}
-function openListDetail(listId,fromTab){
-  const body=$('#pBody');if(!body)return;
-  body.innerHTML='Yuklanmoqda...';
-  Promise.all([api('/api/lists/'+encodeURIComponent(listId)),api('/api/lists/'+encodeURIComponent(listId)+'/items')]).then(([l,it])=>{
-    const rows=it.items.map(b=>`<div class="lrow" data-id="${esc(b.id)}"><div><div class="lt">${esc(b.title||'')}</div></div></div>`).join('')||'<p class="hint">Bo\'sh ro\'yxat.</p>';
-    body.innerHTML=`<div class="creply-btn" id="pBack" style="margin-bottom:10px; display:inline-block">← Orqaga</div>
-      <h3 style="margin:4px 0 2px">${esc(l.title)}</h3>
-      <div class="lm" style="margin-bottom:10px">${l.item_count} ta kitob · ${l.follower_count} ta obunachi</div>
-      ${rows}`;
-    $('#pBack').onclick=()=>{if(fromTab==='mine')loadMyLists();else loadPublicLists();};
-    body.querySelectorAll('.lrow').forEach(el=>el.onclick=()=>{closeSheet2();openDetail(el.dataset.id);});
-  }).catch(()=>{body.innerHTML='<p class="hint">Yuklanmadi.</p>';});
-}
-// ---- "add to list" picker (opened from a book's detail sheet) ----
-function listPickerHtml(bookId,bookTitle){
-  return `<div class="dbody" style="padding-top:20px">
-    <h2 class="dtitle">🗂 Ro'yxatga qo'shish</h2>
-    <div class="dauthor">${esc(bookTitle)}</div>
-    <div id="lpBody">Yuklanmoqda...</div>
-  </div>`;
-}
-function loadListPicker(bookId){
-  const body=$('#lpBody');if(!body)return;
-  api('/api/lists/mine-with-book/'+encodeURIComponent(bookId)).then(r=>{
-    const rows=r.lists.map(l=>`<div class="lrow" data-id="${esc(l.id)}" style="cursor:default">
-        <div class="lt">${esc(l.title)}</div>
-        <button class="btn ghost lp-toggle${l.contains?' on':''}" data-id="${esc(l.id)}" style="width:44px; height:36px; padding:0; flex:0 0 auto">${l.contains?'✓':'+'}</button>
-      </div>`).join('')||'<p class="hint">Hali ro\'yxat yaratmagansiz.</p>';
-    body.innerHTML=rows+`
-      <form id="lpNew" style="margin-top:6px">
-        <input id="lpNewTitle" maxlength="120" placeholder="Yangi ro'yxat nomi..." required style="width:100%; background:var(--card); border:1px solid var(--line); border-radius:10px; color:var(--text); padding:9px; font:inherit; box-sizing:border-box">
-        <button type="submit" style="margin-top:6px; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border:0; border-radius:10px; padding:8px 14px; font-weight:700; cursor:pointer">+ Yaratish va qo'shish</button>
-      </form>`;
-    body.querySelectorAll('.lp-toggle').forEach(el=>el.onclick=()=>{
-      const adding=!el.classList.contains('on');
-      const path='/api/lists/'+encodeURIComponent(el.dataset.id)+(adding?'/items':'/items/remove');
-      api(path,{method:'POST',body:JSON.stringify({book_id:bookId})}).then(()=>{
-        el.classList.toggle('on',adding);el.textContent=adding?'✓':'+';
-        toast(adding?'Ro\'yxatga qo\'shildi':'Ro\'yxatdan olib tashlandi');
-      }).catch(()=>toast('Xatolik yuz berdi'));
-    });
-    $('#lpNew').addEventListener('submit',e=>{
-      e.preventDefault();
-      const t=$('#lpNewTitle').value.trim();if(!t)return;
-      api('/api/lists',{method:'POST',body:JSON.stringify({title:t,is_public:false})}).then(r=>{
-        return api('/api/lists/'+encodeURIComponent(r.id)+'/items',{method:'POST',body:JSON.stringify({book_id:bookId})});
-      }).then(()=>{toast('Ro\'yxat yaratildi');loadListPicker(bookId);}).catch(()=>toast('Xatolik yuz berdi'));
-    });
-  }).catch(()=>{body.innerHTML='<p class="hint">Yuklanmadi.</p>';});
-}
-$('#btnProfile').onclick=()=>{haptic();openSheet2(profileShellHtml());loadProfile();$('#ptabMe').onclick=loadProfile;$('#ptabMine').onclick=loadMyLists;$('#ptabPublic').onclick=loadPublicLists;};
+$('#btnProfile').onclick=()=>{haptic();openSheet2(profileShellHtml());loadProfile();};
 $('#sheet2').onclick=e=>{if(e.target.id==='sheet2')closeSheet2();};
 
 // ---- discussion (per-book comments/replies/likes — talks to the same table the bot's
@@ -625,6 +539,83 @@ function loadComments(bookId){
     list.innerHTML=r.comments.map(c=>commentHtml(c,false)).join('');
     wireCommentActions(list,bookId);
   }).catch(()=>{list.innerHTML='<p class="hint">Izohlarni yuklab bo\'lmadi.</p>';});
+}
+
+// ---- ratings (Play-Store-style 1-5 stars + optional review; flat, not repliable; other
+// readers vote a review "helpful" yes/no) ----
+let myRatingStars=0;
+function starsHtml(n,cls){cls=cls||'ratestars';let s='';for(let i=1;i<=5;i++)s+=i<=Math.round(n)?'★':'☆';return `<span class="${cls}">${s}</span>`;}
+function ratingRowHtml(r){
+  const voted=r.my_vote;
+  return `<div class="rrow" data-id="${esc(r.id)}">
+    <div class="rstars">${starsHtml(r.stars)}</div>
+    ${r.review_text?`<div class="rtext">${esc(r.review_text)}</div>`:''}
+    <div class="cmeta">${esc(r.alias)}</div>
+    <div class="rvote">
+      <span class="rhelp${voted===true?' on':''}" data-id="${esc(r.id)}" data-v="1"${canAct()?'':' data-off="1"'}>👍 Foydali (${r.helpful_yes})</span>
+      <span class="rhelp${voted===false?' on':''}" data-id="${esc(r.id)}" data-v="0"${canAct()?'':' data-off="1"'}>👎 Foydali emas (${r.helpful_no})</span>
+    </div>
+  </div>`;
+}
+function wireRatingVotes(scope,bookId){
+  scope.querySelectorAll('.rhelp').forEach(el=>{
+    if(el.dataset.off)return;
+    el.onclick=()=>{
+      api('/api/ratings/'+encodeURIComponent(el.dataset.id)+'/vote',{method:'POST',body:JSON.stringify({helpful:el.dataset.v==='1'})})
+        .then(()=>loadRatingList(bookId)).catch(()=>{});
+    };
+  });
+}
+function loadRatingList(bookId){
+  const list=$('#rList');if(!list)return;
+  api('/api/books/'+encodeURIComponent(bookId)+'/ratings?limit=20').then(r=>{
+    list.innerHTML=r.ratings.length?r.ratings.map(ratingRowHtml).join(''):'<p class="hint">Hali baholar yo\'q. Birinchi bo\'ling!</p>';
+    wireRatingVotes(list,bookId);
+  }).catch(()=>{list.innerHTML='<p class="hint">Yuklanmadi.</p>';});
+}
+function loadRating(bookId){
+  const body=$('#rBody');if(!body)return;
+  api('/api/books/'+encodeURIComponent(bookId)+'/rating').then(r=>{
+    const pct=n=>r.count?Math.round((r.distribution[n]||0)/r.count*100):0;
+    const dist=[5,4,3,2,1].map(n=>`<div class="drow"><span>${n}</span><div class="dbar"><i style="width:${pct(n)}%"></i></div></div>`).join('');
+    myRatingStars=r.my_rating?r.my_rating.stars:0;
+    const myText=(r.my_rating&&r.my_rating.review_text)||'';
+    const myPicker=`<div class="starpick" id="rPick">${[1,2,3,4,5].map(n=>`<span data-n="${n}" class="${n<=myRatingStars?'on':''}">★</span>`).join('')}</div>`;
+    body.innerHTML=`
+      <div class="ratehead">
+        <div><div class="ratebig">${r.count?r.average:'–'}<span class="of5">/5</span></div>${starsHtml(r.average)}<div class="ratecount">${r.count} ta baho</div></div>
+        <div class="ratedist">${dist}</div>
+      </div>
+      ${canAct()?`<div class="sec"><h3>Sizning bahoyingiz</h3>${myPicker}
+        <form id="rForm">
+          <textarea id="rText" maxlength="2000" placeholder="Fikringiz (ixtiyoriy)...">${esc(myText)}</textarea>
+          <button type="submit">${r.my_rating?'Yangilash':'Yuborish'}</button>
+          ${r.my_rating?'<button type="button" class="rdel" id="rDel">O\'chirish</button>':''}
+        </form>
+      </div>`:'<p class="hint">Baho berish uchun botda oching.</p>'}
+      <div id="rList">Yuklanmoqda...</div>`;
+    if(canAct()){
+      $('#rPick').querySelectorAll('span').forEach(el=>el.onclick=()=>{
+        myRatingStars=parseInt(el.dataset.n,10);
+        $('#rPick').querySelectorAll('span').forEach(s=>s.classList.toggle('on',parseInt(s.dataset.n,10)<=myRatingStars));
+      });
+      $('#rForm').addEventListener('submit',e=>{
+        e.preventDefault();
+        if(!myRatingStars){toast('Yulduz tanlang');return;}
+        const text=$('#rText').value.trim();
+        api('/api/books/'+encodeURIComponent(bookId)+'/rating',{method:'POST',body:JSON.stringify({stars:myRatingStars,review_text:text||null})}).then(()=>{
+          toast('Baho saqlandi');loadRating(bookId);
+        }).catch(()=>toast('Xatolik yuz berdi'));
+      });
+      const delBtn=$('#rDel');
+      if(delBtn)delBtn.onclick=()=>{
+        api('/api/books/'+encodeURIComponent(bookId)+'/rating/delete',{method:'POST'}).then(()=>{
+          toast('Baho o\'chirildi');loadRating(bookId);
+        }).catch(()=>{});
+      };
+    }
+    loadRatingList(bookId);
+  }).catch(()=>{body.innerHTML='<p class="hint">Yuklanmadi.</p>';});
 }
 
 // events
