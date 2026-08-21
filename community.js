@@ -200,12 +200,15 @@
   }
 
   function wireDeliverButton() {
-    // The "📖 Botda ochish" link is baked into each static page's HTML (a t.me deep link),
-    // not rendered by this script — this intercepts its click so the book gets sent straight
-    // into the user's chat via the API instead of leaving the Mini App. Falls back to the
-    // original deep link if delivery isn't possible (no initData, no cached file, API error).
+    // The "📖 Botda ochish" link is baked into each static page's HTML as <a href="t.me/...">.
+    // Telegram's WebView can intercept clicks on t.me links at the native level — closing the
+    // Mini App — even if page JS calls preventDefault(). So the href is removed up front
+    // (the element stops looking like a t.me link at all) and only restored, right before a
+    // real navigation, if in-app delivery actually fails.
     var ctaLink = document.querySelector(".cta .btn.primary");
     if (!ctaLink || !canAct) return;
+    var fallbackHref = ctaLink.getAttribute("href");
+    ctaLink.removeAttribute("href");
     var originalLabel = ctaLink.textContent;
     ctaLink.addEventListener("click", function (e) {
       e.preventDefault();
@@ -214,13 +217,15 @@
       api("/api/books/" + bookId + "/deliver", { method: "POST" })
         .then(function () {
           ctaLink.textContent = "✅ Yuborildi — botdagi chatingizni tekshiring";
+          ctaLink.classList.remove("cw-disabled");
         })
         .catch(function () {
-          // Couldn't deliver in-app (not cached, bot not started yet, etc.) — fall back to
-          // the original deep link so the user still gets the book.
+          // Couldn't deliver in-app (not cached, bot not started yet, etc.) — only now does
+          // this become a real t.me link, so only a genuine failure ever leaves the Mini App.
           ctaLink.textContent = originalLabel;
           ctaLink.classList.remove("cw-disabled");
-          window.location.href = ctaLink.href;
+          ctaLink.setAttribute("href", fallbackHref);
+          window.location.href = fallbackHref;
         });
     });
   }
