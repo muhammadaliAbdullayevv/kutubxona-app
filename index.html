@@ -9,18 +9,27 @@
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="icon" href="favicon-32.png" type="image/png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<meta name="theme-color" content="#0f1020">
+<meta name="theme-color" content="#14100b" id="themeColorMeta">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
+  /* Night (default) — ink & brass, a library after closing time */
   :root{
-    --bg:#0f1020; --card:#191a2e; --card2:#20223a; --text:#eef0f8; --muted:#9aa0c0;
-    --accent:#6c8cff; --accent2:#a06bff; --line:#2a2c47; --chip:#23253f; --danger:#ff5d73;
-    --radius:16px; --shadow:0 6px 24px rgba(0,0,0,.35);
+    --bg:#14100b; --card:#1f1710; --card2:#291f14; --text:#f4ecdc; --muted:#a89172;
+    --accent:#d9a441; --accent2:#b5672e; --line:#34281a; --chip:#241b12; --danger:#e2685a;
+    --radius:16px; --shadow:0 6px 24px rgba(0,0,0,.5);
+  }
+  /* Day — parchment & ink */
+  :root[data-theme="day"]{
+    --bg:#f6f0e3; --card:#fffdf8; --card2:#efe4cd; --text:#26190f; --muted:#83705a;
+    --accent:#a86423; --accent2:#7d4420; --line:#e6d9bd; --chip:#efe4cd; --danger:#b6402f;
+    --shadow:0 6px 20px rgba(60,40,10,.14);
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
   html,body{margin:0; padding:0}
   body{background:var(--bg); color:var(--text); font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;
-    padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom); overscroll-behavior-y:none}
+    padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom); overscroll-behavior-y:none;
+    transition:background-color .25s, color .25s}
+  body,.book,.si,.card,header,.sheetc,.chip,.tab,.btn,.pill,.authchip{transition:background-color .25s, border-color .25s, color .25s}
   .wrap{max-width:760px; margin:0 auto; padding:12px 14px 90px}
   header{position:sticky; top:0; z-index:20; background:linear-gradient(180deg,var(--bg) 72%,transparent); padding:8px 14px 10px; margin:0 -14px 4px}
   h1{font-size:20px; font-weight:700; margin:2px 0 10px; letter-spacing:.2px}
@@ -42,6 +51,11 @@
   .sort{background:var(--card); border:1px solid var(--line); color:var(--text); border-radius:10px; padding:6px 8px; font-size:13px}
   .grid{display:grid; grid-template-columns:1fr 1fr; gap:12px}
   @media(min-width:560px){.grid{grid-template-columns:1fr 1fr 1fr}}
+  @keyframes cardIn{from{opacity:0; transform:translateY(10px)}to{opacity:1; transform:none}}
+  .book,.si{animation:cardIn .4s cubic-bezier(.2,.8,.2,1) backwards; animation-delay:var(--d,0ms)}
+  .book,.si,.chip,.tab,.btn,.authchip,.gtile{transition:transform .15s}
+  .book:active,.si:active,.chip:active,.tab:active,.btn:active,.authchip:active,.gtile:active{transform:scale(.96)}
+  @media (prefers-reduced-motion: reduce){.book,.si,.fbook{animation:none!important}}
   .book{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; cursor:pointer; position:relative; display:flex; flex-direction:column}
   .cover{height:118px; display:flex; align-items:flex-end; padding:10px; position:relative}
   .cover .ini{font-size:30px; font-weight:800; color:rgba(255,255,255,.92); line-height:1; text-shadow:0 2px 8px rgba(0,0,0,.3)}
@@ -74,6 +88,14 @@
   .si .sa{font-size:11px; color:var(--muted); margin:0 1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
   .si .sr{font-size:11px; color:var(--muted); margin:2px 1px 0; font-variant-numeric:tabular-nums}
   .si .sr b{color:var(--text)}
+  /* Floating "just added" books hero, top of home */
+  .floatband{display:flex; justify-content:center; gap:16px; padding:10px 4px 22px; overflow-x:auto; scrollbar-width:none}
+  .floatband::-webkit-scrollbar{display:none}
+  .fbook{flex:0 0 auto; width:60px; height:60px; border-radius:50%; overflow:hidden; position:relative; cursor:pointer; box-shadow:var(--shadow); animation:floaty ease-in-out infinite; border:2px solid var(--line)}
+  .fbook img{width:100%; height:100%; object-fit:cover}
+  .fbook .fini{width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:18px; color:rgba(255,255,255,.92); text-shadow:0 1px 4px rgba(0,0,0,.3)}
+  @keyframes floaty{0%,100%{transform:translateY(0) rotate(0deg)}50%{transform:translateY(-9px) rotate(-4deg)}}
+  @media (prefers-reduced-motion: reduce){.fbook{animation:none}}
   .authchips{display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; padding:2px 14px 4px; margin:0 -14px}
   .authchips::-webkit-scrollbar{display:none}
   .authchip{flex:0 0 auto; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:9px 13px; cursor:pointer; display:flex; flex-direction:column; gap:1px; min-width:110px}
@@ -207,7 +229,7 @@ function api(path,opts){
   return fetch(COMMUNITY_API_BASE+path,opts).then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); });
 }
 const canAct=()=>!!tg?.initData;
-const COVERS=[['#6c8cff','#a06bff'],['#ff7a59','#ff4d8d'],['#3ddc97','#2bb0c9'],['#ffcf5c','#ff8a3d'],['#7b6cff','#4d9dff'],['#ff6b9d','#c86bff'],['#38d9a9','#4dc3ff'],['#ffa14d','#ff6b6b'],['#5c7cff','#8a6bff']];
+const COVERS=[['#c17a3d','#8c4a24'],['#a8452f','#6b2418'],['#4a6b4a','#2d4530'],['#c99a2e','#8a5c16'],['#5a4a6b','#382d45'],['#8a3a4a','#5c2530'],['#3a6b6b','#254545'],['#b06a2a','#6b3816'],['#6b5a3a','#453825']];
 function coverFor(id){let h=0;const s=String(id||'');for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;return COVERS[h%COVERS.length];}
 function initials(t){return String(t||'?').replace(/[^\p{L}\p{N} ]/gu,'').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'📖';}
 function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
@@ -299,9 +321,9 @@ function renderChips(){
   f.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{const k=c.dataset.k;state[k]=state[k]===c.dataset.v?'':c.dataset.v;state.all=false;haptic();renderChips();run();});
 }
 
-function cardHtml(b){
+function cardHtml(b,i){
   const[c1,c2]=coverFor(b.i);const fav=favs.has(b.i);
-  return `<div class="book" data-id="${esc(b.i)}">
+  return `<div class="book" data-id="${esc(b.i)}" style="--d:${Math.min(i||0,12)*30}ms">
     <div class="cover" style="background:linear-gradient(135deg,${c1},${c2})">
       ${b.hc?`<img class="ci" src="covers/${encodeURIComponent(b.i)}.jpg" loading="lazy" onerror="this.remove()">`:''}
       <span class="fav" data-fav="${esc(b.i)}">${fav?'❤️':'🤍'}</span>
@@ -317,7 +339,7 @@ function fmtNum(n){n=n||0;return n>=1000?(n/1000).toFixed(n>=10000?0:1).replace(
 function render(){
   const grid=$('#grid');
   const slice=state.result.slice(0,state.shown);
-  grid.innerHTML=slice.map(cardHtml).join('');
+  grid.innerHTML=slice.map((b,i)=>cardHtml(b,i)).join('');
   grid.querySelectorAll('.book').forEach(el=>el.onclick=e=>{if(e.target.closest('[data-fav]'))return;openDetail(el.dataset.id);});
   grid.querySelectorAll('[data-fav]').forEach(el=>el.onclick=e=>{e.stopPropagation();toggleFav(el.dataset.fav);});
   $('#empty').style.display=state.result.length?'none':'block';
@@ -335,16 +357,28 @@ function buildHome(){
   HOME.authors=Object.entries(ac).filter(([a,c])=>c>=2).sort((x,y)=>y[1]-x[1]).slice(0,16).map(([a,c])=>({a,c}));
   HOME.genres=DB.genres.slice(0,5).map(g=>({v:g.v,c:g.c,books:DB.books.filter(b=>b.g===g.v).slice(0,18)}));
 }
-function siHtml(b){const[c1,c2]=coverFor(b.i);return `<div class="si" data-id="${esc(b.i)}"><div class="sc" style="background:linear-gradient(135deg,${c1},${c2})">${b.hc?`<img class="ci" src="covers/${encodeURIComponent(b.i)}.jpg" loading="lazy" onerror="this.remove()">`:''}${b.ha?'<span class="aud">🎧</span>':''}<span class="ini">${esc(initials(b.t))}</span></div><div class="st">${esc(b.t)}</div><div class="sa">${esc(b.a||'')}</div>${b.rc?`<div class="sr">⭐ <b>${b.rt}</b> (${b.rc})</div>`:''}</div>`;}
-function shelf(title,books,see){return `<div class="section"><div class="shead"><h2>${esc(title)}</h2>${see?`<span class="see" ${see}>Barchasi →</span>`:''}</div><div class="shelf">${books.map(siHtml).join('')}</div></div>`;}
+function siHtml(b,i){const[c1,c2]=coverFor(b.i);return `<div class="si" data-id="${esc(b.i)}" style="--d:${Math.min(i||0,12)*30}ms"><div class="sc" style="background:linear-gradient(135deg,${c1},${c2})">${b.hc?`<img class="ci" src="covers/${encodeURIComponent(b.i)}.jpg" loading="lazy" onerror="this.remove()">`:''}${b.ha?'<span class="aud">🎧</span>':''}<span class="ini">${esc(initials(b.t))}</span></div><div class="st">${esc(b.t)}</div><div class="sa">${esc(b.a||'')}</div>${b.rc?`<div class="sr">⭐ <b>${b.rt}</b> (${b.rc})</div>`:''}</div>`;}
+function shelf(title,books,see){return `<div class="section"><div class="shead"><h2>${esc(title)}</h2>${see?`<span class="see" ${see}>Barchasi →</span>`:''}</div><div class="shelf">${books.map((b,i)=>siHtml(b,i)).join('')}</div></div>`;}
+function floatBandHtml(){
+  const items=DB.books.slice(0,6);
+  if(!items.length)return '';
+  return `<div class="floatband">${items.map((b,i)=>{
+    const[c1,c2]=coverFor(b.i);
+    return `<div class="fbook" data-id="${esc(b.i)}" style="background:linear-gradient(135deg,${c1},${c2}); animation-delay:${(i*0.35).toFixed(2)}s; animation-duration:${(3.2+(i%3)*0.5).toFixed(1)}s">
+      ${b.hc?`<img src="covers/${encodeURIComponent(b.i)}.jpg" loading="lazy" onerror="this.remove()">`:''}
+      <span class="fini">${esc(initials(b.t))}</span>
+    </div>`;
+  }).join('')}</div>`;
+}
 function renderHome(){
-  const h=$('#home');let html='';
+  const h=$('#home');let html=floatBandHtml();
   if(HOME.recent.length)html+=shelf("🕘 Yaqinda ko'rilgan",HOME.recent,null);
   if(HOME.newest.length)html+=shelf("🆕 Yangi qo'shilgan",HOME.newest,'data-see="newest"');
   if(HOME.authors.length)html+=`<div class="section"><div class="shead"><h2>✍️ Mashhur mualliflar</h2></div><div class="authchips">${HOME.authors.map(a=>`<div class="authchip" data-auth="${esc(a.a)}"><span class="an">${esc(a.a)}</span><span class="ac">${a.c} ta kitob</span></div>`).join('')}</div></div>`;
   if(HOME.audio.length)html+=shelf("🎧 Audiokitoblar",HOME.audio,'data-see="audio"');
   for(const g of HOME.genres)html+=shelf(g.v,g.books,`data-see="genre" data-v="${esc(g.v)}"`);
   h.innerHTML=html;
+  h.querySelectorAll('.fbook').forEach(el=>el.onclick=()=>openDetail(el.dataset.id));
   h.querySelectorAll('.si').forEach(el=>el.onclick=()=>openDetail(el.dataset.id));
   h.querySelectorAll('[data-auth]').forEach(el=>el.onclick=()=>{state.all=false;$('#q').value=el.dataset.auth;state.q=el.dataset.auth;$('#clr').style.display='block';haptic();run();window.scrollTo(0,0);});
   h.querySelectorAll('[data-see]').forEach(el=>el.onclick=()=>{const s=el.dataset.see;if(s==='newest'){state.all=true;state.sort='newest';$('#sort').value='newest';}else if(s==='audio'){state.type='audio';renderChips();}else if(s==='genre'){state.genre=el.dataset.v;renderChips();}haptic();run();window.scrollTo(0,0);});
@@ -368,7 +402,7 @@ function relatedShelf(b){
   const byGenre=b.g?DB.books.filter(x=>x.i!==b.i&&x.g===b.g&&!seen.has(x.i)):[];
   const groups=[['Shu muallifdan',byAuthor.slice(0,12)],['Shunga o’xshash',byGenre.slice(0,12)]].filter(([,arr])=>arr.length);
   if(!groups.length)return '';
-  return groups.map(([label,arr])=>`<div class="sec"><h3>${esc(label)}</h3><div class="shelf" style="margin:0 -18px; padding:2px 18px 4px">${arr.map(siHtml).join('')}</div></div>`).join('');
+  return groups.map(([label,arr])=>`<div class="sec"><h3>${esc(label)}</h3><div class="shelf" style="margin:0 -18px; padding:2px 18px 4px">${arr.map((b,i)=>siHtml(b,i)).join('')}</div></div>`).join('');
 }
 function openDetail(id){
   const b=byId[id];if(!b)return;haptic();
@@ -430,9 +464,20 @@ const _BADGE_META={
   collector:{emoji:'⭐',label:"To'plovchi"},
   voice:{emoji:'💬',label:"Faol a'zo"},
 };
+function themeChipsHtml(){
+  const opt=(m,l)=>`<span class="chip ${themeMode===m?'on':''}" data-m="${m}">${l}</span>`;
+  return `<div class="sec"><h3>Mavzu</h3><div class="row" id="themeChips" style="padding:2px 0; margin:0">${opt('day',"☀️ Kunduzgi")}${opt('night',"🌙 Tungi")}${opt('system',"⚙️ Tizim")}</div></div>`;
+}
+function wireThemeChips(){
+  $('#themeChips').querySelectorAll('.chip').forEach(el=>el.onclick=()=>{
+    haptic();setThemeMode(el.dataset.m);
+    $('#themeChips').querySelectorAll('.chip').forEach(c=>c.classList.toggle('on',c.dataset.m===themeMode));
+  });
+}
 function profileShellHtml(){
   return `<div class="dbody" style="padding-top:20px">
     <h2 class="dtitle">👤 Profil</h2>
+    ${themeChipsHtml()}
     <div id="pBody">Yuklanmoqda...</div>
   </div>`;
 }
@@ -453,7 +498,7 @@ function loadProfile(){
       <div class="sec"><h3>Nishonlar</h3><div class="pills">${badges}</div></div>`;
   }).catch(()=>{body.innerHTML='<p class="hint">Ma\'lumot yuklanmadi.</p>';});
 }
-$('#btnProfile').onclick=()=>{haptic();openSheet2(profileShellHtml());loadProfile();};
+$('#btnProfile').onclick=()=>{haptic();openSheet2(profileShellHtml());wireThemeChips();loadProfile();};
 $('#sheet2').onclick=e=>{if(e.target.id==='sheet2')closeSheet2();};
 
 // ---- ratings (Play-Store-style 1-5 stars + optional review; flat, not repliable; other
@@ -545,12 +590,32 @@ $('#tabBrowse').onclick=()=>{state.view='browse';state.q='';$('#q').value='';$('
 $('#tabFav').onclick=()=>{state.view='favorites';state.all=false;setTabs();run();};
 window.addEventListener('scroll',()=>{if(isHome())return;if(window.innerHeight+window.scrollY>=document.body.offsetHeight-500&&state.result.length>state.shown){state.shown+=PAGE;render();}});
 
-function applyTheme(){if(!tg)return;const p=tg.themeParams||{};const set=(k,v)=>{if(v)document.documentElement.style.setProperty(k,v);};
-  set('--bg',p.bg_color);set('--card',p.secondary_bg_color);set('--text',p.text_color);set('--muted',p.hint_color);set('--accent',p.button_color);set('--accent2',p.button_color);if(p.section_bg_color)set('--card2',p.section_bg_color);}
+// ---- theme: day / night / system (manual choice always wins; "system" follows Telegram's
+// own light/dark setting, or the OS preference outside Telegram) ----
+let themeMode='system';
+try{themeMode=localStorage.getItem('themeMode')||'system';}catch(e){}
+function resolveTheme(){
+  if(themeMode==='day'||themeMode==='night')return themeMode;
+  if(tg?.colorScheme)return tg.colorScheme==='light'?'day':'night';
+  if(window.matchMedia?.('(prefers-color-scheme: light)').matches)return 'day';
+  return 'night';
+}
+function applyThemeMode(){
+  const t=resolveTheme();
+  document.documentElement.setAttribute('data-theme',t);
+  const meta=$('#themeColorMeta');
+  if(meta)meta.setAttribute('content',t==='day'?'#f6f0e3':'#14100b');
+}
+function setThemeMode(m){
+  themeMode=m;
+  try{localStorage.setItem('themeMode',m);}catch(e){}
+  applyThemeMode();
+}
+applyThemeMode();
 
 function skeletonShelf(){return `<div class="section"><div class="shead"><h2 class="skel" style="width:140px;height:16px;border-radius:6px"></h2></div><div class="shelf">${Array(4).fill('<div class="si"><div class="skel" style="height:170px;border-radius:14px"></div></div>').join('')}</div></div>`;}
 async function boot(){
-  if(tg){tg.ready();tg.expand();tg.BackButton?.onClick(()=>{if($('#sheet2').classList.contains('open'))closeSheet2();else closeSheet();});applyTheme();tg.onEvent?.('themeChanged',applyTheme);}
+  if(tg){tg.ready();tg.expand();tg.BackButton?.onClick(()=>{if($('#sheet2').classList.contains('open'))closeSheet2();else closeSheet();});applyThemeMode();tg.onEvent?.('themeChanged',()=>{if(themeMode==='system')applyThemeMode();});}
   if('serviceWorker' in navigator)window.addEventListener('load',()=>{
     navigator.serviceWorker.register('./sw.js').catch(()=>{});
     // The shell/data caches are served cache-first-then-refresh, so a stale client can lag a
