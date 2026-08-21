@@ -394,19 +394,42 @@ if(!mqReduced){
 }
 
 // ---- book globe: rotatable 3D sphere of book nodes (Canvas2D, hand-rolled projection) ----
-// STAGE 1 (perf spike): fixed dummy points, drag-to-rotate only. No zoom/LOD/lines/tap yet —
-// this stage exists purely to confirm a hand-rolled canvas globe runs smoothly on a real phone
-// inside Telegram's WebView before any further investment.
+// STAGE 2: real anchor books (popularity+genre-diversity picked), tap-to-open wired to the
+// real openDetail(), "back to map" round-trip. Still no zoom/LOD/lines/labels — those are
+// later stages, once this integration seam is proven solid.
 const GOLDEN_ANGLE=Math.PI*(3-Math.sqrt(5));
 function fibSpherePoint(i,N){
   const y=1-(i/(N-1))*2, rY=Math.sqrt(Math.max(0,1-y*y)), theta=GOLDEN_ANGLE*i;
   return {x:Math.cos(theta)*rY, y:y, z:Math.sin(theta)*rY};
 }
-const GLOBE={built:false,points:[],yaw:0,pitch:0.3,zoom:1,raf:null};
-function buildGlobeSpike(){
-  const N=180, pts=[];
-  for(let i=0;i<N;i++)pts.push(fibSpherePoint(i,N));
-  GLOBE.points=pts;
+// Popularity is extremely sparse in this catalog (most books have 0 downloads, almost none
+// have ratings yet), so raw popularity alone would collapse into one giant tie-block and
+// silently exclude sparse genres. hash31 (duplicated from coverFor()'s own formula, not
+// refactored — keeps this feature's diff isolated from that working code) gives a stable
+// tiebreak so "popular" is at least deterministic and genre-diverse rather than arbitrary
+// array order.
+function popScore(b){return (b.dl||0)*3 + (b.rc?b.rt*b.rc:0) + (b.hc?2:0);}
+function hash31(s){let h=0;s=String(s||'');for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;return h;}
+const GLOBE={built:false,points:[],projected:[],yaw:0,pitch:0.3,zoom:1,raf:null};
+function buildGlobe(){
+  const byGenre={};
+  for(const b of DB.books){(byGenre[b.g||'?']=byGenre[b.g||'?']||[]).push(b);}
+  const total=DB.books.length||1;
+  let anchors=[];
+  for(const g in byGenre){
+    const bucket=byGenre[g];
+    const k=Math.max(6,Math.round(200*bucket.length/total));
+    const sorted=bucket.slice().sort((x,y)=>{
+      const d=popScore(y)-popScore(x);
+      return d!==0?d:hash31(x.i)-hash31(y.i);
+    });
+    anchors=anchors.concat(sorted.slice(0,k));
+  }
+  const N=anchors.length;
+  GLOBE.points=anchors.map((b,i)=>{
+    const p=fibSpherePoint(i,N);
+    return {id:b.i, t:b.t, x:p.x, y:p.y, z:p.z};
+  });
   GLOBE.built=true;
 }
 function globeDraw(){
@@ -424,6 +447,7 @@ function globeDraw(){
   const cosY=Math.cos(GLOBE.yaw),sinY=Math.sin(GLOBE.yaw);
   const cosP=Math.cos(GLOBE.pitch),sinP=Math.sin(GLOBE.pitch);
   const accent=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#d9a441';
+  GLOBE.projected=[];
   for(const p of GLOBE.points){
     // rotate around Y (yaw) then X (pitch)
     let x=p.x*cosY - p.z*sinY;
@@ -433,17 +457,37 @@ function globeDraw(){
     if(z<-0.05)continue; // cull back-facing (weak perspective, camera looking down -z)
     const scale=0.75+0.25*z; // nearer points render slightly larger
     const sx=cx+x*R, sy=cy-y*R;
+    const r=3.6*scale;
     ctx.globalAlpha=0.35+0.65*Math.max(0,z);
     ctx.fillStyle=accent;
     ctx.beginPath();
-    ctx.arc(sx,sy,3.2*scale,0,Math.PI*2);
+    ctx.arc(sx,sy,r,0,Math.PI*2);
     ctx.fill();
+    GLOBE.projected.push({id:p.id,sx,sy,r});
   }
   ctx.globalAlpha=1;
 }
 function globeTick(){
   globeDraw();
   GLOBE.raf=requestAnimationFrame(globeTick);
+}
+function hitTestGlobe(clientX,clientY){
+  const canvas=$('#globeCanvas');
+  const rect=canvas.getBoundingClientRect();
+  const x=clientX-rect.left, y=clientY-rect.top;
+  let best=null,bestD=18*18; // 18px tap-target radius, squared (compared against squared dist)
+  for(const p of GLOBE.projected){
+    const dx=p.sx-x, dy=p.sy-y, d=dx*dx+dy*dy;
+    if(d<bestD){bestD=d;best=p;}
+  }
+  return best;
+}
+let openedFromGlobe=false;
+function onGlobeNodeTap(id){
+  haptic();
+  if(GLOBE.raf){cancelAnimationFrame(GLOBE.raf);GLOBE.raf=null;} // pause while the sheet covers it
+  openedFromGlobe=true;
+  openDetail(id);
 }
 let globeDrag=null;
 function wireGlobeInteraction(){
@@ -459,12 +503,18 @@ function wireGlobeInteraction(){
     GLOBE.yaw=globeDrag.yaw0 + dx*0.006;
     GLOBE.pitch=Math.max(-1.4,Math.min(1.4,globeDrag.pitch0 - dy*0.006));
   });
-  const endDrag=()=>{globeDrag=null;};
-  canvas.addEventListener('pointerup',endDrag);
-  canvas.addEventListener('pointercancel',endDrag);
+  canvas.addEventListener('pointerup',e=>{
+    if(globeDrag && !globeDrag.moved){
+      const hit=hitTestGlobe(e.clientX,e.clientY);
+      if(hit)onGlobeNodeTap(hit.id);
+    }
+    globeDrag=null;
+  });
+  canvas.addEventListener('pointercancel',()=>{globeDrag=null;});
 }
 function openGlobe(){
-  if(!GLOBE.built){buildGlobeSpike();wireGlobeInteraction();}
+  if(!DB.books.length){toast('Kutubxona hali yuklanmoqda...');return;}
+  if(!GLOBE.built){buildGlobe();wireGlobeInteraction();}
   $('#globe').classList.add('open');
   tg?.BackButton?.show();
   if(!GLOBE.raf)GLOBE.raf=requestAnimationFrame(globeTick);
@@ -521,6 +571,7 @@ function openDetail(id){
       <button class="btn primary" id="openBot">📖 Botda o'qish</button>
       <button class="btn ghost ${fav?'on':''}" id="dFav">${fav?'❤️':'🤍'}</button>
       <button class="btn ghost" id="dShare">↗️</button>
+      ${openedFromGlobe?'<button class="btn ghost" id="dBackGlobe">🌐</button>':''}
     </div>`;
   const url=`https://t.me/${DB.bot}?start=b_${encodeURIComponent(b.i)}`;
   const openBotFallback=()=>{tg?.openTelegramLink?tg.openTelegramLink(url):window.open(url);setTimeout(()=>tg?.close?.(),150);};
@@ -540,12 +591,14 @@ function openDetail(id){
   };
   $('#dFav').onclick=()=>toggleFav(b.i);
   $('#dShare').onclick=()=>{const txt=`📚 ${b.t}${b.a?' — '+b.a:''}`;const s=`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(txt)}`;tg?.openTelegramLink?tg.openTelegramLink(s):navigator.share?.({title:b.t,url});};
+  const dBackGlobe=$('#dBackGlobe');
+  if(dBackGlobe)dBackGlobe.onclick=()=>{closeSheet();if(!GLOBE.raf)GLOBE.raf=requestAnimationFrame(globeTick);};
   c.querySelectorAll('[data-sub]').forEach(el=>el.onclick=()=>{closeSheet();$('#q').value=el.dataset.sub;state.q=el.dataset.sub;$('#clr').style.display='block';if(state.view!=='browse'){state.view='browse';setTabs();}run();window.scrollTo(0,0);});
   c.querySelectorAll('.si').forEach(el=>el.onclick=()=>openDetail(el.dataset.id));
   loadRating(b.i);
   c.scrollTop=0;
 }
-function closeSheet(){$('#sheet').classList.remove('open');tg?.BackButton?.hide();}
+function closeSheet(){$('#sheet').classList.remove('open');tg?.BackButton?.hide();openedFromGlobe=false;}
 
 // ---- profile overlay (reading streak/badges) ----
 function openSheet2(html){$('#sheet2c').innerHTML=html;$('#sheet2').classList.add('open');tg?.BackButton?.show();}
