@@ -552,13 +552,18 @@ function skeletonShelf(){return `<div class="section"><div class="shead"><h2 cla
 async function boot(){
   if(tg){tg.ready();tg.expand();tg.BackButton?.onClick(()=>{if($('#sheet2').classList.contains('open'))closeSheet2();else closeSheet();});applyTheme();tg.onEvent?.('themeChanged',applyTheme);}
   if('serviceWorker' in navigator)window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('./sw.js').then(reg=>reg.update().catch(()=>{})).catch(()=>{});
+    navigator.serviceWorker.register('./sw.js').catch(()=>{});
     // The shell/data caches are served cache-first-then-refresh, so a stale client can lag a
     // load behind a new deploy. Once a new SW actually takes control, force exactly one reload
-    // so the fresh shell/JS is what actually runs, instead of silently staying one version back.
-    let reloaded=false;
+    // so the fresh shell/JS is what actually runs. Guarded with sessionStorage (not a plain JS
+    // variable, which resets on every reload and can't prevent a reload loop) so this fires at
+    // most once per tab even if controllerchange happens to fire again after reloading.
     navigator.serviceWorker.addEventListener('controllerchange',()=>{
-      if(reloaded)return;reloaded=true;window.location.reload();
+      let already=false;
+      try{already=sessionStorage.getItem('swReloaded')==='1';}catch(e){}
+      if(already)return;
+      try{sessionStorage.setItem('swReloaded','1');}catch(e){}
+      window.location.reload();
     });
   });
   // Most first loads land on the home view, not a filtered grid — show shimmer shelves
