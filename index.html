@@ -677,7 +677,11 @@ function globeDraw(){
   }
 }
 function globeTick(){
-  globeSimStep();
+  // Pause the physics while a finger/mouse is actively dragging or pinching — otherwise the
+  // nodes keep drifting under the user's touch at the same time their gesture is panning/
+  // zooming the camera, and the combined motion reads as the map "auto-scrolling" on its own.
+  // Resumes (gently, same settle speed as always) the instant they let go.
+  if(!globeDrag && !globePinch)globeSimStep();
   globeDraw();
   GLOBE.raf=requestAnimationFrame(globeTick);
 }
@@ -727,7 +731,7 @@ function wireGlobeInteraction(){
     globePointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
     if(globePinch && globePointers.size>=2){
       const d=pinchDist();
-      if(d>0&&globePinch.d0>0)GLOBE.zoom=Math.max(0.4,Math.min(10,globePinch.zoom0*(d/globePinch.d0)));
+      if(d>0&&globePinch.d0>0)GLOBE.zoom=Math.max(0.4,Math.min(26,globePinch.zoom0*(d/globePinch.d0)));
       return;
     }
     if(!globeDrag)return;
@@ -749,7 +753,7 @@ function wireGlobeInteraction(){
   }
   canvas.addEventListener('pointerup',release);
   canvas.addEventListener('pointercancel',release);
-  canvas.addEventListener('wheel',e=>{GLOBE.zoom=Math.max(0.4,Math.min(10,GLOBE.zoom-e.deltaY*0.0015));e.preventDefault();},{passive:false});
+  canvas.addEventListener('wheel',e=>{GLOBE.zoom=Math.max(0.4,Math.min(26,GLOBE.zoom-e.deltaY*0.0015));e.preventDefault();},{passive:false});
 }
 function openGlobe(){
   if(!DB.books.length){toast('Kutubxona hali yuklanmoqda...');return;}
