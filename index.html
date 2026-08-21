@@ -105,19 +105,8 @@
   .btn.ghost.on{color:var(--danger)}
   .toast{position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(20px); background:var(--card2); border:1px solid var(--line); color:var(--text); padding:11px 18px; border-radius:12px; font-weight:600; font-size:14px; opacity:0; transition:.25s; z-index:99; box-shadow:var(--shadow)}
   .toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
-  /* Discussion (per-book comments) */
   .hint{color:var(--muted); font-size:13px; margin:6px 0}
-  .crow{padding:10px 0; border-top:1px solid var(--line)}
-  .crow:first-child{border-top:0}
   .cmeta{font-size:12px; color:var(--muted); font-weight:700}
-  .ctext{font-size:14px; margin:3px 0 6px; white-space:pre-wrap}
-  .cactions{display:flex; gap:14px; font-size:12.5px; color:var(--muted)}
-  .cactions span{cursor:pointer}
-  .clike.on{color:var(--accent)}
-  .creplies{margin-left:14px; margin-top:6px}
-  #cForm,.creply-form{margin-top:10px}
-  #cForm textarea,.creply-form textarea{width:100%; background:var(--card); border:1px solid var(--line); border-radius:10px; color:var(--text); padding:9px; font:inherit; resize:vertical; min-height:56px}
-  #cForm button,.creply-form button{margin-top:6px; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border:0; border-radius:10px; padding:8px 14px; font-weight:700; cursor:pointer}
   /* Profile overlay (streaks/badges) */
   #sheet2{z-index:55}
   .streakbig{display:flex; align-items:baseline; gap:8px; margin:4px 0 2px}
@@ -398,9 +387,6 @@ function openDetail(id){
       ${(b.s&&b.s.length)?`<div class="sec"><h3>Mavzular</h3><div class="subs">${b.s.map(s=>`<span class="sub" data-sub="${esc(s)}">${esc(s)}</span>`).join('')}</div></div>`:''}
       ${relatedShelf(b)}
       <div class="sec" id="rSec"><h3>⭐ Reyting</h3><div id="rBody">Yuklanmoqda...</div></div>
-      <div class="sec" id="cSec"><h3>💬 Muhokama</h3><div id="cList">Yuklanmoqda...</div>
-        ${canAct()?'<form id="cForm"><textarea id="cText" maxlength="2000" placeholder="Fikringizni yozing..." required></textarea><button type="submit">Yuborish</button></form>':'<p class="hint">Izoh qoldirish uchun botda oching.</p>'}
-      </div>
     </div>
     <div class="actions">
       <button class="btn primary" id="openBot">📖 Botda o'qish</button>
@@ -427,15 +413,6 @@ function openDetail(id){
   $('#dShare').onclick=()=>{const txt=`📚 ${b.t}${b.a?' — '+b.a:''}`;const s=`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(txt)}`;tg?.openTelegramLink?tg.openTelegramLink(s):navigator.share?.({title:b.t,url});};
   c.querySelectorAll('[data-sub]').forEach(el=>el.onclick=()=>{closeSheet();$('#q').value=el.dataset.sub;state.q=el.dataset.sub;$('#clr').style.display='block';if(state.view!=='browse'){state.view='browse';setTabs();}run();window.scrollTo(0,0);});
   c.querySelectorAll('.si').forEach(el=>el.onclick=()=>openDetail(el.dataset.id));
-  const cForm=$('#cForm');
-  if(cForm)cForm.addEventListener('submit',e=>{
-    e.preventDefault();
-    const ta=$('#cText');const text=ta.value.trim();if(!text)return;
-    api('/api/books/'+encodeURIComponent(b.i)+'/comments',{method:'POST',body:JSON.stringify({text})}).then(()=>{
-      ta.value='';loadComments(b.i);
-    }).catch(()=>{});
-  });
-  loadComments(b.i);
   loadRating(b.i);
   c.scrollTop=0;
 }
@@ -476,70 +453,6 @@ function loadProfile(){
 }
 $('#btnProfile').onclick=()=>{haptic();openSheet2(profileShellHtml());loadProfile();};
 $('#sheet2').onclick=e=>{if(e.target.id==='sheet2')closeSheet2();};
-
-// ---- discussion (per-book comments/replies/likes — talks to the same table the bot's
-// /bookcomments flow uses, so a reply posted here shows up there too) ----
-let likedThisSession={};
-function commentHtml(c,isReply){
-  const liked=!!likedThisSession[c.id];
-  return `<div class="crow${isReply?' creply':''}" data-id="${esc(c.id)}">
-    <div class="cmeta">${esc(c.alias)}</div>
-    <div class="ctext">${esc(c.text)}</div>
-    <div class="cactions">
-      <span class="clike${liked?' on':''}" data-id="${esc(c.id)}"${canAct()?'':' data-off="1"'}>👍 <b>${c.like_count||0}</b></span>
-      ${(!isReply&&canAct())?`<span class="creply-btn" data-id="${esc(c.id)}">Javob berish</span>`:''}
-      ${(!isReply&&c.reply_count)?`<span class="cshow-replies" data-id="${esc(c.id)}">${c.reply_count} ta javobni ko'rish</span>`:''}
-    </div>
-    ${!isReply?`<div class="creplies" data-parent="${esc(c.id)}"></div>`:''}
-  </div>`;
-}
-function wireCommentActions(scope,bookId){
-  scope.querySelectorAll('.clike').forEach(el=>{
-    if(el.dataset.off)return;
-    el.onclick=()=>{
-      api('/api/comments/'+encodeURIComponent(el.dataset.id)+'/like',{method:'POST'}).then(r=>{
-        likedThisSession[el.dataset.id]=r.liked;
-        el.classList.toggle('on',r.liked);
-        el.querySelector('b').textContent=r.like_count;
-      }).catch(()=>{});
-    };
-  });
-  scope.querySelectorAll('.creply-btn').forEach(el=>el.onclick=()=>{
-    const parentId=el.dataset.id;
-    const row=el.closest('.crow');
-    if(row.querySelector('.creply-form'))return;
-    const f=document.createElement('form');
-    f.className='creply-form';
-    f.innerHTML=`<textarea maxlength="2000" placeholder="Javobingiz..." required></textarea><button type="submit">Yuborish</button>`;
-    row.querySelector('.creplies').insertAdjacentElement('afterbegin',f);
-    f.addEventListener('submit',e=>{
-      e.preventDefault();
-      const text=f.querySelector('textarea').value.trim();
-      if(!text)return;
-      api('/api/books/'+encodeURIComponent(bookId)+'/comments',{method:'POST',body:JSON.stringify({text,parent_comment_id:parentId})}).then(()=>{
-        f.remove();loadReplies(bookId,parentId,true);
-      }).catch(()=>{});
-    });
-  });
-  scope.querySelectorAll('.cshow-replies').forEach(el=>el.onclick=()=>{loadReplies(bookId,el.dataset.id,false);el.remove();});
-}
-function loadReplies(bookId,parentId,append){
-  const repliesEl=$('#cList').querySelector(`.creplies[data-parent="${CSS.escape(parentId)}"]`);
-  if(!repliesEl)return;
-  api('/api/comments/'+encodeURIComponent(parentId)+'/replies').then(r=>{
-    const html=r.replies.map(c=>commentHtml(c,true)).join('');
-    if(append)repliesEl.insertAdjacentHTML('beforeend',html);else repliesEl.innerHTML=html;
-    wireCommentActions(repliesEl,bookId);
-  }).catch(()=>{});
-}
-function loadComments(bookId){
-  const list=$('#cList');if(!list)return;
-  api('/api/books/'+encodeURIComponent(bookId)+'/comments?limit=20').then(r=>{
-    if(!r.comments.length){list.innerHTML='<p class="hint">Hali izohlar yo\'q. Birinchi bo\'ling!</p>';return;}
-    list.innerHTML=r.comments.map(c=>commentHtml(c,false)).join('');
-    wireCommentActions(list,bookId);
-  }).catch(()=>{list.innerHTML='<p class="hint">Izohlarni yuklab bo\'lmadi.</p>';});
-}
 
 // ---- ratings (Play-Store-style 1-5 stars + optional review; flat, not repliable; other
 // readers vote a review "helpful" yes/no) ----
