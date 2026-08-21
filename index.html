@@ -525,7 +525,7 @@ function globeSimStep(){
       // (exactly what "moving so fast, can't see anything" was — dividing by a near-zero
       // distSq). Flooring at 100 (~10px) caps the worst-case force instead of letting it blow up.
       if(distSq<100)distSq=100;
-      const dist=Math.sqrt(distSq), force=140/distSq;
+      const dist=Math.sqrt(distSq), force=95/distSq;
       const fx=(dx/dist)*force, fy=(dy/dist)*force;
       A.vx+=fx;A.vy+=fy;B.vx-=fx;B.vy-=fy;
     }
@@ -540,7 +540,7 @@ function globeSimStep(){
   // Centering needs to scale with node count — with ~220 anchors each pushed by ~220 others,
   // a fixed weak pull loses that tug-of-war and the whole graph drifts apart into empty space —
   // but too strong (an earlier attempt) overshoots and oscillates instead of settling.
-  for(const A of nodes){A.vx-=A.x*0.008;A.vy-=A.y*0.008;}
+  for(const A of nodes){A.vx-=A.x*0.011;A.vy-=A.y*0.011;}
   // Hard velocity cap: a safety net independent of the exact force constants above — whatever
   // the net force on a node comes out to, it can never move faster than this per frame, so a
   // parameter combination that's slightly too strong degrades to "settles a bit slower"
@@ -748,8 +748,21 @@ function wireGlobeInteraction(){
       }
       globePointers.delete(e.pointerId);
     }
-    if(globePointers.size<2)globePinch=null;
-    if(globePointers.size===0)globeDrag=null;
+    // Lifting one finger out of a 2-finger pinch used to leave BOTH globeDrag and globePinch
+    // null while the other finger was still down — physics would resume mid-touch and the
+    // remaining finger stopped panning, which read as the map "breaking"/jumping right as you
+    // let go. Hand off to a fresh drag anchored at the remaining finger instead.
+    if(globePointers.size>=2){
+      globePinch={d0:pinchDist(),zoom0:GLOBE.zoom};
+      globeDrag=null;
+    } else if(globePointers.size===1){
+      globePinch=null;
+      const remaining=[...globePointers.values()][0];
+      globeDrag={x0:remaining.x,y0:remaining.y,panX0:GLOBE.panX,panY0:GLOBE.panY,moved:true};
+    } else {
+      globePinch=null;
+      globeDrag=null;
+    }
   }
   canvas.addEventListener('pointerup',release);
   canvas.addEventListener('pointercancel',release);
