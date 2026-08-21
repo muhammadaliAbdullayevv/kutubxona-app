@@ -383,6 +383,7 @@ function openDetail(id){
     <div class="actions">
       <button class="btn primary" id="openBot">📖 Botda o'qish</button>
       <button class="btn ghost ${fav?'on':''}" id="dFav">${fav?'❤️':'🤍'}</button>
+      ${canAct()?'<button class="btn ghost" id="dList">🗂</button>':''}
       <button class="btn ghost" id="dShare">↗️</button>
     </div>`;
   const url=`https://t.me/${DB.bot}?start=b_${encodeURIComponent(b.i)}`;
@@ -402,6 +403,8 @@ function openDetail(id){
     });
   };
   $('#dFav').onclick=()=>toggleFav(b.i);
+  const dListBtn=$('#dList');
+  if(dListBtn)dListBtn.onclick=()=>{haptic();openSheet2(listPickerHtml(b.i,b.t));loadListPicker(b.i);};
   $('#dShare').onclick=()=>{const txt=`📚 ${b.t}${b.a?' — '+b.a:''}`;const s=`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(txt)}`;tg?.openTelegramLink?tg.openTelegramLink(s):navigator.share?.({title:b.t,url});};
   c.querySelectorAll('[data-sub]').forEach(el=>el.onclick=()=>{closeSheet();$('#q').value=el.dataset.sub;state.q=el.dataset.sub;$('#clr').style.display='block';if(state.view!=='browse'){state.view='browse';setTabs();}run();window.scrollTo(0,0);});
   c.querySelectorAll('.si').forEach(el=>el.onclick=()=>openDetail(el.dataset.id));
@@ -418,7 +421,7 @@ function openDetail(id){
 }
 function closeSheet(){$('#sheet').classList.remove('open');tg?.BackButton?.hide();}
 
-// ---- profile overlay (reading streak, badges) ----
+// ---- profile overlay (reading streak/badges, my lists, public lists) ----
 function openSheet2(html){$('#sheet2c').innerHTML=html;$('#sheet2').classList.add('open');tg?.BackButton?.show();}
 function closeSheet2(){$('#sheet2').classList.remove('open');tg?.BackButton?.hide();}
 const _BADGE_META={
@@ -427,16 +430,29 @@ const _BADGE_META={
   bookworm:{emoji:'📚',label:'Kitobxon'},
   collector:{emoji:'⭐',label:"To'plovchi"},
   voice:{emoji:'💬',label:"Faol a'zo"},
+  curator:{emoji:'🗂',label:'Kutubxonachi'},
 };
 function profileShellHtml(){
   return `<div class="dbody" style="padding-top:20px">
     <h2 class="dtitle">👤 Profil</h2>
+    <div class="tabs" style="margin:10px 0 14px">
+      <div class="tab on" id="ptabMe">📊 Men</div>
+      <div class="tab" id="ptabMine">🗂 Ro'yxatlarim</div>
+      <div class="tab" id="ptabPublic">🌍 Kashfiyot</div>
+    </div>
     <div id="pBody">Yuklanmoqda...</div>
   </div>`;
 }
+function setProfileTab(which){
+  $('#ptabMe').classList.toggle('on',which==='me');
+  $('#ptabMine').classList.toggle('on',which==='mine');
+  $('#ptabPublic').classList.toggle('on',which==='public');
+}
 function loadProfile(){
+  setProfileTab('me');
   const body=$('#pBody');if(!body)return;
   if(!canAct()){body.innerHTML='<p class="hint">Profilingizni ko\'rish uchun botda oching.</p>';return;}
+  body.innerHTML='Yuklanmoqda...';
   api('/api/profile/me').then(r=>{
     const s=r.streak,st=r.stats;
     const badges=r.badges.map(b=>{const m=_BADGE_META[b.code]||{emoji:'🏅',label:b.code};return `<span class="pill${b.achieved?'':' locked'}">${m.emoji} <b>${esc(m.label)}</b></span>`;}).join('');
@@ -451,7 +467,100 @@ function loadProfile(){
       <div class="sec"><h3>Nishonlar</h3><div class="pills">${badges}</div></div>`;
   }).catch(()=>{body.innerHTML='<p class="hint">Ma\'lumot yuklanmadi.</p>';});
 }
-$('#btnProfile').onclick=()=>{haptic();openSheet2(profileShellHtml());loadProfile();};
+function listRowHtml(l){
+  return `<div class="lrow" data-id="${esc(l.id)}">
+    <div><div class="lt">${esc(l.title)}</div><div class="lm">${l.item_count} ta kitob · ${l.follower_count} ta obunachi</div></div>
+    ${l.is_owner?'':`<button class="btn ghost lfollow${l.is_following?' on':''}" data-id="${esc(l.id)}" style="width:44px; height:36px; padding:0; flex:0 0 auto">${l.is_following?'✓':'+'}</button>`}
+  </div>`;
+}
+function loadMyLists(){
+  setProfileTab('mine');
+  const body=$('#pBody');if(!body)return;
+  if(!canAct()){body.innerHTML='<p class="hint">Ro\'yxatlaringizni ko\'rish uchun botda oching.</p>';return;}
+  body.innerHTML='Yuklanmoqda...';
+  api('/api/lists/mine').then(r=>{
+    const rows=r.lists.map(listRowHtml).join('')||'<p class="hint">Hali ro\'yxat yaratmagansiz.</p>';
+    body.innerHTML=`
+      <form id="pNewList" style="margin-bottom:14px">
+        <input id="pNewListTitle" maxlength="120" placeholder="Yangi ro'yxat nomi..." required style="width:100%; background:var(--card); border:1px solid var(--line); border-radius:10px; color:var(--text); padding:9px; font:inherit; box-sizing:border-box">
+        <button type="submit" style="margin-top:6px; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border:0; border-radius:10px; padding:8px 14px; font-weight:700; cursor:pointer">+ Yaratish</button>
+      </form>
+      <div id="pMyListRows">${rows}</div>`;
+    $('#pNewList').addEventListener('submit',e=>{
+      e.preventDefault();
+      const t=$('#pNewListTitle').value.trim();if(!t)return;
+      api('/api/lists',{method:'POST',body:JSON.stringify({title:t,is_public:false})}).then(()=>{loadMyLists();}).catch(()=>toast('Xatolik yuz berdi'));
+    });
+    body.querySelectorAll('.lrow').forEach(el=>el.onclick=e=>{if(e.target.closest('.lfollow'))return;openListDetail(el.dataset.id,'mine');});
+  }).catch(()=>{body.innerHTML='<p class="hint">Yuklanmadi.</p>';});
+}
+function loadPublicLists(){
+  setProfileTab('public');
+  const body=$('#pBody');if(!body)return;
+  body.innerHTML='Yuklanmoqda...';
+  api('/api/lists/public').then(r=>{
+    body.innerHTML=r.lists.length?r.lists.map(listRowHtml).join(''):'<p class="hint">Hali ochiq ro\'yxatlar yo\'q.</p>';
+    body.querySelectorAll('.lfollow').forEach(el=>el.onclick=e=>{
+      e.stopPropagation();
+      if(!canAct()){toast('Botda oching');return;}
+      api('/api/lists/'+encodeURIComponent(el.dataset.id)+'/follow',{method:'POST'}).then(r=>{
+        el.classList.toggle('on',r.following);el.textContent=r.following?'✓':'+';
+      }).catch(()=>{});
+    });
+    body.querySelectorAll('.lrow').forEach(el=>el.onclick=e=>{if(e.target.closest('.lfollow'))return;openListDetail(el.dataset.id,'public');});
+  }).catch(()=>{body.innerHTML='<p class="hint">Yuklanmadi.</p>';});
+}
+function openListDetail(listId,fromTab){
+  const body=$('#pBody');if(!body)return;
+  body.innerHTML='Yuklanmoqda...';
+  Promise.all([api('/api/lists/'+encodeURIComponent(listId)),api('/api/lists/'+encodeURIComponent(listId)+'/items')]).then(([l,it])=>{
+    const rows=it.items.map(b=>`<div class="lrow" data-id="${esc(b.id)}"><div><div class="lt">${esc(b.title||'')}</div></div></div>`).join('')||'<p class="hint">Bo\'sh ro\'yxat.</p>';
+    body.innerHTML=`<div class="creply-btn" id="pBack" style="margin-bottom:10px; display:inline-block">← Orqaga</div>
+      <h3 style="margin:4px 0 2px">${esc(l.title)}</h3>
+      <div class="lm" style="margin-bottom:10px">${l.item_count} ta kitob · ${l.follower_count} ta obunachi</div>
+      ${rows}`;
+    $('#pBack').onclick=()=>{if(fromTab==='mine')loadMyLists();else loadPublicLists();};
+    body.querySelectorAll('.lrow').forEach(el=>el.onclick=()=>{closeSheet2();openDetail(el.dataset.id);});
+  }).catch(()=>{body.innerHTML='<p class="hint">Yuklanmadi.</p>';});
+}
+// ---- "add to list" picker (opened from a book's detail sheet) ----
+function listPickerHtml(bookId,bookTitle){
+  return `<div class="dbody" style="padding-top:20px">
+    <h2 class="dtitle">🗂 Ro'yxatga qo'shish</h2>
+    <div class="dauthor">${esc(bookTitle)}</div>
+    <div id="lpBody">Yuklanmoqda...</div>
+  </div>`;
+}
+function loadListPicker(bookId){
+  const body=$('#lpBody');if(!body)return;
+  api('/api/lists/mine-with-book/'+encodeURIComponent(bookId)).then(r=>{
+    const rows=r.lists.map(l=>`<div class="lrow" data-id="${esc(l.id)}" style="cursor:default">
+        <div class="lt">${esc(l.title)}</div>
+        <button class="btn ghost lp-toggle${l.contains?' on':''}" data-id="${esc(l.id)}" style="width:44px; height:36px; padding:0; flex:0 0 auto">${l.contains?'✓':'+'}</button>
+      </div>`).join('')||'<p class="hint">Hali ro\'yxat yaratmagansiz.</p>';
+    body.innerHTML=rows+`
+      <form id="lpNew" style="margin-top:6px">
+        <input id="lpNewTitle" maxlength="120" placeholder="Yangi ro'yxat nomi..." required style="width:100%; background:var(--card); border:1px solid var(--line); border-radius:10px; color:var(--text); padding:9px; font:inherit; box-sizing:border-box">
+        <button type="submit" style="margin-top:6px; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border:0; border-radius:10px; padding:8px 14px; font-weight:700; cursor:pointer">+ Yaratish va qo'shish</button>
+      </form>`;
+    body.querySelectorAll('.lp-toggle').forEach(el=>el.onclick=()=>{
+      const adding=!el.classList.contains('on');
+      const path='/api/lists/'+encodeURIComponent(el.dataset.id)+(adding?'/items':'/items/remove');
+      api(path,{method:'POST',body:JSON.stringify({book_id:bookId})}).then(()=>{
+        el.classList.toggle('on',adding);el.textContent=adding?'✓':'+';
+        toast(adding?'Ro\'yxatga qo\'shildi':'Ro\'yxatdan olib tashlandi');
+      }).catch(()=>toast('Xatolik yuz berdi'));
+    });
+    $('#lpNew').addEventListener('submit',e=>{
+      e.preventDefault();
+      const t=$('#lpNewTitle').value.trim();if(!t)return;
+      api('/api/lists',{method:'POST',body:JSON.stringify({title:t,is_public:false})}).then(r=>{
+        return api('/api/lists/'+encodeURIComponent(r.id)+'/items',{method:'POST',body:JSON.stringify({book_id:bookId})});
+      }).then(()=>{toast('Ro\'yxat yaratildi');loadListPicker(bookId);}).catch(()=>toast('Xatolik yuz berdi'));
+    });
+  }).catch(()=>{body.innerHTML='<p class="hint">Yuklanmadi.</p>';});
+}
+$('#btnProfile').onclick=()=>{haptic();openSheet2(profileShellHtml());loadProfile();$('#ptabMe').onclick=loadProfile;$('#ptabMine').onclick=loadMyLists;$('#ptabPublic').onclick=loadPublicLists;};
 $('#sheet2').onclick=e=>{if(e.target.id==='sheet2')closeSheet2();};
 
 // ---- discussion (per-book comments/replies/likes — talks to the same table the bot's
