@@ -385,8 +385,8 @@ function openDetail(id){
       ${b.sm?`<div class="sec"><h3>Qisqacha</h3><p>${esc(b.sm)}</p></div>`:''}
       ${b.d?`<div class="sec"><h3>Tavsif</h3><p>${esc(b.d)}</p></div>`:''}
       ${(b.s&&b.s.length)?`<div class="sec"><h3>Mavzular</h3><div class="subs">${b.s.map(s=>`<span class="sub" data-sub="${esc(s)}">${esc(s)}</span>`).join('')}</div></div>`:''}
-      ${relatedShelf(b)}
       <div class="sec" id="rSec"><h3>⭐ Reyting</h3><div id="rBody">Yuklanmoqda...</div></div>
+      ${relatedShelf(b)}
     </div>
     <div class="actions">
       <button class="btn primary" id="openBot">📖 Botda o'qish</button>
