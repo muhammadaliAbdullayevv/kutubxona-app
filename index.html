@@ -20,9 +20,9 @@
   }
   /* Day — parchment & ink */
   :root[data-theme="day"]{
-    --bg:#f6f0e3; --card:#fffdf8; --card2:#efe4cd; --text:#26190f; --muted:#83705a;
-    --accent:#a86423; --accent2:#7d4420; --line:#e6d9bd; --chip:#efe4cd; --danger:#b6402f;
-    --shadow:0 6px 20px rgba(60,40,10,.14);
+    --bg:#f7f5f0; --card:#ffffff; --card2:#eeebe2; --text:#1e1b16; --muted:#726c5f;
+    --accent:#2f6b4f; --accent2:#1f4d38; --line:#e3ded1; --chip:#eeebe2; --danger:#c0392b;
+    --shadow:0 6px 20px rgba(30,25,15,.10);
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
   html,body{margin:0; padding:0}
@@ -607,7 +607,7 @@ function applyThemeMode(){
   const t=resolveTheme();
   document.documentElement.setAttribute('data-theme',t);
   const meta=$('#themeColorMeta');
-  if(meta)meta.setAttribute('content',t==='day'?'#f6f0e3':'#14100b');
+  if(meta)meta.setAttribute('content',t==='day'?'#f7f5f0':'#14100b');
   const btn=$('#btnTheme');
   if(btn)btn.textContent=t==='day'?'☀️':'🌙';
 }
