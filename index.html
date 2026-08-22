@@ -147,6 +147,29 @@
   #libLeft{grid-column:1; grid-row:2}
   #libDown{grid-column:2; grid-row:2}
   #libRight{grid-column:3; grid-row:2}
+  #libCarHud{position:fixed; left:0; right:0; bottom:0; height:24vh; pointer-events:none; z-index:1; display:none;
+    background:linear-gradient(to top, rgba(0,0,0,.5), rgba(0,0,0,0));
+    clip-path:polygon(0 100%, 0 38%, 16% 18%, 84% 18%, 100% 38%, 100% 100%);}
+  #libgame.car #libCarHud{display:block}
+  #libKnock{position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom) + 96px); transform:translateX(-50%) scale(.92);
+    padding:12px 20px; border-radius:999px; border:1px solid var(--line); background:var(--accent); color:#fff;
+    font-size:15px; font-weight:700; font-family:inherit; box-shadow:var(--shadow); z-index:2; cursor:pointer;
+    display:none; opacity:0; transition:opacity .2s, transform .2s;}
+  #libKnock.show{display:block; opacity:1; transform:translateX(-50%) scale(1); animation:libKnockPulse 1.3s ease-in-out infinite}
+  @keyframes libKnockPulse{0%,100%{box-shadow:0 0 0 0 rgba(0,0,0,0)}50%{box-shadow:0 0 0 9px rgba(0,0,0,0)}}
+  #libChoice{position:fixed; inset:0; z-index:5; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.55)}
+  #libChoice.show{display:flex}
+  .libChoiceCard{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:22px; width:min(320px,86vw); text-align:center; box-shadow:var(--shadow)}
+  .libChoiceTitle{font-size:17px; font-weight:700; color:var(--text); margin-bottom:16px}
+  .libChoiceCard button{display:block; width:100%; padding:14px; margin-top:10px; border-radius:14px; border:1px solid var(--line);
+    background:var(--chip); color:var(--text); font-size:16px; font-weight:600; font-family:inherit; cursor:pointer}
+  .libChoiceCard button:active{background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff}
+  #libInterior{position:fixed; inset:0; z-index:5; display:none; align-items:center; justify-content:center; background:var(--bg)}
+  #libInterior.show{display:flex}
+  .libInteriorCard{text-align:center; padding:24px; max-width:320px}
+  .libInteriorTitle{font-size:20px; font-weight:700; color:var(--text); margin-bottom:8px}
+  .libInteriorText{font-size:14px; color:var(--muted); margin-bottom:18px}
+  .libInteriorCard button{padding:12px 20px; border-radius:14px; border:1px solid var(--line); background:var(--chip); color:var(--text); font-size:15px; font-weight:600; font-family:inherit; cursor:pointer}
   .glegend{position:absolute; left:12px; bottom:calc(env(safe-area-inset-bottom) + 12px); display:flex; flex-direction:column; gap:4px; font-size:11px; color:var(--muted); max-height:44vh; overflow-y:auto; pointer-events:none; max-width:56%}
   .glegend .lg-row{display:flex; align-items:center; gap:6px; white-space:nowrap; text-shadow:0 1px 3px var(--bg)}
   .glegend .lg-row b{color:var(--text)}
@@ -228,7 +251,20 @@
   <button id="libLeft" type="button">◀</button>
   <button id="libDown" type="button">▼</button>
   <button id="libRight" type="button">▶</button>
+</div>
+<div id="libCarHud"></div>
+<button id="libKnock" type="button">🚪 Eshikni taqillatish</button>
+<div id="libChoice"><div class="libChoiceCard">
+  <div class="libChoiceTitle">Kutubxonaga qanday borasiz?</div>
+  <button id="libFoot" type="button">🚶 Piyoda</button>
+  <button id="libCar" type="button">🚗 Mashinada</button>
 </div></div>
+<div id="libInterior"><div class="libInteriorCard">
+  <div class="libInteriorTitle">📚 Eshik ochildi!</div>
+  <div class="libInteriorText">Kitob javonlari tez orada shu yerda paydo bo'ladi.</div>
+  <button id="libInteriorBack" type="button">🔙 Tashqariga</button>
+</div></div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1158,15 +1194,20 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.m
 
 const LG_WORLD = { halfX: 90, zMin: -70, zMax: 90, spawnZ: 70, libZ: -40 };
 const LG_EYE_HEIGHT = 1.7;
-const LG_TURN_RATE = 1.8;   // rad/s while holding a turn button
-const LG_MAX_SPEED = 9;     // m/s forward
-const LG_ACCEL = 24, LG_DECEL = 30;
+const LG_DOOR = { x: 0, z: LG_WORLD.libZ + 9.05 };
+const LG_KNOCK_DIST = 7;
+// Foot vs. car changes feel, not just top speed — a car accelerates/brakes more gradually
+// (heavier) and turns less sharply than a person can pivot on foot.
+const LG_MODE_CFG = {
+  foot: { maxSpeed: 9, accel: 24, decel: 30, turnRate: 1.8, bobAmp: 0.045 },
+  car: { maxSpeed: 24, accel: 14, decel: 20, turnRate: 1.0, bobAmp: 0.015 },
+};
 
 const LG = {
-  x: 0, z: LG_WORLD.spawnZ, yaw: 0, speed: 0, walk: 0,
+  x: 0, z: LG_WORLD.spawnZ, yaw: 0, speed: 0, walk: 0, mode: null, nearDoor: false, atDoor: false,
   keys: { fwd: false, back: false, left: false, right: false },
   raf: null, lastTs: 0, built: false, wired: false,
-  renderer: null, scene: null, camera: null,
+  renderer: null, scene: null, camera: null, door: null,
 };
 
 function lgToken(name) {
@@ -1243,10 +1284,11 @@ function lgBuildScene() {
   lib.add(roof);
   const door = new THREE.Mesh(
     new THREE.BoxGeometry(4, 6.5, 0.4),
-    new THREE.MeshStandardMaterial({ color: path, roughness: 0.6 })
+    new THREE.MeshStandardMaterial({ color: path, roughness: 0.6, transparent: true, opacity: 1 })
   );
   door.position.set(0, 3.25, 9.05);
   lib.add(door);
+  LG.door = door;
   const winMat = new THREE.MeshStandardMaterial({ color: accent, roughness: 0.4 });
   const win1 = new THREE.Mesh(new THREE.BoxGeometry(3, 3, 0.3), winMat);
   win1.position.set(-6.5, 8.5, 9.05);
@@ -1287,13 +1329,14 @@ function lgResize() {
 window.addEventListener('resize', lgResize);
 
 function lgStep(dt) {
-  if (LG.keys.left) LG.yaw += LG_TURN_RATE * dt;
-  if (LG.keys.right) LG.yaw -= LG_TURN_RATE * dt;
+  const cfg = LG_MODE_CFG[LG.mode] || LG_MODE_CFG.foot;
+  if (LG.keys.left) LG.yaw += cfg.turnRate * dt;
+  if (LG.keys.right) LG.yaw -= cfg.turnRate * dt;
   let target = 0;
-  if (LG.keys.fwd) target = LG_MAX_SPEED;
-  else if (LG.keys.back) target = -LG_MAX_SPEED * 0.5; // reversing is slower, like walking backward
-  if (LG.speed < target) LG.speed = Math.min(target, LG.speed + LG_ACCEL * dt);
-  else if (LG.speed > target) LG.speed = Math.max(target, LG.speed - LG_DECEL * dt);
+  if (LG.keys.fwd) target = cfg.maxSpeed;
+  else if (LG.keys.back) target = -cfg.maxSpeed * 0.5; // reversing is slower, like backing up
+  if (LG.speed < target) LG.speed = Math.min(target, LG.speed + cfg.accel * dt);
+  else if (LG.speed > target) LG.speed = Math.max(target, LG.speed - cfg.decel * dt);
   if (Math.abs(LG.speed) > 0.05) {
     LG.x += -Math.sin(LG.yaw) * LG.speed * dt;
     LG.z += -Math.cos(LG.yaw) * LG.speed * dt;
@@ -1302,9 +1345,18 @@ function lgStep(dt) {
   LG.x = Math.max(-LG_WORLD.halfX, Math.min(LG_WORLD.halfX, LG.x));
   LG.z = Math.max(LG_WORLD.zMin, Math.min(LG_WORLD.zMax, LG.z));
 
-  const bob = Math.abs(LG.speed) > 0.3 ? Math.sin(LG.walk) * 0.045 : 0;
+  const bob = Math.abs(LG.speed) > 0.3 ? Math.sin(LG.walk) * cfg.bobAmp : 0;
   LG.camera.position.set(LG.x, LG_EYE_HEIGHT + bob, LG.z);
   LG.camera.rotation.set(0, LG.yaw, 0);
+
+  if (!LG.atDoor) {
+    const dist = Math.hypot(LG.x - LG_DOOR.x, LG.z - LG_DOOR.z);
+    const near = dist < LG_KNOCK_DIST;
+    if (near !== LG.nearDoor) {
+      LG.nearDoor = near;
+      document.getElementById('libKnock').classList.toggle('show', near);
+    }
+  }
 }
 
 function lgTick(ts) {
@@ -1326,23 +1378,67 @@ function lgWireControls() {
     el.addEventListener('pointerleave', release);
   }
   bind('#libUp', 'fwd'); bind('#libDown', 'back'); bind('#libLeft', 'left'); bind('#libRight', 'right');
+  document.getElementById('libKnock').addEventListener('click', lgKnock);
+  document.getElementById('libFoot').addEventListener('click', () => startLibGame('foot'));
+  document.getElementById('libCar').addEventListener('click', () => startLibGame('car'));
+  document.getElementById('libInteriorBack').addEventListener('click', lgLeaveInterior);
   LG.wired = true;
 }
 
-function openLibGame() {
+// Fades the door out in place (no hinge geometry yet — good enough to read as "opening" for
+// this stage) then shows the interior placeholder. Real shelf browsing is the next build.
+function lgKnock() {
+  if (LG.atDoor) return;
+  LG.atDoor = true;
+  window.haptic?.('medium');
+  Object.keys(LG.keys).forEach(k => LG.keys[k] = false);
+  document.getElementById('libKnock').classList.remove('show');
+  const door = LG.door, mat = door.material;
+  const start = performance.now(), dur = 480;
+  function anim(ts) {
+    const t = Math.min(1, (ts - start) / dur);
+    mat.opacity = 1 - t;
+    door.position.y = 3.25 + t * 0.4;
+    door.rotation.z = t * 0.5;
+    if (t < 1) requestAnimationFrame(anim);
+    else document.getElementById('libInterior').classList.add('show');
+  }
+  requestAnimationFrame(anim);
+}
+function lgLeaveInterior() {
+  document.getElementById('libInterior').classList.remove('show');
+  const door = LG.door, mat = door.material;
+  mat.opacity = 1; door.position.y = 3.25; door.rotation.z = 0;
+  LG.atDoor = false; LG.nearDoor = false;
+  LG.z = LG_DOOR.z + LG_KNOCK_DIST + 3; // step back so the prompt doesn't fire again immediately
+}
+
+function startLibGame(mode) {
+  LG.mode = mode;
+  document.getElementById('libChoice').classList.remove('show');
+  document.getElementById('libgame').classList.toggle('car', mode === 'car');
   if (!LG.built) lgBuildScene();
-  if (!LG.wired) lgWireControls();
-  document.getElementById('libgame').classList.add('open');
-  window.Telegram?.WebApp?.BackButton?.show();
+  LG.x = 0; LG.z = LG_WORLD.spawnZ; LG.yaw = 0; LG.speed = 0; LG.atDoor = false; LG.nearDoor = false;
   lgResize();
   LG.lastTs = 0;
   if (!LG.raf) LG.raf = requestAnimationFrame(lgTick);
 }
+
+function openLibGame() {
+  if (!LG.wired) lgWireControls();
+  document.getElementById('libgame').classList.add('open');
+  document.getElementById('libChoice').classList.add('show');
+  window.Telegram?.WebApp?.BackButton?.show();
+}
 function closeLibGame() {
   document.getElementById('libgame').classList.remove('open');
+  document.getElementById('libChoice').classList.remove('show');
+  document.getElementById('libInterior').classList.remove('show');
+  document.getElementById('libKnock').classList.remove('show');
   window.Telegram?.WebApp?.BackButton?.hide();
   if (LG.raf) { cancelAnimationFrame(LG.raf); LG.raf = null; }
   Object.keys(LG.keys).forEach(k => LG.keys[k] = false);
+  LG.mode = null;
 }
 window.openLibGame = openLibGame;
 window.closeLibGame = closeLibGame;
