@@ -157,6 +157,15 @@
     display:none; opacity:0; transition:opacity .2s, transform .2s;}
   #libKnock.show{display:block; opacity:1; transform:translateX(-50%) scale(1); animation:libKnockPulse 1.3s ease-in-out infinite}
   @keyframes libKnockPulse{0%,100%{box-shadow:0 0 0 0 rgba(0,0,0,0)}50%{box-shadow:0 0 0 9px rgba(0,0,0,0)}}
+  #libCarEnter{position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom) + 96px); transform:translateX(-50%) scale(.92);
+    padding:12px 20px; border-radius:999px; border:1px solid var(--line); background:var(--accent2); color:#fff;
+    font-size:15px; font-weight:700; font-family:inherit; box-shadow:var(--shadow); z-index:2; cursor:pointer;
+    display:none; opacity:0; transition:opacity .2s, transform .2s;}
+  #libCarEnter.show{display:block; opacity:1; transform:translateX(-50%) scale(1); animation:libKnockPulse 1.3s ease-in-out infinite}
+  #libCarExit{position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom) + 96px); transform:translateX(-50%);
+    padding:12px 20px; border-radius:999px; border:1px solid var(--line); background:var(--chip); color:var(--text);
+    font-size:15px; font-weight:700; font-family:inherit; box-shadow:var(--shadow); z-index:2; cursor:pointer; display:none;}
+  #libCarExit.show{display:block}
   #libChoice{position:fixed; inset:0; z-index:5; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.55)}
   #libChoice.show{display:flex}
   .libChoiceCard{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:22px; width:min(320px,86vw); text-align:center; box-shadow:var(--shadow)}
@@ -282,6 +291,8 @@
 </div>
 <div id="libCarHud"></div>
 <button id="libKnock" type="button">🚪 Eshikni taqillatish</button>
+<button id="libCarEnter" type="button">🚗 Haydash</button>
+<button id="libCarExit" type="button">🚶 Tushish</button>
 <div id="libChoice"><div class="libChoiceCard">
   <div class="libChoiceTitle">Kutubxonaga qanday borasiz?</div>
   <button id="libFoot" type="button">🚶 Piyoda</button>
@@ -1252,6 +1263,7 @@ const lgGltfLoader = new GLTFLoader();
 const lgTreeModels = { oak: null, detailed: null };
 const lgCharModels = { a: null, b: null, c: null, d: null };
 const LG_CHAR_KEYS = ['a', 'b', 'c', 'd'];
+let lgCarModel = null;
 let lgModelsLoadPromise = null;
 function lgLoadModels() {
   if (!lgModelsLoadPromise) {
@@ -1259,6 +1271,7 @@ function lgLoadModels() {
       lgGltfLoader.loadAsync('models/tree_oak.glb').then(g => { lgTreeModels.oak = g.scene; }).catch(() => {}),
       lgGltfLoader.loadAsync('models/tree_detailed.glb').then(g => { lgTreeModels.detailed = g.scene; }).catch(() => {}),
       ...LG_CHAR_KEYS.map(k => lgGltfLoader.loadAsync(`models/char_${k}.glb`).then(g => { lgCharModels[k] = g; }).catch(() => {})),
+      lgGltfLoader.loadAsync('models/car/sedan.glb').then(g => { lgCarModel = g.scene; }).catch(() => {}),
     ]);
   }
   return lgModelsLoadPromise;
@@ -1321,7 +1334,13 @@ const LG = {
   raf: null, lastTs: 0, built: false, interiorBuilt: false, wired: false,
   renderer: null, camera: null, outdoorScene: null, interiorScene: null, activeScene: null,
   door: null, bookMeshes: [], bookInstanceIds: [], shelfZones: [],
+  carMesh: null, carState: 'parked', carPos: { x: 0, z: 45 }, carYaw: 0, nearCar: false,
 };
+const LG_CAR_ENTER_DIST = 5;
+// Kenney's sedan.glb is authored front-facing +Z (its wheel nodes are literally named
+// wheel-front-*/wheel-back-* with front at z=+0.66) — opposite of this game's yaw=0 forward
+// (-Z), same mismatch as the character models needed the same fix for.
+const LG_CAR_FACING_OFFSET = Math.PI;
 
 // Live multiplayer: presence, movement, chat, all over one WebSocket per player. `others` maps
 // player id -> {name, mesh, tx/tz/tyaw (latest server-reported position, interpolated toward
@@ -1853,6 +1872,23 @@ async function lgBuildOutdoor(pal) {
     scene.add(lamp);
   }
 
+  // A real parked car sitting in the street — walk up to it for a "Drive" prompt, same pattern
+  // as the library door. Hidden (not omitted) while someone's actually driving it.
+  if (lgCarModel) {
+    const car = lgCarModel.clone(true);
+    const box = new THREE.Box3().setFromObject(car);
+    const size = new THREE.Vector3(); box.getSize(size);
+    car.scale.setScalar(4.2 / (size.z || 1)); // real sedan length, the car's most recognizable dimension
+    const box2 = new THREE.Box3().setFromObject(car);
+    car.position.y -= box2.min.y;
+    car.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    car.position.x = LG.carPos.x; car.position.z = LG.carPos.z;
+    car.rotation.y = LG.carYaw + LG_CAR_FACING_OFFSET;
+    car.visible = LG.carState !== 'driving';
+    scene.add(car);
+    LG.carMesh = car;
+  }
+
   const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('libgameCanvas'), antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -2039,6 +2075,14 @@ function lgStep(dt) {
       document.getElementById('libKnock').classList.toggle('show', near);
     }
   }
+  if (!LG.inside && LG.carState === 'parked' && LG.carMesh) {
+    const cdist = Math.hypot(LG.x - LG.carPos.x, LG.z - LG.carPos.z);
+    const cnear = cdist < LG_CAR_ENTER_DIST;
+    if (cnear !== LG.nearCar) {
+      LG.nearCar = cnear;
+      document.getElementById('libCarEnter').classList.toggle('show', cnear);
+    }
+  }
   if (LG.inside && LG.shelfZones.length) {
     let closest = null, bestD = Infinity;
     for (const z of LG.shelfZones) {
@@ -2145,6 +2189,8 @@ function lgWireControls() {
   // leave the character walking forever — release everything the moment focus leaves the page.
   window.addEventListener('blur', () => { Object.keys(LG.keys).forEach(k => LG.keys[k] = false); });
   document.getElementById('libKnock').addEventListener('click', lgKnock);
+  document.getElementById('libCarEnter').addEventListener('click', lgEnterCar);
+  document.getElementById('libCarExit').addEventListener('click', lgExitCar);
   document.getElementById('libFoot').addEventListener('click', () => startLibGame('foot'));
   document.getElementById('libCar').addEventListener('click', () => startLibGame('car'));
   document.getElementById('libInteriorBack').addEventListener('click', lgLeaveInterior);
@@ -2205,10 +2251,42 @@ function lgLeaveInterior() {
   document.getElementById('libgame').classList.remove('hasInteriorBack');
 }
 
+function lgEnterCar() {
+  if (LG.carState !== 'parked') return;
+  window.haptic?.('medium');
+  LG.carState = 'driving';
+  LG.mode = 'car';
+  if (LG.carMesh) LG.carMesh.visible = false;
+  document.getElementById('libgame').classList.add('car');
+  document.getElementById('libCarEnter').classList.remove('show');
+  document.getElementById('libCarExit').classList.add('show');
+  LG.nearCar = false;
+}
+function lgExitCar() {
+  if (LG.carState !== 'driving') return;
+  window.haptic?.('light');
+  LG.carState = 'parked';
+  LG.mode = 'foot';
+  LG.carPos = { x: LG.x, z: LG.z };
+  LG.carYaw = LG.yaw;
+  if (LG.carMesh) {
+    LG.carMesh.position.set(LG.carPos.x, LG.carMesh.position.y, LG.carPos.z);
+    LG.carMesh.rotation.y = LG.carYaw + LG_CAR_FACING_OFFSET;
+    LG.carMesh.visible = true;
+  }
+  document.getElementById('libgame').classList.remove('car');
+  document.getElementById('libCarExit').classList.remove('show');
+}
+
 async function startLibGame(mode) {
   LG.mode = mode; LG.outdoorMode = mode;
+  // Choosing "Mashinada" up front means you're already driving the same world car the "Drive"
+  // prompt would otherwise put you in — keep both paths in sync rather than having a second,
+  // untouched parked car sitting ignored at its spawn point.
+  LG.carState = mode === 'car' ? 'driving' : 'parked';
   document.getElementById('libChoice').classList.remove('show');
   document.getElementById('libgame').classList.toggle('car', mode === 'car');
+  document.getElementById('libCarExit').classList.toggle('show', mode === 'car');
   if (!LG.built) await lgBuildOutdoor(lgPalette());
   LG.x = 0; LG.z = LG_WORLD.spawnZ; LG.yaw = 0; LG.pitch = 0; LG.speed = 0; LG.atDoor = false; LG.nearDoor = false; LG.inside = false;
   LG.activeScene = LG.outdoorScene;
