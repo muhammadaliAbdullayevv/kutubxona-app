@@ -1198,12 +1198,10 @@ boot();
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
 
 const LG_WORLD = { halfX: 90, zMin: -70, zMax: 90, spawnZ: 70, libZ: -40 };
-const LG_IN_WORLD = { halfX: 20, zMin: -30, zMax: 6 };
+const LG_IN_WORLD = { halfX: 25, zMin: -44, zMax: 32 };
 const LG_EYE_HEIGHT = 1.7;
 const LG_DOOR = { x: 0, z: LG_WORLD.libZ + 9.05 };
 const LG_KNOCK_DIST = 7;
-const LG_SHELF_GENRES = 6;
-const LG_BOOKS_PER_SHELF = 10;
 
 // Natural environment colors, independent of the app's flat UI accent tokens — grass, brick and
 // wood shouldn't be rendered in the same palette as buttons and chips.
@@ -1229,9 +1227,10 @@ const LG_PALETTE = {
     treeFoliage: ['#1e3018', '#182812', '#243a1e'],
   },
 };
+// The game always renders in daylight regardless of the app's own day/night theme toggle —
+// a dim library at 9pm isn't the point; the night palette stays defined but unused for now.
 function lgPalette() {
-  const t = document.documentElement.getAttribute('data-theme');
-  return LG_PALETTE[t === 'night' ? 'night' : 'day'];
+  return LG_PALETTE.day;
 }
 
 // Foot vs. car changes feel, not just top speed — a car accelerates/brakes more gradually
@@ -1248,7 +1247,7 @@ const LG = {
   keys: { fwd: false, back: false, left: false, right: false },
   raf: null, lastTs: 0, built: false, interiorBuilt: false, wired: false,
   renderer: null, camera: null, outdoorScene: null, interiorScene: null, activeScene: null,
-  door: null, bookMeshes: [], shelfZones: [],
+  door: null, bookMeshes: [], bookInstanceIds: [], shelfZones: [],
 };
 
 // ---- hand-generated procedural textures (no art assets — canvas patterns tiled via THREE.RepeatWrapping) ----
@@ -1346,25 +1345,14 @@ function lgTree(pal, seed) {
   g.add(foliage);
   return g;
 }
-function lgFallbackTexture(b) {
-  let h = 0; const s = String(b.i || '');
+// Same hash formula as the app's own coverFor() (duplicated on purpose, not shared — keeps this
+// module's diffs isolated from the classic script), used to tint each instanced book spine so
+// thousands of books still read as visually distinct without a unique texture each.
+const LG_COVERS = [0xc17a3d, 0xa8452f, 0x4a6b4a, 0xc99a2e, 0x5a4a6b, 0x8a3a4a, 0x3a6b6b, 0xb06a2a, 0x6b5a3a];
+function lgHashColor(id) {
+  let h = 0; const s = String(id || '');
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-  const COVERS = [['#c17a3d', '#8c4a24'], ['#a8452f', '#6b2418'], ['#4a6b4a', '#2d4530'], ['#c99a2e', '#8a5c16'], ['#5a4a6b', '#382d45'], ['#8a3a4a', '#5c2530'], ['#3a6b6b', '#254545'], ['#b06a2a', '#6b3816'], ['#6b5a3a', '#453825']];
-  const [c1, c2] = COVERS[h % COVERS.length];
-  const initials = String(b.t || '?').replace(/[^\p{L}\p{N} ]/gu, '').trim().split(/\s+/).slice(0, 2).map(w => w[0] || '').join('').toUpperCase() || '📖';
-  const canvas = document.createElement('canvas');
-  canvas.width = 256; canvas.height = 340;
-  const c = canvas.getContext('2d');
-  const grad = c.createLinearGradient(0, 0, 256, 340);
-  grad.addColorStop(0, c1); grad.addColorStop(1, c2);
-  c.fillStyle = grad; c.fillRect(0, 0, 256, 340);
-  c.fillStyle = 'rgba(255,255,255,.92)';
-  c.font = '700 64px system-ui, sans-serif';
-  c.textAlign = 'center'; c.textBaseline = 'middle';
-  c.fillText(initials, 128, 170);
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
+  return LG_COVERS[h % LG_COVERS.length];
 }
 
 function lgBuildOutdoor(pal) {
@@ -1372,8 +1360,12 @@ function lgBuildOutdoor(pal) {
   scene.fog = new THREE.Fog(pal.fog, 45, 190);
   scene.add(lgSky(pal));
 
-  scene.add(new THREE.HemisphereLight(pal.sky1, pal.grass1, 0.85));
-  const sun = new THREE.DirectionalLight(pal.sun, 1.05);
+  // Three.js (r155+) uses physically-correct light units by default, where the old "looks fine
+  // at intensity ~1" values render almost pitch black — these need to be an order of magnitude
+  // higher, plus a baseline ambient so nothing ever goes fully unlit.
+  scene.add(new THREE.AmbientLight(pal.sky1, 1.2));
+  scene.add(new THREE.HemisphereLight(pal.sky1, pal.grass1, 2.2));
+  const sun = new THREE.DirectionalLight(pal.sun, 3.4);
   sun.position.set(45, 65, 25);
   sun.castShadow = true;
   sun.shadow.mapSize.set(1024, 1024);
@@ -1434,6 +1426,8 @@ function lgBuildOutdoor(pal) {
   const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('libgameCanvas'), antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.0;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
@@ -1445,88 +1439,112 @@ function lgBuildOutdoor(pal) {
   lgResize();
 }
 
-function lgMakeBookMesh(b, pal, wallSide) {
-  const w = 1.0, h = 1.3, d = 0.16;
-  const geo = new THREE.BoxGeometry(w, h, d);
-  const spineMat = new THREE.MeshStandardMaterial({ color: pal.shelfWood, roughness: 0.85 });
-  const coverTex = lgFallbackTexture(b);
-  const coverMat = new THREE.MeshStandardMaterial({ map: coverTex, roughness: 0.55 });
-  // Box material order is [+X,-X,+Y,-Y,+Z,-Z]. The cover has to face the aisle: a left-wall
-  // book (wallSide<0) needs its +X face outward, a right-wall book needs its -X face outward.
-  const mats = [spineMat, spineMat, spineMat, spineMat, spineMat, spineMat];
-  mats[wallSide < 0 ? 0 : 1] = coverMat;
-  const mesh = new THREE.Mesh(geo, mats);
-  mesh.userData.bookId = b.i;
-  if (b.hc) {
-    new THREE.TextureLoader().load(`covers/${encodeURIComponent(b.i)}.jpg`, tex => {
-      tex.colorSpace = THREE.SRGBColorSpace;
-      coverMat.map = tex; coverMat.needsUpdate = true;
-    }, undefined, () => {});
-  }
-  return mesh;
-}
+// Real library floorplans use rows of double-sided stacks with aisles between them, not two
+// walls — that's also the only way to fit thousands of books at a sane, walkable spacing instead
+// of cramming them along just two long shelves. Every book in the catalog gets a slot; genres
+// are sorted contiguous so each stack face reads as one section. Rendered as a single
+// InstancedMesh (one draw call for every book) since individual meshes per book would be far
+// too many draw calls for a phone GPU — each instance gets a hash-tinted color instead of a
+// unique cover texture; tapping still opens the real detail sheet with the real cover.
+const LG_RANGE_COUNT = 8, LG_TIERS = 5, LG_RANGE_SPACING = 6;
+const LG_ROOM_HALF_X = 26, LG_ROOM_Z_NEAR = 34, LG_ROOM_Z_FAR = -46;
 
 function lgBuildInterior(pal) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(pal.ceiling);
-  scene.fog = new THREE.Fog(pal.wallInterior, 20, 55);
+  scene.fog = new THREE.Fog(pal.wallInterior, 30, 85);
 
-  scene.add(new THREE.HemisphereLight(pal.ceiling, pal.woodFloor2, 0.6));
-  for (const z of [4, -6, -16, -26]) {
-    const lamp = new THREE.PointLight(pal.lamp, 1.3, 16, 2);
-    lamp.position.set(0, 3.8, z);
-    scene.add(lamp);
-    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 8), new THREE.MeshStandardMaterial({ color: pal.lamp, emissive: pal.lamp, emissiveIntensity: 1.2 }));
-    bulb.position.copy(lamp.position);
-    scene.add(bulb);
+  scene.add(new THREE.AmbientLight(pal.ceiling, 1.8));
+  scene.add(new THREE.HemisphereLight(pal.ceiling, pal.woodFloor2, 1.4));
+  const lampMat = new THREE.MeshStandardMaterial({ color: pal.lamp, emissive: pal.lamp, emissiveIntensity: 1.4 });
+  for (const z of [26, 10, -6, -22, -38]) {
+    for (const x of [-14, 0, 14]) {
+      const lamp = new THREE.PointLight(pal.lamp, 55, 26, 1.4);
+      lamp.position.set(x, 4.2, z);
+      scene.add(lamp);
+      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 8), lampMat);
+      bulb.position.copy(lamp.position);
+      scene.add(bulb);
+    }
   }
 
-  const floorTex = lgGrainTexture(pal.woodFloor1, pal.woodFloor2, 256, 40, 6);
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(54, 40), new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.8 }));
-  floor.rotation.x = -Math.PI / 2; floor.position.set(0, 0, -13);
+  const roomW = LG_ROOM_HALF_X * 2, roomD = LG_ROOM_Z_NEAR - LG_ROOM_Z_FAR, roomMidZ = (LG_ROOM_Z_NEAR + LG_ROOM_Z_FAR) / 2;
+  const floorTex = lgGrainTexture(pal.woodFloor1, pal.woodFloor2, 256, 60, 10);
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(roomW, roomD), new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.8 }));
+  floor.rotation.x = -Math.PI / 2; floor.position.set(0, 0, roomMidZ);
   scene.add(floor);
-  const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(54, 40), new THREE.MeshStandardMaterial({ color: pal.ceiling, roughness: 1 }));
-  ceiling.rotation.x = Math.PI / 2; ceiling.position.set(0, 4.3, -13);
+  const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(roomW, roomD), new THREE.MeshStandardMaterial({ color: pal.ceiling, roughness: 1 }));
+  ceiling.rotation.x = Math.PI / 2; ceiling.position.set(0, 4.6, roomMidZ);
   scene.add(ceiling);
   const wallMat = new THREE.MeshStandardMaterial({ color: pal.wallInterior, roughness: 0.9 });
-  const farWall = new THREE.Mesh(new THREE.PlaneGeometry(54, 4.3), wallMat);
-  farWall.position.set(0, 2.15, -32);
+  const farWall = new THREE.Mesh(new THREE.PlaneGeometry(roomW, 4.6), wallMat);
+  farWall.position.set(0, 2.3, LG_ROOM_Z_FAR);
   scene.add(farWall);
-  const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(38, 4.3), wallMat);
-  leftWall.position.set(-26, 2.15, -13); leftWall.rotation.y = Math.PI / 2;
+  const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(roomD, 4.6), wallMat);
+  leftWall.position.set(-LG_ROOM_HALF_X, 2.3, roomMidZ); leftWall.rotation.y = Math.PI / 2;
   scene.add(leftWall);
   const rightWall = leftWall.clone();
-  rightWall.position.x = 26; rightWall.rotation.y = -Math.PI / 2;
+  rightWall.position.x = LG_ROOM_HALF_X; rightWall.rotation.y = -Math.PI / 2;
   scene.add(rightWall);
 
-  const genres = (window.DB?.genres || []).slice(0, LG_SHELF_GENRES);
-  const zStart = 4, zEnd = -30, span = zStart - zEnd;
-  const tiers = [1.0, 2.3, 3.6];
-  LG.bookMeshes = [];
-  LG.shelfZones = [];
-  genres.forEach((g, gi) => {
-    const wallSide = gi < 3 ? -1 : 1; // first 3 genres on the left wall, next 3 on the right
-    const tier = tiers[gi % 3];
-    const xPos = wallSide * 24;
-    const books = (window.DB.books || []).filter(b => b.g === g.v).slice(0, LG_BOOKS_PER_SHELF);
-    if (!books.length) return;
-    const board = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.08, span), new THREE.MeshStandardMaterial({ color: pal.shelfWood, roughness: 0.85 }));
-    board.position.set(xPos, tier, (zStart + zEnd) / 2);
-    scene.add(board);
-    const gap = span / (books.length + 1);
-    books.forEach((b, i) => {
-      const mesh = lgMakeBookMesh(b, pal, wallSide);
-      const z = zStart - gap * (i + 1);
-      mesh.position.set(xPos - wallSide * 0.33, tier + 0.7, z);
-      scene.add(mesh);
-      LG.bookMeshes.push(mesh);
-    });
-    const label = lgLabelSprite(g.v, pal.text, 512, 128, 60);
-    label.position.set(xPos - wallSide * 0.6, tier + 1.5, zStart + 1.5);
-    scene.add(label);
-    LG.shelfZones.push({ name: g.v, x: xPos, zMid: (zStart + zEnd) / 2 });
-  });
+  const allBooks = (window.DB.books || []).slice().sort((a, b) => (a.g || '').localeCompare(b.g || ''));
+  const rowZStart = LG_ROOM_Z_NEAR - 4, rowZEnd = LG_ROOM_Z_FAR + 4, rowSpan = rowZStart - rowZEnd;
+  const totalRows = LG_RANGE_COUNT * 2 * LG_TIERS;
+  const perRow = Math.max(1, Math.ceil(allBooks.length / totalRows));
+  const boardMat = new THREE.MeshStandardMaterial({ color: pal.shelfWood, roughness: 0.85 });
 
+  const bookGeo = new THREE.BoxGeometry(0.42, 1.15, 0.13);
+  const bookMat = new THREE.MeshStandardMaterial({ roughness: 0.6 });
+  const instMesh = new THREE.InstancedMesh(bookGeo, bookMat, allBooks.length);
+  instMesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+  const dummy = new THREE.Object3D();
+  const col = new THREE.Color();
+  const idsByInstance = new Array(allBooks.length);
+
+  LG.shelfZones = [];
+  let bi = 0;
+  outer:
+  for (let r = 0; r < LG_RANGE_COUNT; r++) {
+    const rangeX = (r - (LG_RANGE_COUNT - 1) / 2) * LG_RANGE_SPACING;
+    for (const faceSide of [-1, 1]) {
+      const faceX = rangeX + faceSide * 0.32;
+      for (let t = 0; t < LG_TIERS; t++) {
+        const y = 0.9 + t * 0.85;
+        const board = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.06, rowSpan), boardMat);
+        board.position.set(rangeX, y, roomMidZ);
+        scene.add(board);
+        const thisRowCount = Math.min(perRow, allBooks.length - bi);
+        if (thisRowCount > 0) {
+          const gap = rowSpan / (thisRowCount + 1);
+          let rowGenre = null;
+          for (let k = 0; k < thisRowCount; k++) {
+            const b = allBooks[bi];
+            if (!rowGenre) rowGenre = b.g || 'Boshqa';
+            const z = rowZStart - gap * (k + 1);
+            dummy.position.set(faceX, y + 0.62, z);
+            dummy.rotation.set(0, 0, 0);
+            dummy.updateMatrix();
+            instMesh.setMatrixAt(bi, dummy.matrix);
+            col.setHex(lgHashColor(b.i));
+            instMesh.setColorAt(bi, col);
+            idsByInstance[bi] = b.i;
+            bi++;
+          }
+          const label = lgLabelSprite(rowGenre, pal.text, 512, 128, 54);
+          label.position.set(faceX, y + 1.0, rowZStart + 1.5);
+          scene.add(label);
+          LG.shelfZones.push({ name: rowGenre, x: faceX, zMid: roomMidZ });
+        }
+        if (bi >= allBooks.length) break outer;
+      }
+    }
+  }
+  instMesh.instanceMatrix.needsUpdate = true;
+  if (instMesh.instanceColor) instMesh.instanceColor.needsUpdate = true;
+  scene.add(instMesh);
+
+  LG.bookMeshes = [instMesh];
+  LG.bookInstanceIds = idsByInstance;
   LG.interiorScene = scene;
   LG.interiorBuilt = true;
 }
@@ -1608,7 +1626,10 @@ function lgCanvasUp(e) {
   lgPointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
   lgRay.setFromCamera(lgPointer, LG.camera);
   const hits = lgRay.intersectObjects(LG.bookMeshes, false);
-  if (hits.length) lgOpenBook(hits[0].object.userData.bookId);
+  if (!hits.length) return;
+  const hit = hits[0];
+  const id = hit.instanceId !== undefined ? LG.bookInstanceIds[hit.instanceId] : hit.object.userData.bookId;
+  if (id) lgOpenBook(id);
 }
 function lgOpenBook(id) {
   window.haptic?.('light');
@@ -1664,7 +1685,7 @@ function lgEnterInterior() {
   LG.activeScene = LG.interiorScene;
   LG.outdoorMode = LG.mode;
   LG.mode = 'inside';
-  LG.x = 0; LG.z = 3; LG.yaw = 0; LG.speed = 0;
+  LG.x = 0; LG.z = 30; LG.yaw = 0; LG.speed = 0;
   document.getElementById('libInteriorBack').classList.add('show');
 }
 function lgLeaveInterior() {
