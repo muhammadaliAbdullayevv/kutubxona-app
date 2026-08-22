@@ -1393,7 +1393,7 @@ function lgBrickTexture(base, mortar, size, repeatX, repeatY) {
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
 }
-function lgLabelSprite(text, color, w = 512, h = 128, fontSize = 56) {
+function lgLabelSprite(text, color, w = 512, h = 128, fontSize = 56, worldHeight = 4) {
   const canvas = document.createElement('canvas');
   canvas.width = w; canvas.height = h;
   const c = canvas.getContext('2d');
@@ -1405,7 +1405,10 @@ function lgLabelSprite(text, color, w = 512, h = 128, fontSize = 56) {
   tex.colorSpace = THREE.SRGBColorSpace;
   const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
   const sprite = new THREE.Sprite(mat);
-  sprite.scale.set((w / h) * 4, 4, 1);
+  // worldHeight=4 suits the building/shelf labels this was originally built for (large,
+  // read from many meters away); a name tag over a ~1.7-unit-tall avatar needs a much smaller
+  // explicit override, or it renders many times taller than the person it's labeling.
+  sprite.scale.set((w / h) * worldHeight, worldHeight, 1);
   return sprite;
 }
 function lgSky(pal) {
@@ -1516,8 +1519,8 @@ function lgAvatarMesh(name, id) {
   } else {
     wrapper.add(lgAvatarFallback(id));
   }
-  const label = lgLabelSprite(name || 'Reader', '#ffffff', 420, 100, 46);
-  label.position.y = 2.05;
+  const label = lgLabelSprite(name || 'Reader', '#ffffff', 420, 100, 46, 0.32);
+  label.position.y = 1.95;
   wrapper.add(label);
   return { mesh: wrapper, ...rec };
 }
