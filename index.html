@@ -1193,7 +1193,7 @@ $('#btnTheme').onclick=()=>{
 
 function skeletonShelf(){return `<div class="section"><div class="shead"><h2 class="skel" style="width:140px;height:16px;border-radius:6px"></h2></div><div class="shelf">${Array(4).fill('<div class="si"><div class="skel" style="height:170px;border-radius:14px"></div></div>').join('')}</div></div>`;}
 async function boot(){
-  if(tg){tg.ready();tg.expand();tg.BackButton?.onClick(()=>{if($('#sheet2').classList.contains('open'))closeSheet2();else if($('#sheet').classList.contains('open'))closeSheet();else if($('#globe').classList.contains('open'))closeGlobe();else if($('#libgame').classList.contains('open'))closeLibGame();});applyThemeMode();tg.onEvent?.('themeChanged',()=>{if(themeMode==='system')applyThemeMode();});}
+  if(tg){tg.ready();tg.expand();tg.disableVerticalSwipes?.();tg.BackButton?.onClick(()=>{if($('#sheet2').classList.contains('open'))closeSheet2();else if($('#sheet').classList.contains('open'))closeSheet();else if($('#globe').classList.contains('open'))closeGlobe();else if($('#libgame').classList.contains('open'))closeLibGame();});applyThemeMode();tg.onEvent?.('themeChanged',()=>{if(themeMode==='system')applyThemeMode();});}
   if('serviceWorker' in navigator)window.addEventListener('load',()=>{
     navigator.serviceWorker.register('./sw.js').catch(()=>{});
     // The shell/data caches are served cache-first-then-refresh, so a stale client can lag a
