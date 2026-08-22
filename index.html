@@ -2108,6 +2108,27 @@ function lgOpenBook(id) {
   window.openDetail(id);
 }
 
+const LG_KEY_MAP = {
+  ArrowUp: 'fwd', w: 'fwd', W: 'fwd',
+  ArrowDown: 'back', s: 'back', S: 'back',
+  ArrowLeft: 'left', a: 'left', A: 'left',
+  ArrowRight: 'right', d: 'right', D: 'right',
+};
+function lgKeyDown(e) {
+  // Don't hijack arrow/WASD keys while actually typing in the chat box, and only drive when the
+  // game is the thing on screen — a laptop's keyboard is otherwise live for the whole page.
+  const tag = document.activeElement?.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+  if (!document.getElementById('libgame').classList.contains('open')) return;
+  const key = LG_KEY_MAP[e.key];
+  if (!key) return;
+  LG.keys[key] = true;
+  e.preventDefault();
+}
+function lgKeyUp(e) {
+  const key = LG_KEY_MAP[e.key];
+  if (key) LG.keys[key] = false;
+}
 function lgWireControls() {
   function bind(sel, key) {
     const el = document.querySelector(sel);
@@ -2118,6 +2139,11 @@ function lgWireControls() {
     el.addEventListener('pointerleave', release);
   }
   bind('#libUp', 'fwd'); bind('#libDown', 'back'); bind('#libLeft', 'left'); bind('#libRight', 'right');
+  window.addEventListener('keydown', lgKeyDown);
+  window.addEventListener('keyup', lgKeyUp);
+  // A held key with no matching keyup (alt-tab, window losing focus mid-press) would otherwise
+  // leave the character walking forever — release everything the moment focus leaves the page.
+  window.addEventListener('blur', () => { Object.keys(LG.keys).forEach(k => LG.keys[k] = false); });
   document.getElementById('libKnock').addEventListener('click', lgKnock);
   document.getElementById('libFoot').addEventListener('click', () => startLibGame('foot'));
   document.getElementById('libCar').addEventListener('click', () => startLibGame('car'));
