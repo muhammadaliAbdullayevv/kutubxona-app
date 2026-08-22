@@ -1264,7 +1264,8 @@ function lgLoadModels() {
   return lgModelsLoadPromise;
 }
 
-const LG_WORLD = { halfX: 90, zMin: -70, zMax: 90, spawnZ: 70, libZ: -40 };
+const LG_WORLD = { halfX: 115, zMin: -100, zMax: 100, spawnZ: 70, libZ: -40 };
+const LG_CITY_CROSS_Z = 25; // where the east-west street crosses the existing north-south path
 const LG_IN_WORLD = { halfX: 25, zMin: -44, zMax: 32 };
 const LG_EYE_HEIGHT = 1.7;
 const LG_DOOR = { x: 0, z: LG_WORLD.libZ + 9.05 };
@@ -1278,7 +1279,7 @@ const LG_PALETTE = {
     grass1: '#5f8f4c', grass2: '#436b38',
     path1: '#b3a892', path2: '#8f8270',
     wall: '#c98a4c', wallDark: '#a06a34', roof: '#8a3f30', roofDark: '#6b2f24', column: '#e9dfc9',
-    plinth: '#8a7a63', step: '#c9bfa8',
+    plinth: '#8a7a63', step: '#c9bfa8', road: '#5c5a58', roadLine: '#e9e2c9',
     door: '#4a3320', windowLit: '#fff0b0',
     woodFloor1: '#a06b3c', woodFloor2: '#7a4e28', shelfWood: '#6f4526', wallInterior: '#d8b688',
     ceiling: '#e7d9bd', lamp: '#fff2c8', text: '#3a2717',
@@ -1289,7 +1290,7 @@ const LG_PALETTE = {
     grass1: '#1e2e1c', grass2: '#152213',
     path1: '#39352d', path2: '#2a2721',
     wall: '#6b4a2c', wallDark: '#43301c', roof: '#3a2019', roofDark: '#241009', column: '#8f8368',
-    plinth: '#453b2d', step: '#5c503c',
+    plinth: '#453b2d', step: '#5c503c', road: '#232322', roadLine: '#8f8878',
     door: '#180f08', windowLit: '#ffd97a',
     woodFloor1: '#3c2716', woodFloor2: '#2a1a0d', shelfWood: '#2c1c10', wallInterior: '#4a3722',
     ceiling: '#221808', lamp: '#ffcf82', text: '#f1e6d2',
@@ -1465,6 +1466,57 @@ function lgTreeInstance(pal, seed) {
     wrapper.add(lgTree(pal, seed));
   }
   return wrapper;
+}
+// A generic city building — same construction technique as the library (box + brick texture +
+// windows + door) but parametrized by seed so a whole street of them doesn't look identical:
+// varied footprint, height, wall tint, and flat-roof vs. peaked-roof.
+function lgCityBuilding(pal, seed) {
+  const g = new THREE.Group();
+  const tintSrc = [pal.wall, pal.plinth, pal.roofDark, pal.column][seed % 4];
+  const wallCol = new THREE.Color(tintSrc).offsetHSL(0, 0, (((seed * 37) % 21) - 10) / 100);
+  const w = 10 + (seed % 4) * 2.5;
+  const d = 10 + ((seed * 3) % 4) * 2.2;
+  const h = 8 + (seed % 5) * 2.6;
+  const brickTex = lgBrickTexture('#' + wallCol.getHexString(), pal.wallDark, 256, Math.max(2, Math.round(w / 5)), Math.max(2, Math.round(h / 5)));
+  const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ map: brickTex, roughness: 0.9 }));
+  body.position.y = h / 2; body.castShadow = true; body.receiveShadow = true;
+  g.add(body);
+  if (seed % 2 === 0) {
+    const trim = new THREE.Mesh(new THREE.BoxGeometry(w + 0.6, 0.5, d + 0.6), new THREE.MeshStandardMaterial({ color: pal.roofDark, roughness: 0.8 }));
+    trim.position.y = h + 0.25; trim.castShadow = true;
+    g.add(trim);
+  } else {
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(Math.max(w, d) * 0.72, 4.5, 4), new THREE.MeshStandardMaterial({ color: pal.roof, roughness: 0.7 }));
+    roof.rotation.y = Math.PI / 4; roof.position.y = h + 2.25; roof.castShadow = true;
+    g.add(roof);
+  }
+  const winMat = new THREE.MeshStandardMaterial({ color: pal.windowLit, roughness: 0.3, emissive: pal.windowLit, emissiveIntensity: 0.5 });
+  const rows = Math.max(1, Math.floor((h - 2) / 4));
+  const cols = Math.max(1, Math.floor((w - 2) / 3.5));
+  for (let r = 0; r < rows; r++) {
+    for (let ci = 0; ci < cols; ci++) {
+      const win = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.8, 0.25), winMat);
+      win.position.set(-w / 2 + (ci + 0.5) * (w / cols), 2.4 + r * 4, d / 2 + 0.05);
+      g.add(win);
+    }
+  }
+  const door = new THREE.Mesh(new THREE.BoxGeometry(2.6, 3.6, 0.3), new THREE.MeshStandardMaterial({ color: pal.door, roughness: 0.6 }));
+  door.position.set(0, 1.8, d / 2 + 0.05);
+  g.add(door);
+  return g;
+}
+function lgStreetLamp(pal) {
+  const g = new THREE.Group();
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 5.5, 8), new THREE.MeshStandardMaterial({ color: pal.roofDark, roughness: 0.7 }));
+  pole.position.y = 2.75; pole.castShadow = true;
+  g.add(pole);
+  const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.35, 10, 8), new THREE.MeshStandardMaterial({ color: pal.lamp, emissive: pal.lamp, emissiveIntensity: 1.3 }));
+  bulb.position.y = 5.6;
+  g.add(bulb);
+  const pl = new THREE.PointLight(pal.lamp, 6, 14, 2);
+  pl.position.y = 5.6;
+  g.add(pl);
+  return g;
 }
 // Same hash formula as the app's own coverFor() (duplicated on purpose, not shared — keeps this
 // module's diffs isolated from the classic script), used to tint each instanced book spine so
@@ -1664,23 +1716,31 @@ function lgDisconnectMultiplayer() {
 async function lgBuildOutdoor(pal) {
   await lgLoadModels(); // kicked off from openLibGame(); usually already resolved by the time this runs
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(pal.fog, 45, 190);
+  scene.fog = new THREE.Fog(pal.fog, 55, 260);
   scene.add(lgSky(pal));
 
   // Three.js (r155+) uses physically-correct light units by default, where the old "looks fine
   // at intensity ~1" values render almost pitch black — these need to be an order of magnitude
   // higher, plus a baseline ambient so nothing ever goes fully unlit.
-  scene.add(new THREE.AmbientLight(pal.sky1, 0.4));
-  scene.add(new THREE.HemisphereLight(pal.sky1, pal.grass1, 1.3));
+  // Faces angled away from the sun (e.g. the real tree model's low-poly, flat-shaded foliage)
+  // were going nearly black — ambient/hemisphere have no distance falloff so raising them can't
+  // create the close-range point-light hotspot that overexposed things once before; this is a
+  // uniform, safe fill increase.
+  scene.add(new THREE.AmbientLight(pal.sky1, 0.7));
+  scene.add(new THREE.HemisphereLight(pal.sky1, pal.grass1, 1.8));
   const sun = new THREE.DirectionalLight(pal.sun, 2.6);
   sun.position.set(45, 65, 25);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(1024, 1024);
-  Object.assign(sun.shadow.camera, { left: -70, right: 70, top: 70, bottom: -70, near: 1, far: 160 });
+  // 2048 (was 1024) + a small bias: the shadow camera frustum grew a lot for the city (was
+  // ±70, now ±130) without this, each shadow-map texel covers more world space and self-
+  // shadowing artifacts (a tree's own foliage casting acne onto itself) got a lot more visible.
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.bias = -0.0015;
+  Object.assign(sun.shadow.camera, { left: -130, right: 130, top: 130, bottom: -130, near: 1, far: 220 });
   scene.add(sun);
 
   const grassTex = lgNoiseTexture(pal.grass1, [[pal.grass2, 900, 0.5, 1, 2.5], ['#00000022', 250, 0.15, 1, 3]], 256, 30);
-  const groundMesh = new THREE.Mesh(new THREE.PlaneGeometry(220, 200), new THREE.MeshStandardMaterial({ map: grassTex, roughness: 1 }));
+  const groundMesh = new THREE.Mesh(new THREE.PlaneGeometry(500, 460), new THREE.MeshStandardMaterial({ map: grassTex, roughness: 1 }));
   groundMesh.rotation.x = -Math.PI / 2;
   groundMesh.receiveShadow = true;
   scene.add(groundMesh);
@@ -1756,6 +1816,41 @@ async function lgBuildOutdoor(pal) {
     tree.position.set(side * (7 + (i % 3) * 3), 0, tz);
     tree.rotation.y = i * 1.3;
     scene.add(tree);
+  }
+
+  // City: an east-west street crossing the existing north-south path, with a scatter of generic
+  // buildings in each of the 4 resulting quadrants — the library keeps its exact original
+  // position/orientation and is now just one building along the main street.
+  const roadTex = lgNoiseTexture(pal.road, [[pal.roadLine, 40, 0.5, 1.5, 3]], 256, 12);
+  const nsRoad = new THREE.Mesh(new THREE.PlaneGeometry(10, 210), new THREE.MeshStandardMaterial({ map: roadTex, roughness: 0.95 }));
+  nsRoad.rotation.x = -Math.PI / 2;
+  nsRoad.position.set(0, 0.015, -40);
+  nsRoad.receiveShadow = true;
+  scene.add(nsRoad);
+  const ewRoadTex = lgNoiseTexture(pal.road, [[pal.roadLine, 40, 0.5, 1.5, 3]], 256, 12);
+  const ewRoad = new THREE.Mesh(new THREE.PlaneGeometry(10, 210), new THREE.MeshStandardMaterial({ map: ewRoadTex, roughness: 0.95 }));
+  ewRoad.rotation.x = -Math.PI / 2;
+  ewRoad.rotation.z = Math.PI / 2;
+  ewRoad.position.set(0, 0.015, LG_CITY_CROSS_Z);
+  ewRoad.receiveShadow = true;
+  scene.add(ewRoad);
+
+  const cityPlots = [
+    { x: 35, z: 55, seed: 0 }, { x: 72, z: 72, seed: 1 },   // NE
+    { x: -35, z: 60, seed: 2 }, { x: -72, z: 45, seed: 3 }, // NW
+    { x: 35, z: -15, seed: 4 }, { x: 72, z: -50, seed: 5 }, // SE
+    { x: -35, z: -10, seed: 6 }, { x: -72, z: -55, seed: 7 }, // SW
+  ];
+  for (const p of cityPlots) {
+    const b = lgCityBuilding(pal, p.seed);
+    b.position.set(p.x, 0, p.z);
+    b.rotation.y = (p.x < 0 ? 1 : -1) * Math.PI / 2 + (p.seed % 2 === 0 ? 0 : Math.PI); // face roughly toward the main street
+    scene.add(b);
+  }
+  for (const lp of [[12, 34], [-12, 34], [12, 16], [-12, 16]]) {
+    const lamp = lgStreetLamp(pal);
+    lamp.position.set(lp[0], 0, lp[1]);
+    scene.add(lamp);
   }
 
   const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('libgameCanvas'), antialias: true });
