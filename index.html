@@ -133,11 +133,20 @@
   #sheet2{z-index:55}
   /* Book globe */
   #globe{align-items:stretch; background:var(--bg)}
+  #libgame{align-items:stretch; background:var(--bg)}
   #globeCanvas{width:100%; height:100%; touch-action:none; display:block}
   .gclose{position:fixed; top:calc(env(safe-area-inset-top) + 14px); right:14px; width:36px; height:36px; border-radius:50%; background:var(--chip); border:1px solid var(--line); color:var(--text); display:flex; align-items:center; justify-content:center; font-size:16px; cursor:pointer; z-index:1}
   .gzoom{position:fixed; right:14px; top:50%; transform:translateY(-50%); display:flex; flex-direction:column; gap:10px; z-index:1}
   .gzoom button{width:42px; height:42px; border-radius:50%; background:var(--chip); border:1px solid var(--line); color:var(--text); font-size:21px; font-weight:700; font-family:inherit; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:var(--shadow); padding:0; line-height:1; transition:transform .15s}
   .gzoom button:active{transform:scale(.9)}
+  #libgameCanvas{width:100%; height:100%; touch-action:none; display:block}
+  .libctrls{position:fixed; right:16px; bottom:calc(env(safe-area-inset-bottom) + 16px); display:grid; grid-template-columns:repeat(3,50px); grid-template-rows:repeat(2,50px); gap:6px; z-index:1; touch-action:none}
+  .libctrls button{border:1px solid var(--line); border-radius:14px; background:var(--chip); color:var(--text); font-size:19px; font-weight:700; font-family:inherit; display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0; box-shadow:var(--shadow); user-select:none}
+  .libctrls button:active{background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff}
+  #libUp{grid-column:2; grid-row:1}
+  #libLeft{grid-column:1; grid-row:2}
+  #libDown{grid-column:2; grid-row:2}
+  #libRight{grid-column:3; grid-row:2}
   .glegend{position:absolute; left:12px; bottom:calc(env(safe-area-inset-bottom) + 12px); display:flex; flex-direction:column; gap:4px; font-size:11px; color:var(--muted); max-height:44vh; overflow-y:auto; pointer-events:none; max-width:56%}
   .glegend .lg-row{display:flex; align-items:center; gap:6px; white-space:nowrap; text-shadow:0 1px 3px var(--bg)}
   .glegend .lg-row b{color:var(--text)}
@@ -186,6 +195,7 @@
       <span class="clr" id="clr">✕</span>
     </div>
     <button class="mapbtn" id="btnGlobe">🌐 Kitoblar xaritasi</button>
+    <button class="mapbtn" id="btnGame">🎮 Kutubxonaga sayohat</button>
     <div class="tabs">
       <div class="tab on" id="tabBrowse">Barchasi</div>
       <div class="tab" id="tabFav">❤️ Saqlanganlar</div>
@@ -213,6 +223,12 @@
 <div class="sheet" id="sheet"><div class="sheetc" id="sheetc"></div></div>
 <div class="sheet" id="sheet2"><div class="sheetc" id="sheet2c"></div></div>
 <div class="sheet" id="globe" style="z-index:45"><canvas id="globeCanvas"></canvas><div class="gclose" id="globeClose">✕</div><div class="gzoom"><button id="globeZoomIn" type="button">+</button><button id="globeZoomOut" type="button">−</button></div><div class="glegend" id="globeLegend"></div></div>
+<div class="sheet" id="libgame" style="z-index:46"><canvas id="libgameCanvas"></canvas><div class="gclose" id="libgameClose">✕</div><div class="libctrls">
+  <button id="libUp" type="button">▲</button>
+  <button id="libLeft" type="button">◀</button>
+  <button id="libDown" type="button">▼</button>
+  <button id="libRight" type="button">▶</button>
+</div></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -843,6 +859,123 @@ function closeGlobe(){
 $('#btnGlobe').onclick=()=>{haptic();openGlobe();};
 $('#globeClose').onclick=()=>closeGlobe();
 
+// === Library adventure mini-game — Stage 0: outdoor scene + GTA-1-style movement only.
+// No vehicle choice, door, or interior yet — those come once movement + art style are confirmed
+// to feel right on a real device (same "ship the risky part alone first" approach the book-map
+// needed after building too much on a guess).
+const LIBGAME_WORLD={w:2000,h:1400,libX:1500,libY:700,spawnX:300,spawnY:700};
+const LIBGAME_TURN_RATE=2.6; // rad/s while holding left/right
+const LIBGAME_MAX_SPEED=140; // px/s forward
+const LIBGAME_ACCEL=420, LIBGAME_DECEL=520;
+const LIBGAME={x:LIBGAME_WORLD.spawnX,y:LIBGAME_WORLD.spawnY,angle:0,speed:0,walk:0,
+  keys:{fwd:false,back:false,left:false,right:false},raf:null,wired:false,lastTs:0};
+
+function libgameStep(dt){
+  const L=LIBGAME;
+  if(L.keys.left)L.angle-=LIBGAME_TURN_RATE*dt;
+  if(L.keys.right)L.angle+=LIBGAME_TURN_RATE*dt;
+  let target=0;
+  if(L.keys.fwd)target=LIBGAME_MAX_SPEED;
+  else if(L.keys.back)target=-LIBGAME_MAX_SPEED*0.55; // reversing is slower, like a car/person backing up
+  if(L.speed<target)L.speed=Math.min(target,L.speed+LIBGAME_ACCEL*dt);
+  else if(L.speed>target)L.speed=Math.max(target,L.speed-LIBGAME_DECEL*dt);
+  if(Math.abs(L.speed)>1){
+    L.x+=Math.cos(L.angle)*L.speed*dt;
+    L.y+=Math.sin(L.angle)*L.speed*dt;
+    L.walk+=Math.abs(L.speed)*dt*7;
+  }
+  L.x=Math.max(40,Math.min(LIBGAME_WORLD.w-40,L.x));
+  L.y=Math.max(40,Math.min(LIBGAME_WORLD.h-40,L.y));
+}
+function libgameDraw(){
+  const canvas=$('#libgameCanvas');
+  const dpr=window.devicePixelRatio||1;
+  const w=canvas.clientWidth,h=canvas.clientHeight;
+  if(canvas.width!==Math.round(w*dpr)||canvas.height!==Math.round(h*dpr)){canvas.width=w*dpr;canvas.height=h*dpr;}
+  const ctx=canvas.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  const cs=getComputedStyle(document.documentElement);
+  const bg=cs.getPropertyValue('--bg').trim(), card=cs.getPropertyValue('--card').trim();
+  const line=cs.getPropertyValue('--line').trim(), accent=cs.getPropertyValue('--accent').trim();
+  const accent2=cs.getPropertyValue('--accent2').trim(), text=cs.getPropertyValue('--text').trim();
+  const muted=cs.getPropertyValue('--muted').trim();
+  ctx.fillStyle=bg;ctx.fillRect(0,0,w,h);
+
+  const L=LIBGAME;
+  const camX=L.x-w/2, camY=L.y-h/2; // camera follows the character; world scrolls underneath
+
+  // path from spawn to the library
+  const sx=LIBGAME_WORLD.spawnX-camX, sy=LIBGAME_WORLD.spawnY-camY;
+  const bx=LIBGAME_WORLD.libX-camX, by=LIBGAME_WORLD.libY-camY;
+  ctx.strokeStyle=card;ctx.lineWidth=70;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(bx,by);ctx.stroke();
+  ctx.strokeStyle=line;ctx.lineWidth=2;ctx.setLineDash([10,10]);
+  ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(bx,by);ctx.stroke();
+  ctx.setLineDash([]);
+
+  // library building: body + triangular roof + door + windows + label
+  ctx.fillStyle=accent2;ctx.fillRect(bx-90,by-70,180,140);
+  ctx.beginPath();ctx.moveTo(bx-105,by-70);ctx.lineTo(bx,by-140);ctx.lineTo(bx+105,by-70);ctx.closePath();
+  ctx.fillStyle=accent;ctx.fill();
+  ctx.fillStyle=card;ctx.fillRect(bx-22,by+10,44,60);
+  ctx.fillStyle=accent;ctx.fillRect(bx-65,by-40,30,30);ctx.fillRect(bx+35,by-40,30,30);
+  ctx.fillStyle=text;ctx.font='600 15px system-ui,sans-serif';ctx.textAlign='center';
+  ctx.fillText('📚 Kutubxona',bx,by-150);
+
+  // character: rotated head/body/legs with a simple walk-cycle swing
+  const px=L.x-camX, py=L.y-camY;
+  ctx.save();
+  ctx.translate(px,py);
+  ctx.rotate(L.angle+Math.PI/2);
+  const swing=Math.sin(L.walk)*9;
+  ctx.strokeStyle=text;ctx.lineWidth=5;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(-6,10);ctx.lineTo(-6+swing*0.35,25);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(6,10);ctx.lineTo(6-swing*0.35,25);ctx.stroke();
+  ctx.fillStyle=accent;
+  if(ctx.roundRect){ctx.beginPath();ctx.roundRect(-9,-9,18,22,6);ctx.fill();}
+  else ctx.fillRect(-9,-9,18,22);
+  ctx.fillStyle=muted;
+  ctx.beginPath();ctx.arc(0,-17,8,0,Math.PI*2);ctx.fill();
+  ctx.restore();
+  ctx.textAlign='left';
+}
+function libgameTick(ts){
+  const L=LIBGAME;
+  if(!L.lastTs)L.lastTs=ts;
+  const dt=Math.min(0.05,(ts-L.lastTs)/1000);
+  L.lastTs=ts;
+  libgameStep(dt);
+  libgameDraw();
+  L.raf=requestAnimationFrame(libgameTick);
+}
+function wireLibgameControls(){
+  function bind(sel,key){
+    const el=$(sel);
+    el.addEventListener('pointerdown',e=>{e.preventDefault();LIBGAME.keys[key]=true;});
+    const release=()=>{LIBGAME.keys[key]=false;};
+    el.addEventListener('pointerup',release);
+    el.addEventListener('pointercancel',release);
+    el.addEventListener('pointerleave',release);
+  }
+  bind('#libUp','fwd');bind('#libDown','back');bind('#libLeft','left');bind('#libRight','right');
+  LIBGAME.wired=true;
+}
+function openLibGame(){
+  if(!LIBGAME.wired)wireLibgameControls();
+  $('#libgame').classList.add('open');
+  tg?.BackButton?.show();
+  LIBGAME.lastTs=0;
+  if(!LIBGAME.raf)LIBGAME.raf=requestAnimationFrame(libgameTick);
+}
+function closeLibGame(){
+  $('#libgame').classList.remove('open');
+  tg?.BackButton?.hide();
+  if(LIBGAME.raf){cancelAnimationFrame(LIBGAME.raf);LIBGAME.raf=null;}
+  Object.keys(LIBGAME.keys).forEach(k=>LIBGAME.keys[k]=false);
+}
+$('#btnGame').onclick=()=>{haptic();openLibGame();};
+$('#libgameClose').onclick=()=>closeLibGame();
+
 function isHome(){return state.view==='browse'&&!state.q&&!state.genre&&!state.audience&&!state.type&&!state.all;}
 function showHome(on){$('#home').style.display=on?'block':'none';$('#grid').style.display=on?'none':'grid';$('.bar').style.display=on?'none':'flex';if(on){$('#more').style.display='none';$('#empty').style.display='none';}}
 function run(){if(isHome()){renderHome();showHome(true);}else{compute();render();showHome(false);}}
@@ -1094,7 +1227,7 @@ $('#btnTheme').onclick=()=>{
 
 function skeletonShelf(){return `<div class="section"><div class="shead"><h2 class="skel" style="width:140px;height:16px;border-radius:6px"></h2></div><div class="shelf">${Array(4).fill('<div class="si"><div class="skel" style="height:170px;border-radius:14px"></div></div>').join('')}</div></div>`;}
 async function boot(){
-  if(tg){tg.ready();tg.expand();tg.BackButton?.onClick(()=>{if($('#sheet2').classList.contains('open'))closeSheet2();else if($('#sheet').classList.contains('open'))closeSheet();else if($('#globe').classList.contains('open'))closeGlobe();});applyThemeMode();tg.onEvent?.('themeChanged',()=>{if(themeMode==='system')applyThemeMode();});}
+  if(tg){tg.ready();tg.expand();tg.BackButton?.onClick(()=>{if($('#sheet2').classList.contains('open'))closeSheet2();else if($('#sheet').classList.contains('open'))closeSheet();else if($('#globe').classList.contains('open'))closeGlobe();else if($('#libgame').classList.contains('open'))closeLibGame();});applyThemeMode();tg.onEvent?.('themeChanged',()=>{if(themeMode==='system')applyThemeMode();});}
   if('serviceWorker' in navigator)window.addEventListener('load',()=>{
     navigator.serviceWorker.register('./sw.js').catch(()=>{});
     // The shell/data caches are served cache-first-then-refresh, so a stale client can lag a
