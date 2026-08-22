@@ -1196,6 +1196,19 @@ boot();
 // built from the actual catalog, tap a cover to open the same detail/read sheet every other
 // entry point in the app uses.
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
+import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js";
+
+// Real trees (CC0, Kenney Nature Kit — models/KENNEY_NATURE_KIT_LICENSE.txt) instead of hand-
+// rolled primitives: a genuine step toward "realistic" that hand-coded boxes/icosahedrons can't
+// reach on their own. Kicked off now (tiny files, ~15-31KB) so they're almost always already
+// loaded by the time a player actually reaches the outdoor scene; each falls back to the old
+// procedural lgTree() below if the fetch ever fails, so a flaky network never leaves a gap.
+const lgGltfLoader = new GLTFLoader();
+const lgTreeModels = { oak: null, detailed: null };
+const lgTreeLoadPromise = Promise.all([
+  lgGltfLoader.loadAsync('models/tree_oak.glb').then(g => { lgTreeModels.oak = g.scene; }).catch(() => {}),
+  lgGltfLoader.loadAsync('models/tree_detailed.glb').then(g => { lgTreeModels.detailed = g.scene; }).catch(() => {}),
+]);
 
 const LG_WORLD = { halfX: 90, zMin: -70, zMax: 90, spawnZ: 70, libZ: -40 };
 const LG_IN_WORLD = { halfX: 25, zMin: -44, zMax: 32 };
@@ -1363,6 +1376,27 @@ function lgTree(pal, seed) {
   }
   return g;
 }
+// Places one tree: the real loaded model when available (alternating the two variants for
+// variety), scaled to a natural height and grounded at y=0 (a GLTF's own origin isn't
+// necessarily at its base), falling back to the hand-rolled lgTree() above otherwise.
+function lgTreeInstance(pal, seed) {
+  const wrapper = new THREE.Group();
+  const src = seed % 2 === 0 ? lgTreeModels.oak : lgTreeModels.detailed;
+  if (src) {
+    const m = src.clone(true);
+    const box = new THREE.Box3().setFromObject(m);
+    const size = new THREE.Vector3(); box.getSize(size);
+    const targetH = 4.0 + (seed % 3) * 0.5;
+    m.scale.setScalar(targetH / (size.y || 1));
+    const box2 = new THREE.Box3().setFromObject(m);
+    m.position.y -= box2.min.y;
+    m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    wrapper.add(m);
+  } else {
+    wrapper.add(lgTree(pal, seed));
+  }
+  return wrapper;
+}
 // Same hash formula as the app's own coverFor() (duplicated on purpose, not shared — keeps this
 // module's diffs isolated from the classic script), used to tint each instanced book spine so
 // thousands of books still read as visually distinct without a unique texture each.
@@ -1373,7 +1407,8 @@ function lgHashColor(id) {
   return LG_COVERS[h % LG_COVERS.length];
 }
 
-function lgBuildOutdoor(pal) {
+async function lgBuildOutdoor(pal) {
+  await lgTreeLoadPromise; // tiny files, almost always already resolved by the time this runs
   const scene = new THREE.Scene();
   scene.fog = new THREE.Fog(pal.fog, 45, 190);
   scene.add(lgSky(pal));
@@ -1463,7 +1498,7 @@ function lgBuildOutdoor(pal) {
   for (let i = 0; i < 7; i++) {
     const side = i % 2 === 0 ? -1 : 1;
     const tz = LG_WORLD.spawnZ - 8 - (i * 13);
-    const tree = lgTree(pal, i);
+    const tree = lgTreeInstance(pal, i);
     tree.position.set(side * (7 + (i % 3) * 3), 0, tz);
     tree.rotation.y = i * 1.3;
     scene.add(tree);
@@ -1771,11 +1806,11 @@ function lgLeaveInterior() {
   document.getElementById('libGenreLabel').classList.remove('show');
 }
 
-function startLibGame(mode) {
+async function startLibGame(mode) {
   LG.mode = mode; LG.outdoorMode = mode;
   document.getElementById('libChoice').classList.remove('show');
   document.getElementById('libgame').classList.toggle('car', mode === 'car');
-  if (!LG.built) lgBuildOutdoor(lgPalette());
+  if (!LG.built) await lgBuildOutdoor(lgPalette());
   LG.x = 0; LG.z = LG_WORLD.spawnZ; LG.yaw = 0; LG.pitch = 0; LG.speed = 0; LG.atDoor = false; LG.nearDoor = false; LG.inside = false;
   LG.activeScene = LG.outdoorScene;
   lgResize();
