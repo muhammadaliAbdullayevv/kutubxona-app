@@ -135,6 +135,9 @@
   #globe{align-items:stretch; background:var(--bg)}
   #globeCanvas{width:100%; height:100%; touch-action:none; display:block}
   .gclose{position:fixed; top:calc(env(safe-area-inset-top) + 14px); right:14px; width:36px; height:36px; border-radius:50%; background:var(--chip); border:1px solid var(--line); color:var(--text); display:flex; align-items:center; justify-content:center; font-size:16px; cursor:pointer; z-index:1}
+  .gzoom{position:fixed; right:14px; top:50%; transform:translateY(-50%); display:flex; flex-direction:column; gap:10px; z-index:1}
+  .gzoom button{width:42px; height:42px; border-radius:50%; background:var(--chip); border:1px solid var(--line); color:var(--text); font-size:21px; font-weight:700; font-family:inherit; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:var(--shadow); padding:0; line-height:1; transition:transform .15s}
+  .gzoom button:active{transform:scale(.9)}
   .glegend{position:absolute; left:12px; bottom:calc(env(safe-area-inset-bottom) + 12px); display:flex; flex-direction:column; gap:4px; font-size:11px; color:var(--muted); max-height:44vh; overflow-y:auto; pointer-events:none; max-width:56%}
   .glegend .lg-row{display:flex; align-items:center; gap:6px; white-space:nowrap; text-shadow:0 1px 3px var(--bg)}
   .glegend .lg-row b{color:var(--text)}
@@ -209,7 +212,7 @@
 
 <div class="sheet" id="sheet"><div class="sheetc" id="sheetc"></div></div>
 <div class="sheet" id="sheet2"><div class="sheetc" id="sheet2c"></div></div>
-<div class="sheet" id="globe" style="z-index:45"><canvas id="globeCanvas"></canvas><div class="gclose" id="globeClose">✕</div><div class="glegend" id="globeLegend"></div></div>
+<div class="sheet" id="globe" style="z-index:45"><canvas id="globeCanvas"></canvas><div class="gclose" id="globeClose">✕</div><div class="gzoom"><button id="globeZoomIn" type="button">+</button><button id="globeZoomOut" type="button">−</button></div><div class="glegend" id="globeLegend"></div></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -726,9 +729,32 @@ const globePointers=new Map();
 let globeDrag=null, globePinch=null, globeSimPaused=false, globeResumeTimer=null;
 const GLOBE_RESUME_DELAY=3000; // how long the map holds still after you let go, so there's a
                                  // real window to actually tap a book before it drifts again
+// Zooms toward a specific screen point (pinch midpoint, cursor position, or canvas center for
+// the +/- buttons) instead of always toward the canvas center — keeps whatever you're actually
+// looking at under your fingers/cursor as it grows, like any normal map.
+function zoomToward(px,py,newZoom){
+  const canvas=$('#globeCanvas');
+  if(!canvas)return;
+  const w=canvas.clientWidth,h=canvas.clientHeight;
+  newZoom=Math.max(0.4,Math.min(26,newZoom));
+  const wx=(px-(w/2+GLOBE.panX))/GLOBE.zoom, wy=(py-(h/2+GLOBE.panY))/GLOBE.zoom;
+  GLOBE.zoom=newZoom;
+  GLOBE.panX=px-w/2-wx*newZoom;
+  GLOBE.panY=py-h/2-wy*newZoom;
+}
+function globePauseThenResume(){
+  globeSimPaused=true;
+  clearTimeout(globeResumeTimer);
+  globeResumeTimer=setTimeout(()=>{globeSimPaused=false;},GLOBE_RESUME_DELAY);
+}
 function wireGlobeInteraction(){
   const canvas=$('#globeCanvas');
   function pinchDist(){const pts=[...globePointers.values()];return pts.length<2?0:Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);}
+  function pinchMid(){
+    const pts=[...globePointers.values()];
+    const rect=canvas.getBoundingClientRect();
+    return {x:(pts[0].x+pts[1].x)/2-rect.left, y:(pts[0].y+pts[1].y)/2-rect.top};
+  }
   canvas.addEventListener('pointerdown',e=>{
     canvas.setPointerCapture(e.pointerId);
     globeSimPaused=true;
@@ -746,7 +772,10 @@ function wireGlobeInteraction(){
     globePointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
     if(globePinch && globePointers.size>=2){
       const d=pinchDist();
-      if(d>0&&globePinch.d0>0)GLOBE.zoom=Math.max(0.4,Math.min(26,globePinch.zoom0*(d/globePinch.d0)));
+      if(d>0&&globePinch.d0>0){
+        const mid=pinchMid();
+        zoomToward(mid.x,mid.y,globePinch.zoom0*(d/globePinch.d0));
+      }
       return;
     }
     if(!globeDrag)return;
@@ -777,20 +806,27 @@ function wireGlobeInteraction(){
     } else {
       globePinch=null;
       globeDrag=null;
-      // Fully released — hold still a bit longer before the simulation starts drifting again.
-      clearTimeout(globeResumeTimer);
-      globeResumeTimer=setTimeout(()=>{globeSimPaused=false;},GLOBE_RESUME_DELAY);
+      globePauseThenResume(); // fully released — hold still before the sim drifts again
     }
   }
   canvas.addEventListener('pointerup',release);
   canvas.addEventListener('pointercancel',release);
   canvas.addEventListener('wheel',e=>{
-    GLOBE.zoom=Math.max(0.4,Math.min(26,GLOBE.zoom-e.deltaY*0.0015));
+    const rect=canvas.getBoundingClientRect();
+    zoomToward(e.clientX-rect.left,e.clientY-rect.top,GLOBE.zoom-e.deltaY*0.0015);
     e.preventDefault();
-    globeSimPaused=true;
-    clearTimeout(globeResumeTimer);
-    globeResumeTimer=setTimeout(()=>{globeSimPaused=false;},GLOBE_RESUME_DELAY);
+    globePauseThenResume();
   },{passive:false});
+  $('#globeZoomIn').onclick=()=>{
+    const canvas=$('#globeCanvas');
+    zoomToward(canvas.clientWidth/2,canvas.clientHeight/2,GLOBE.zoom*1.35);
+    haptic();globePauseThenResume();
+  };
+  $('#globeZoomOut').onclick=()=>{
+    const canvas=$('#globeCanvas');
+    zoomToward(canvas.clientWidth/2,canvas.clientHeight/2,GLOBE.zoom/1.35);
+    haptic();globePauseThenResume();
+  };
 }
 function openGlobe(){
   if(!DB.books.length){toast('Kutubxona hali yuklanmoqda...');return;}
