@@ -1240,18 +1240,29 @@ boot();
 // entry point in the app uses.
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
 import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js";
+import * as SkeletonUtils from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/utils/SkeletonUtils.js";
 
-// Real trees (CC0, Kenney Nature Kit — models/KENNEY_NATURE_KIT_LICENSE.txt) instead of hand-
-// rolled primitives: a genuine step toward "realistic" that hand-coded boxes/icosahedrons can't
-// reach on their own. Kicked off now (tiny files, ~15-31KB) so they're almost always already
-// loaded by the time a player actually reaches the outdoor scene; each falls back to the old
-// procedural lgTree() below if the fetch ever fails, so a flaky network never leaves a gap.
+// Real trees + rigged character models (CC0, Kenney Nature Kit / Mini Characters — license
+// files alongside them in models/) instead of hand-rolled primitives: a genuine step toward
+// "realistic" that hand-coded boxes/capsules can't reach on their own. Each falls back to a
+// procedural shape if its fetch ever fails, so a flaky network never leaves a visible gap.
+// Loading is lazy (kicked off from openLibGame(), not at page load) — nobody who never opens
+// the game should pay for downloading ~1.3MB of 3D models they'll never see.
 const lgGltfLoader = new GLTFLoader();
 const lgTreeModels = { oak: null, detailed: null };
-const lgTreeLoadPromise = Promise.all([
-  lgGltfLoader.loadAsync('models/tree_oak.glb').then(g => { lgTreeModels.oak = g.scene; }).catch(() => {}),
-  lgGltfLoader.loadAsync('models/tree_detailed.glb').then(g => { lgTreeModels.detailed = g.scene; }).catch(() => {}),
-]);
+const lgCharModels = { a: null, b: null, c: null, d: null };
+const LG_CHAR_KEYS = ['a', 'b', 'c', 'd'];
+let lgModelsLoadPromise = null;
+function lgLoadModels() {
+  if (!lgModelsLoadPromise) {
+    lgModelsLoadPromise = Promise.all([
+      lgGltfLoader.loadAsync('models/tree_oak.glb').then(g => { lgTreeModels.oak = g.scene; }).catch(() => {}),
+      lgGltfLoader.loadAsync('models/tree_detailed.glb').then(g => { lgTreeModels.detailed = g.scene; }).catch(() => {}),
+      ...LG_CHAR_KEYS.map(k => lgGltfLoader.loadAsync(`models/char_${k}.glb`).then(g => { lgCharModels[k] = g; }).catch(() => {})),
+    ]);
+  }
+  return lgModelsLoadPromise;
+}
 
 const LG_WORLD = { halfX: 90, zMin: -70, zMax: 90, spawnZ: 70, libZ: -40 };
 const LG_IN_WORLD = { halfX: 25, zMin: -44, zMax: 32 };
@@ -1459,25 +1470,67 @@ function lgHashColor(id) {
 }
 
 // ---- multiplayer: connection, other-player avatars, chat -------------------------------------
-function lgAvatarMesh(name, id) {
+// Crude capsule+sphere placeholder, only used for the brief window (if any) before the real
+// character model finishes downloading — matches the same fallback pattern used for trees.
+function lgAvatarFallback(id) {
   const g = new THREE.Group();
   const color = new THREE.Color(lgHashColor(String(id)));
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.32, 0.9, 4, 8), new THREE.MeshStandardMaterial({ color, roughness: 0.7 }));
-  body.position.y = 0.95;
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.28, 0.85, 4, 8), new THREE.MeshStandardMaterial({ color, roughness: 0.7 }));
+  body.position.y = 0.9;
   g.add(body);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 12, 10), new THREE.MeshStandardMaterial({ color: 0xf2d9b8, roughness: 0.85 }));
-  head.position.y = 1.72;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 10), new THREE.MeshStandardMaterial({ color: 0xf2d9b8, roughness: 0.85 }));
+  head.position.y = 1.55;
   g.add(head);
-  const label = lgLabelSprite(name || 'Reader', '#ffffff', 420, 100, 46);
-  label.position.y = 2.3;
-  g.add(label);
   return g;
+}
+// Real rigged character (Kenney Mini Characters, CC0) picked deterministically from the 4
+// downloaded variants by user id, scaled to a natural standing height and grounded at y=0.
+// SkeletonUtils.clone (not the plain Object3D.clone used for the static trees) is required for
+// a skinned/rigged mesh — a plain clone would share one skeleton across every avatar instance.
+function lgAvatarMesh(name, id) {
+  const wrapper = new THREE.Group();
+  let h = 0; const s = String(id || '');
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  const key = LG_CHAR_KEYS[h % LG_CHAR_KEYS.length];
+  const src = lgCharModels[key];
+  const rec = { mixer: null, actions: {}, animName: null };
+  if (src) {
+    const model = SkeletonUtils.clone(src.scene);
+    const box = new THREE.Box3().setFromObject(model);
+    const size = new THREE.Vector3(); box.getSize(size);
+    model.scale.setScalar(1.72 / (size.y || 1));
+    const box2 = new THREE.Box3().setFromObject(model);
+    model.position.y -= box2.min.y;
+    model.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    wrapper.add(model);
+    const mixer = new THREE.AnimationMixer(model);
+    for (const clip of src.animations || []) {
+      if (clip.name === 'idle' || clip.name === 'walk') rec.actions[clip.name] = mixer.clipAction(clip);
+    }
+    if (rec.actions.idle) { rec.actions.idle.play(); rec.animName = 'idle'; }
+    rec.mixer = mixer;
+  } else {
+    wrapper.add(lgAvatarFallback(id));
+  }
+  const label = lgLabelSprite(name || 'Reader', '#ffffff', 420, 100, 46);
+  label.position.y = 2.05;
+  wrapper.add(label);
+  return { mesh: wrapper, ...rec };
+}
+function lgSetAvatarAnim(o, name) {
+  if (o.animName === name || !o.actions[name]) return;
+  const prev = o.actions[o.animName];
+  o.actions[name].reset().fadeIn(0.25).play();
+  if (prev) prev.fadeOut(0.25);
+  o.animName = name;
 }
 function lgUpsertOther(player) {
   if (!player || player.id === LG_MP.myId) return;
   let o = LG_MP.others.get(player.id);
   if (!o) {
-    o = { name: player.name, mesh: lgAvatarMesh(player.name, player.id), tx: player.x, tz: player.z, tyaw: player.yaw, scene: player.scene || 'outdoor' };
+    const av = lgAvatarMesh(player.name, player.id);
+    o = { name: player.name, mesh: av.mesh, mixer: av.mixer, actions: av.actions, animName: av.animName,
+      tx: player.x, tz: player.z, tyaw: player.yaw, scene: player.scene || 'outdoor' };
     o.mesh.position.set(o.tx, 0, o.tz);
     o.mesh.rotation.y = o.tyaw;
     LG_MP.others.set(player.id, o);
@@ -1490,6 +1543,8 @@ function lgMoveOther(msg) {
   if (msg.id === LG_MP.myId) return;
   const o = LG_MP.others.get(msg.id);
   if (!o) return; // haven't received their join/roster entry yet — the next roster sync will catch up
+  const moved = Math.hypot(msg.x - o.tx, msg.z - o.tz);
+  lgSetAvatarAnim(o, moved > 0.06 ? 'walk' : 'idle');
   o.tx = msg.x; o.tz = msg.z; o.tyaw = msg.yaw;
   if (msg.scene) o.scene = msg.scene;
 }
@@ -1498,10 +1553,10 @@ function lgRemoveOther(id) {
   if (o) { o.mesh.parent?.remove(o.mesh); LG_MP.others.delete(id); }
   lgRefreshOnlineCount();
 }
-// Smoothly moves every other-player avatar toward its latest reported position, and keeps each
-// one added to (or removed from) the scene the local player is currently looking at — someone
-// standing in the library interior shouldn't visually appear in the outdoor scene, or vice versa.
-function lgStepOthers() {
+// Smoothly moves every other-player avatar toward its latest reported position, advances its
+// walk/idle animation, and keeps it added to (or removed from) the scene the local player is
+// currently looking at — someone in the library interior shouldn't appear in the outdoor scene.
+function lgStepOthers(dt) {
   const here = LG.inside ? 'interior' : 'outdoor';
   const sceneObj = LG.inside ? LG.interiorScene : LG.outdoorScene;
   for (const o of LG_MP.others.values()) {
@@ -1514,6 +1569,7 @@ function lgStepOthers() {
       let dyaw = o.tyaw - o.mesh.rotation.y;
       dyaw = Math.atan2(Math.sin(dyaw), Math.cos(dyaw)); // shortest angular direction, avoids a spin-around
       o.mesh.rotation.y += dyaw * 0.18;
+      o.mixer?.update(dt);
     }
   }
 }
@@ -1594,7 +1650,7 @@ function lgDisconnectMultiplayer() {
 }
 
 async function lgBuildOutdoor(pal) {
-  await lgTreeLoadPromise; // tiny files, almost always already resolved by the time this runs
+  await lgLoadModels(); // kicked off from openLibGame(); usually already resolved by the time this runs
   const scene = new THREE.Scene();
   scene.fog = new THREE.Fog(pal.fog, 45, 190);
   scene.add(lgSky(pal));
@@ -1885,7 +1941,7 @@ function lgTick(ts) {
   const dt = Math.min(0.05, (ts - LG.lastTs) / 1000);
   LG.lastTs = ts;
   lgStep(dt);
-  lgStepOthers();
+  lgStepOthers(dt);
   if (LG_MP.ws && LG_MP.ws.readyState === WebSocket.OPEN && ts - LG_MP.lastSend > LG_MOVE_SEND_MS) {
     LG_MP.lastSend = ts;
     LG_MP.ws.send(JSON.stringify({ t: 'move', x: LG.x, z: LG.z, yaw: LG.yaw, scene: LG.inside ? 'interior' : 'outdoor' }));
@@ -2025,6 +2081,7 @@ function openLibGame() {
   document.getElementById('libgame').classList.add('open');
   document.getElementById('libChoice').classList.add('show');
   window.Telegram?.WebApp?.BackButton?.show();
+  lgLoadModels();
   lgConnectMultiplayer();
 }
 function closeLibGame() {
