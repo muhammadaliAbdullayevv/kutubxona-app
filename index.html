@@ -1635,6 +1635,11 @@ function lgBuildInterior(pal) {
   }
   instMesh.instanceMatrix.needsUpdate = true;
   if (instMesh.instanceColor) instMesh.instanceColor.needsUpdate = true;
+  // InstancedMesh auto-computes its culling bounds from ONE un-instanced box at the object's own
+  // origin — it has no idea the instances are actually spread across the whole 70m room, so the
+  // default frustum culling wrongly discards the entire mesh from almost any camera angle. This
+  // is a single draw call either way, so disabling culling here costs nothing.
+  instMesh.frustumCulled = false;
   scene.add(instMesh);
 
   LG.bookMeshes = [instMesh];
