@@ -1475,6 +1475,11 @@ function lgHashColor(id) {
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
   return LG_COVERS[h % LG_COVERS.length];
 }
+function lgHash01(seed) {
+  let h = 0; const s = String(seed || '');
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return (h % 10000) / 10000;
+}
 
 // ---- multiplayer: connection, other-player avatars, chat -------------------------------------
 // Crude capsule+sphere placeholder, only used for the brief window (if any) before the real
@@ -1857,8 +1862,16 @@ function lgBuildInterior(pal) {
             const b = allBooks[bi];
             if (!rowGenre) rowGenre = b.g || 'Boshqa';
             const z = rowZStart - gap * (k + 1);
-            dummy.position.set(faceX, y + 0.62, z);
-            dummy.rotation.set(0, 0, 0);
+            // Every book was the exact same size — a flat wall of uniform bars reads as a
+            // striped pattern, not a shelf of books. Real shelves are uneven: vary each one's
+            // height/thickness (hash-derived so it's stable across rebuilds) and give it a
+            // slight lean, the same trick most stylized bookshelf scenes rely on.
+            const sy = 0.72 + lgHash01(b.i + '#h') * 0.5;
+            const sz = 0.55 + lgHash01(b.i + '#t') * 1.0;
+            const lean = (lgHash01(b.i + '#l') - 0.5) * 0.22;
+            dummy.position.set(faceX, y + 0.03 + 0.575 * sy, z);
+            dummy.rotation.set(lean, 0, 0);
+            dummy.scale.set(1, sy, sz);
             dummy.updateMatrix();
             instMesh.setMatrixAt(bi, dummy.matrix);
             col.setHex(lgHashColor(b.i));
