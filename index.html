@@ -1327,6 +1327,10 @@ const LG = {
 // each frame), scene}. Avatars only render while the local player is in the SAME scene (outdoor
 // vs interior) as that player — otherwise you'd see people floating in the wrong place.
 const LG_WS_URL = 'wss://pdf-audio-kitoblar.site/ws/game';
+// The Kenney character model's own authored "forward" (walk direction) faces the opposite way
+// from what yaw=0 means in this game's camera/movement convention (facing -Z) — without this,
+// every avatar walked exactly backwards relative to the direction it was actually moving.
+const LG_AVATAR_FACING_OFFSET = Math.PI;
 const LG_MOVE_SEND_MS = 200;
 const LG_MP = { ws: null, myId: window.Telegram?.WebApp?.initDataUnsafe?.user?.id || null, others: new Map(), lastSend: 0, chatOpen: false, unread: 0 };
 
@@ -1530,12 +1534,12 @@ function lgUpsertOther(player) {
   if (!o) {
     const av = lgAvatarMesh(player.name, player.id);
     o = { name: player.name, mesh: av.mesh, mixer: av.mixer, actions: av.actions, animName: av.animName,
-      tx: player.x, tz: player.z, tyaw: player.yaw, scene: player.scene || 'outdoor' };
+      tx: player.x, tz: player.z, tyaw: player.yaw + LG_AVATAR_FACING_OFFSET, scene: player.scene || 'outdoor' };
     o.mesh.position.set(o.tx, 0, o.tz);
     o.mesh.rotation.y = o.tyaw;
     LG_MP.others.set(player.id, o);
   } else {
-    o.tx = player.x; o.tz = player.z; o.tyaw = player.yaw; o.scene = player.scene || o.scene;
+    o.tx = player.x; o.tz = player.z; o.tyaw = player.yaw + LG_AVATAR_FACING_OFFSET; o.scene = player.scene || o.scene;
   }
   lgRefreshOnlineCount();
 }
@@ -1545,7 +1549,7 @@ function lgMoveOther(msg) {
   if (!o) return; // haven't received their join/roster entry yet — the next roster sync will catch up
   const moved = Math.hypot(msg.x - o.tx, msg.z - o.tz);
   lgSetAvatarAnim(o, moved > 0.06 ? 'walk' : 'idle');
-  o.tx = msg.x; o.tz = msg.z; o.tyaw = msg.yaw;
+  o.tx = msg.x; o.tz = msg.z; o.tyaw = msg.yaw + LG_AVATAR_FACING_OFFSET;
   if (msg.scene) o.scene = msg.scene;
 }
 function lgRemoveOther(id) {
