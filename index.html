@@ -1210,7 +1210,8 @@ const LG_PALETTE = {
     sky1: '#bfe0f7', sky2: '#f2f9ff', fog: '#d7ecfa', sun: '#fff3d6',
     grass1: '#5f8f4c', grass2: '#436b38',
     path1: '#b3a892', path2: '#8f8270',
-    wall: '#c98a4c', wallDark: '#a06a34', roof: '#8a3f30', column: '#e9dfc9',
+    wall: '#c98a4c', wallDark: '#a06a34', roof: '#8a3f30', roofDark: '#6b2f24', column: '#e9dfc9',
+    plinth: '#8a7a63', step: '#c9bfa8',
     door: '#4a3320', windowLit: '#fff0b0',
     woodFloor1: '#a06b3c', woodFloor2: '#7a4e28', shelfWood: '#6f4526', wallInterior: '#d8b688',
     ceiling: '#e7d9bd', lamp: '#fff2c8', text: '#3a2717',
@@ -1220,7 +1221,8 @@ const LG_PALETTE = {
     sky1: '#0a1230', sky2: '#1c2a4d', fog: '#0d1733', sun: '#8fa5ff',
     grass1: '#1e2e1c', grass2: '#152213',
     path1: '#39352d', path2: '#2a2721',
-    wall: '#6b4a2c', wallDark: '#43301c', roof: '#3a2019', column: '#8f8368',
+    wall: '#6b4a2c', wallDark: '#43301c', roof: '#3a2019', roofDark: '#241009', column: '#8f8368',
+    plinth: '#453b2d', step: '#5c503c',
     door: '#180f08', windowLit: '#ffd97a',
     woodFloor1: '#3c2716', woodFloor2: '#2a1a0d', shelfWood: '#2c1c10', wallInterior: '#4a3722',
     ceiling: '#221808', lamp: '#ffcf82', text: '#f1e6d2',
@@ -1241,8 +1243,11 @@ const LG_MODE_CFG = {
   inside: { maxSpeed: 4, accel: 16, decel: 22, turnRate: 2.0, bobAmp: 0.03 },
 };
 
+const LG_LOOK_SENS = 0.0048; // radians of yaw/pitch per pixel of swipe
+const LG_PITCH_MAX = Math.PI / 2 * 0.85; // clamp so looking up/down never flips past vertical
+
 const LG = {
-  x: 0, z: LG_WORLD.spawnZ, yaw: 0, speed: 0, walk: 0,
+  x: 0, z: LG_WORLD.spawnZ, yaw: 0, pitch: 0, speed: 0, walk: 0,
   mode: null, outdoorMode: 'foot', inside: false, nearDoor: false, atDoor: false,
   keys: { fwd: false, back: false, left: false, right: false },
   raf: null, lastTs: 0, built: false, interiorBuilt: false, wired: false,
@@ -1334,15 +1339,28 @@ function lgSky(pal) {
   });
   return new THREE.Mesh(geo, mat);
 }
+// A single trunk + one blob foliage read as a Minecraft tree; a slightly leaning trunk plus 3
+// overlapping, differently-sized foliage clumps (rounder geometry — detail level 1, not 0) breaks
+// up that silhouette into something closer to a real canopy while staying cheap, low-poly shapes.
 function lgTree(pal, seed) {
   const g = new THREE.Group();
-  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.26, 2.4, 6), new THREE.MeshStandardMaterial({ color: pal.woodFloor2, roughness: 0.9 }));
-  trunk.position.y = 1.2; trunk.castShadow = true;
+  const trunkMat = new THREE.MeshStandardMaterial({ color: pal.woodFloor2, roughness: 0.95 });
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.28, 2.6, 7), trunkMat);
+  trunk.position.y = 1.3; trunk.rotation.z = ((seed % 5) - 2) * 0.02; trunk.castShadow = true;
   g.add(trunk);
-  const foliageColor = pal.treeFoliage[seed % pal.treeFoliage.length];
-  const foliage = new THREE.Mesh(new THREE.IcosahedronGeometry(1.5 + (seed % 3) * 0.2, 0), new THREE.MeshStandardMaterial({ color: foliageColor, roughness: 0.95, flatShading: true }));
-  foliage.position.y = 3.2; foliage.castShadow = true;
-  g.add(foliage);
+  const foliageColor = new THREE.Color(pal.treeFoliage[seed % pal.treeFoliage.length]);
+  const clumps = [
+    { r: 1.3, y: 3.0, x: 0, z: 0, tint: 0 },
+    { r: 1.0, y: 3.5, x: 0.75, z: 0.3, tint: 0.12 },
+    { r: 1.05, y: 3.3, x: -0.6, z: -0.5, tint: -0.08 },
+  ];
+  for (const c of clumps) {
+    const col = foliageColor.clone().offsetHSL(0, 0, c.tint);
+    const foliage = new THREE.Mesh(new THREE.IcosahedronGeometry(c.r, 1), new THREE.MeshStandardMaterial({ color: col, roughness: 0.9, flatShading: true }));
+    foliage.position.set(c.x, c.y, c.z);
+    foliage.castShadow = true;
+    g.add(foliage);
+  }
   return g;
 }
 // Same hash formula as the app's own coverFor() (duplicated on purpose, not shared — keeps this
@@ -1387,30 +1405,58 @@ function lgBuildOutdoor(pal) {
   scene.add(pathMesh);
 
   const brickTex = lgBrickTexture(pal.wall, pal.wallDark, 256, 4, 3);
+  const shingleTex = lgBrickTexture(pal.roof, pal.roofDark, 256, 8, 5);
   const lib = new THREE.Group();
   lib.position.set(0, 0, LG_WORLD.libZ);
+
+  const plinth = new THREE.Mesh(new THREE.BoxGeometry(19, 1, 19), new THREE.MeshStandardMaterial({ color: pal.plinth, roughness: 1 }));
+  plinth.position.y = 0.5; plinth.receiveShadow = true; plinth.castShadow = true;
+  lib.add(plinth);
   const body = new THREE.Mesh(new THREE.BoxGeometry(18, 14, 18), new THREE.MeshStandardMaterial({ map: brickTex, roughness: 0.9 }));
-  body.position.y = 7; body.castShadow = true; body.receiveShadow = true;
+  body.position.y = 1 + 7; body.castShadow = true; body.receiveShadow = true;
   lib.add(body);
-  const roof = new THREE.Mesh(new THREE.ConeGeometry(14.5, 8, 4), new THREE.MeshStandardMaterial({ color: pal.roof, roughness: 0.6 }));
-  roof.rotation.y = Math.PI / 4; roof.position.y = 14 + 4; roof.castShadow = true;
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(15.5, 8, 4), new THREE.MeshStandardMaterial({ map: shingleTex, roughness: 0.75 }));
+  roof.rotation.y = Math.PI / 4; roof.position.y = 1 + 14 + 4; roof.castShadow = true;
   lib.add(roof);
+  // A thin flat trim ring at the roofline reads as an overhang/eave — breaks the "cone glued
+  // straight onto a box" look without adding real geometric complexity.
+  const eave = new THREE.Mesh(new THREE.CylinderGeometry(11, 11, 0.4, 4), new THREE.MeshStandardMaterial({ color: pal.roofDark, roughness: 0.8 }));
+  eave.rotation.y = Math.PI / 4; eave.position.y = 1 + 14.2; eave.castShadow = true;
+  lib.add(eave);
+
+  const doorFrameMat = new THREE.MeshStandardMaterial({ color: pal.roofDark, roughness: 0.7 });
+  const doorFrame = new THREE.Mesh(new THREE.BoxGeometry(4.6, 7.1, 0.25), doorFrameMat);
+  doorFrame.position.set(0, 1 + 3.55, 9.0);
+  lib.add(doorFrame);
   const door = new THREE.Mesh(new THREE.BoxGeometry(4, 6.5, 0.4), new THREE.MeshStandardMaterial({ color: pal.door, roughness: 0.6, transparent: true, opacity: 1 }));
-  door.position.set(0, 3.25, 9.05);
+  door.position.set(0, 1 + 3.25, 9.05);
   lib.add(door);
   LG.door = door;
+  const stepMat = new THREE.MeshStandardMaterial({ color: pal.step, roughness: 0.95 });
+  for (let s = 0; s < 3; s++) {
+    const step = new THREE.Mesh(new THREE.BoxGeometry(6 - s * 0.4, 0.3, 1.4 - s * 0.35), stepMat);
+    step.position.set(0, 1 - s * 0.3 - 0.15, 9.6 + s * 0.9);
+    step.receiveShadow = true;
+    lib.add(step);
+  }
   const winMat = new THREE.MeshStandardMaterial({ color: pal.windowLit, roughness: 0.3, emissive: pal.windowLit, emissiveIntensity: 0.6 });
-  const win1 = new THREE.Mesh(new THREE.BoxGeometry(3, 3, 0.3), winMat);
-  win1.position.set(-6.5, 8.5, 9.05);
-  lib.add(win1);
-  const win2 = win1.clone(); win2.position.x = 6.5; lib.add(win2);
+  const sillMat = new THREE.MeshStandardMaterial({ color: pal.roofDark, roughness: 0.8 });
+  function lgWindow(x) {
+    const win = new THREE.Mesh(new THREE.BoxGeometry(3, 3, 0.3), winMat);
+    win.position.set(x, 1 + 8.5, 9.05);
+    lib.add(win);
+    const sill = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.25, 0.5), sillMat);
+    sill.position.set(x, 1 + 6.9, 9.2);
+    lib.add(sill);
+  }
+  lgWindow(-6.5); lgWindow(6.5);
   const colMat = new THREE.MeshStandardMaterial({ color: pal.column, roughness: 0.8 });
   const col1 = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.55, 7.2, 10), colMat);
-  col1.position.set(-4.6, 3.6, 9.3); col1.castShadow = true;
+  col1.position.set(-4.6, 1 + 3.6, 9.3); col1.castShadow = true;
   lib.add(col1);
   const col2 = col1.clone(); col2.position.x = 4.6; lib.add(col2);
   const label = lgLabelSprite('📚 Kutubxona', pal.text);
-  label.position.set(0, 22, 0);
+  label.position.set(0, 1 + 22, 0);
   lib.add(label);
   scene.add(lib);
 
@@ -1433,6 +1479,9 @@ function lgBuildOutdoor(pal) {
 
   const camera = new THREE.PerspectiveCamera(72, 1, 0.1, 500);
   camera.position.set(0, LG_EYE_HEIGHT, LG_WORLD.spawnZ);
+  // YXZ (not the default XYZ) so a swipe applies yaw around world-up first and pitch around the
+  // camera's own local axis after — the standard order for an FPS-style look, avoids roll drift.
+  camera.rotation.order = 'YXZ';
 
   LG.renderer = renderer; LG.camera = camera; LG.outdoorScene = scene; LG.activeScene = scene;
   LG.built = true;
@@ -1583,7 +1632,7 @@ function lgStep(dt) {
 
   const bob = Math.abs(LG.speed) > 0.3 ? Math.sin(LG.walk) * cfg.bobAmp : 0;
   LG.camera.position.set(LG.x, LG_EYE_HEIGHT + bob, LG.z);
-  LG.camera.rotation.set(0, LG.yaw, 0);
+  LG.camera.rotation.set(LG.pitch, LG.yaw, 0);
 
   if (!LG.inside && !LG.atDoor) {
     const dist = Math.hypot(LG.x - LG_DOOR.x, LG.z - LG_DOOR.z);
@@ -1617,8 +1666,24 @@ function lgTick(ts) {
 const lgRay = new THREE.Raycaster();
 const lgPointer = new THREE.Vector2();
 let lgTapStart = null;
-function lgCanvasDown(e) { lgTapStart = { x: e.clientX, y: e.clientY, t: performance.now() }; }
+let lgLookLast = null;
+// Swipe-to-look: drag anywhere on the canvas to turn/tilt the camera, same as any first-person
+// mobile game — the D-pad still handles moving forward/back, this only handles where you're
+// looking. A drag that moves far enough cancels the tap-to-open-book gesture below.
+function lgCanvasDown(e) {
+  lgTapStart = { x: e.clientX, y: e.clientY, t: performance.now() };
+  lgLookLast = { x: e.clientX, y: e.clientY };
+}
+function lgCanvasMove(e) {
+  if (!lgLookLast) return;
+  const dx = e.clientX - lgLookLast.x, dy = e.clientY - lgLookLast.y;
+  lgLookLast = { x: e.clientX, y: e.clientY };
+  LG.yaw -= dx * LG_LOOK_SENS;
+  LG.pitch = Math.max(-LG_PITCH_MAX, Math.min(LG_PITCH_MAX, LG.pitch - dy * LG_LOOK_SENS));
+}
+function lgCanvasEnd() { lgLookLast = null; }
 function lgCanvasUp(e) {
+  lgCanvasEnd();
   if (!lgTapStart) return;
   const dx = e.clientX - lgTapStart.x, dy = e.clientY - lgTapStart.y, dt = performance.now() - lgTapStart.t;
   lgTapStart = null;
@@ -1657,7 +1722,10 @@ function lgWireControls() {
   document.getElementById('libInteriorBack').addEventListener('click', lgLeaveInterior);
   const canvas = document.getElementById('libgameCanvas');
   canvas.addEventListener('pointerdown', lgCanvasDown);
+  canvas.addEventListener('pointermove', lgCanvasMove);
   canvas.addEventListener('pointerup', lgCanvasUp);
+  canvas.addEventListener('pointercancel', lgCanvasEnd);
+  canvas.addEventListener('pointerleave', lgCanvasEnd);
   LG.wired = true;
 }
 
@@ -1674,7 +1742,7 @@ function lgKnock() {
   function anim(ts) {
     const t = Math.min(1, (ts - start) / dur);
     mat.opacity = 1 - t;
-    door.position.y = 3.25 + t * 0.4;
+    door.position.y = 4.25 + t * 0.4;
     door.rotation.z = t * 0.5;
     if (t < 1) { requestAnimationFrame(anim); return; }
     lgEnterInterior();
@@ -1688,7 +1756,7 @@ function lgEnterInterior() {
   LG.activeScene = LG.interiorScene;
   LG.outdoorMode = LG.mode;
   LG.mode = 'inside';
-  LG.x = 0; LG.z = 30; LG.yaw = 0; LG.speed = 0;
+  LG.x = 0; LG.z = 30; LG.yaw = 0; LG.pitch = 0; LG.speed = 0;
   document.getElementById('libInteriorBack').classList.add('show');
 }
 function lgLeaveInterior() {
@@ -1696,9 +1764,9 @@ function lgLeaveInterior() {
   LG.activeScene = LG.outdoorScene;
   LG.mode = LG.outdoorMode;
   const door = LG.door, mat = door.material;
-  mat.opacity = 1; door.position.y = 3.25; door.rotation.z = 0;
+  mat.opacity = 1; door.position.y = 4.25; door.rotation.z = 0;
   LG.atDoor = false; LG.nearDoor = false;
-  LG.x = 0; LG.z = LG_DOOR.z + LG_KNOCK_DIST + 3; LG.yaw = 0;
+  LG.x = 0; LG.z = LG_DOOR.z + LG_KNOCK_DIST + 3; LG.yaw = 0; LG.pitch = 0;
   document.getElementById('libInteriorBack').classList.remove('show');
   document.getElementById('libGenreLabel').classList.remove('show');
 }
@@ -1708,7 +1776,7 @@ function startLibGame(mode) {
   document.getElementById('libChoice').classList.remove('show');
   document.getElementById('libgame').classList.toggle('car', mode === 'car');
   if (!LG.built) lgBuildOutdoor(lgPalette());
-  LG.x = 0; LG.z = LG_WORLD.spawnZ; LG.yaw = 0; LG.speed = 0; LG.atDoor = false; LG.nearDoor = false; LG.inside = false;
+  LG.x = 0; LG.z = LG_WORLD.spawnZ; LG.yaw = 0; LG.pitch = 0; LG.speed = 0; LG.atDoor = false; LG.nearDoor = false; LG.inside = false;
   LG.activeScene = LG.outdoorScene;
   lgResize();
   LG.lastTs = 0;
