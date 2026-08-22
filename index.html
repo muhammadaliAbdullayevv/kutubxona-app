@@ -1363,9 +1363,9 @@ function lgBuildOutdoor(pal) {
   // Three.js (r155+) uses physically-correct light units by default, where the old "looks fine
   // at intensity ~1" values render almost pitch black — these need to be an order of magnitude
   // higher, plus a baseline ambient so nothing ever goes fully unlit.
-  scene.add(new THREE.AmbientLight(pal.sky1, 1.2));
-  scene.add(new THREE.HemisphereLight(pal.sky1, pal.grass1, 2.2));
-  const sun = new THREE.DirectionalLight(pal.sun, 3.4);
+  scene.add(new THREE.AmbientLight(pal.sky1, 0.4));
+  scene.add(new THREE.HemisphereLight(pal.sky1, pal.grass1, 1.3));
+  const sun = new THREE.DirectionalLight(pal.sun, 2.6);
   sun.position.set(45, 65, 25);
   sun.castShadow = true;
   sun.shadow.mapSize.set(1024, 1024);
@@ -1454,12 +1454,15 @@ function lgBuildInterior(pal) {
   scene.background = new THREE.Color(pal.ceiling);
   scene.fog = new THREE.Fog(pal.wallInterior, 30, 85);
 
-  scene.add(new THREE.AmbientLight(pal.ceiling, 1.8));
-  scene.add(new THREE.HemisphereLight(pal.ceiling, pal.woodFloor2, 1.4));
+  // Book instances sit close to the ceiling lamps on the upper tiers — high intensity with a
+  // gentle decay (1.4) blew those out to near-white under ACES tone mapping. Standard decay (2)
+  // and a much lower per-lamp intensity, spread over more lamps, avoids that hotspot.
+  scene.add(new THREE.AmbientLight(pal.ceiling, 0.35));
+  scene.add(new THREE.HemisphereLight(pal.ceiling, pal.woodFloor2, 0.8));
   const lampMat = new THREE.MeshStandardMaterial({ color: pal.lamp, emissive: pal.lamp, emissiveIntensity: 1.4 });
   for (const z of [26, 10, -6, -22, -38]) {
     for (const x of [-14, 0, 14]) {
-      const lamp = new THREE.PointLight(pal.lamp, 55, 26, 1.4);
+      const lamp = new THREE.PointLight(pal.lamp, 9, 15, 2);
       lamp.position.set(x, 4.2, z);
       scene.add(lamp);
       const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 8), lampMat);
