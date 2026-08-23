@@ -3526,6 +3526,22 @@ window.lgResumeAfterDetail = function () {
     LG.raf = requestAnimationFrame(lgTick);
   }
 };
+// Watchdog: lgOpenBook() cancels LG.raf when a shelf book is tapped, and the ONLY normal path
+// back is closeSheet()'s openedFromLibGame check — a single boolean that has to survive however
+// many sheets/readers/players the player stacks on top (PDF reader, audio player, a related-book
+// re-open, backgrounding the app mid-read...) before they land back on closeSheet(). Any gap in
+// that chain leaves the loop dead forever with the last frame frozen on screen and every control
+// silently unresponsive — exactly "I can't move," with no exception for lgTick's own try/catch to
+// ever catch. Rather than keep chasing the exact stacked-sheet sequence that breaks the flag,
+// just periodically check the one invariant that actually matters (game open → loop running) and
+// self-heal if it's ever false, whatever the cause.
+setInterval(() => {
+  if (LG.built && document.getElementById('libgame').classList.contains('open') && !LG.raf) {
+    LG.lastTs = 0;
+    LG.raf = requestAnimationFrame(lgTick);
+    lgShowErrBanner({ message: "O'yin siklini qayta ishga tushirdik (vaqtinchalik to'xtagan edi)" });
+  }
+}, 1500);
 window.openLibGame = openLibGame;
 window.closeLibGame = closeLibGame;
 </script>
