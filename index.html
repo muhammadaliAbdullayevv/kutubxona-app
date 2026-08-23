@@ -1596,10 +1596,11 @@ function lgPalette() {
 // (heavier) and turns less sharply than a person can pivot on foot; indoors everyone walks.
 const LG_MODE_CFG = {
   foot: { maxSpeed: 9, accel: 24, decel: 30, turnRate: 1.8, bobAmp: 0.045 },
-  // autoCruise: a car keeps rolling forward on its own (holding the accelerator the whole time
-  // on a phone, on top of steering, is awkward) — ▲ speeds up to maxSpeed, ▼ brakes/reverses,
-  // letting go just settles back to this cruising pace instead of stopping dead.
-  car: { maxSpeed: 24, accel: 14, decel: 20, turnRate: 1.0, bobAmp: 0.015, autoCruise: 7 },
+  // maxSpeed 69 m/s ≈ 250 km/h. accel is deliberately modest (not an instant punch to redline) —
+  // 0→100 km/h in ~4.3s, full 0→250 in ~10.6s, closer to a fast real car than an arcade jolt.
+  // No auto-cruise: the car sits still until the accelerator is actually held, same as any
+  // other driving game — it used to creep forward on its own, which read as a bug, not a feature.
+  car: { maxSpeed: 69, accel: 6.5, decel: 26, turnRate: 1.0, bobAmp: 0.015 },
   inside: { maxSpeed: 4, accel: 16, decel: 22, turnRate: 2.0, bobAmp: 0.03 },
 };
 
@@ -2264,6 +2265,9 @@ function lgToggleChat() {
   LG_MP.chatOpen = !LG_MP.chatOpen;
   document.getElementById('libChat').classList.toggle('show', LG_MP.chatOpen);
   if (LG_MP.chatOpen) {
+    // The online list and the chat panel live in the same top-left corner — showing both at
+    // once is what made opening a DM look cluttered/overlapping. Only one is ever open.
+    document.getElementById('libOnlineList')?.classList.remove('show');
     LG_MP.unread = 0;
     document.getElementById('libChatDot')?.classList.remove('show');
     document.getElementById('libChatInput')?.focus();
@@ -2354,7 +2358,13 @@ function lgReleaseChatMic() {
   if (lgChatMicStream) { lgChatMicStream.getTracks().forEach(t => t.stop()); lgChatMicStream = null; }
 }
 function lgToggleOnlineList() {
-  document.getElementById('libOnlineList')?.classList.toggle('show');
+  const list = document.getElementById('libOnlineList');
+  const opening = !list?.classList.contains('show');
+  list?.classList.toggle('show', opening);
+  // Same reasoning as lgToggleChat — these two panels share the top-left corner, so only one is
+  // ever open at a time. Goes through the same close path chatOpen uses elsewhere so a message
+  // arriving while the roster is open still correctly counts as unread.
+  if (opening && LG_MP.chatOpen) lgToggleChat();
 }
 function lgConnectMultiplayer() {
   if (LG_MP.ws) return;
@@ -2819,7 +2829,7 @@ function lgStep(dt) {
   const steerFlip = LG.speed < -0.05 ? -1 : 1;
   if (LG.keys.left) LG.yaw += cfg.turnRate * dt * steerFlip;
   if (LG.keys.right) LG.yaw -= cfg.turnRate * dt * steerFlip;
-  let target = LG.mode === 'car' ? cfg.autoCruise : 0;
+  let target = 0;
   if (LG.keys.fwd) target = cfg.maxSpeed;
   else if (LG.keys.back) target = -cfg.maxSpeed * 0.5; // reversing is slower, like backing up
   if (LG.speed < target) LG.speed = Math.min(target, LG.speed + cfg.accel * dt);
@@ -3046,6 +3056,8 @@ function lgKnock() {
   window.haptic?.('medium');
   Object.keys(LG.keys).forEach(k => LG.keys[k] = false);
   document.getElementById('libKnock').classList.remove('show');
+  document.getElementById('libCarEnter').classList.remove('show');
+  document.getElementById('libCarSit').classList.remove('show');
   const door = LG.door, mat = door.material;
   const start = performance.now(), dur = 480;
   function anim(ts) {
@@ -3146,6 +3158,7 @@ function lgEnterCar() {
   document.getElementById('libgame').classList.add('car');
   document.getElementById('libCarEnter').classList.remove('show');
   document.getElementById('libCarSit').classList.remove('show');
+  document.getElementById('libKnock').classList.remove('show');
   document.getElementById('libCarExit').classList.add('show');
   lgEngineStart();
   if (LG_MP.ws && LG_MP.ws.readyState === WebSocket.OPEN) {
@@ -3165,6 +3178,7 @@ function lgSitInCar() {
   document.getElementById('libgame').classList.add('riding');
   document.getElementById('libCarEnter').classList.remove('show');
   document.getElementById('libCarSit').classList.remove('show');
+  document.getElementById('libKnock').classList.remove('show');
   document.getElementById('libCarExit').classList.add('show');
   if (LG_MP.ws && LG_MP.ws.readyState === WebSocket.OPEN) {
     LG_MP.ws.send(JSON.stringify({ t: 'car_sit', carId: idx }));
