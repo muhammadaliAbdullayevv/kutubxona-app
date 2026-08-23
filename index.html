@@ -142,6 +142,13 @@
   #libgame{align-items:stretch; background:var(--bg)}
   #globeCanvas{width:100%; height:100%; touch-action:none; display:block}
   .gclose{position:fixed; top:calc(env(safe-area-inset-top) + 14px); right:14px; width:36px; height:36px; border-radius:50%; background:var(--chip); border:1px solid var(--line); color:var(--text); display:flex; align-items:center; justify-content:center; font-size:16px; cursor:pointer; z-index:1}
+  /* Surfaces the frame-error recovery in lgTick — previously only console.error, which a
+     player never sees, so a genuine bug there read as an unexplained "the game just froze" with
+     nothing to go on. Small and dismissible, not a hard failure screen — the game keeps running. */
+  #libErrBanner{position:fixed; left:10px; right:10px; top:calc(env(safe-area-inset-top) + 14px); z-index:70;
+    display:none; background:var(--danger); color:#fff; padding:10px 14px; border-radius:12px;
+    font-size:12px; line-height:1.4; box-shadow:var(--shadow); word-break:break-word}
+  #libErrBanner.show{display:block}
   .gzoom{position:fixed; right:14px; top:50%; transform:translateY(-50%); display:flex; flex-direction:column; gap:10px; z-index:1}
   .gzoom button{width:42px; height:42px; border-radius:50%; background:var(--chip); border:1px solid var(--line); color:var(--text); font-size:21px; font-weight:700; font-family:inherit; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:var(--shadow); padding:0; line-height:1; transition:transform .15s}
   .gzoom button:active{transform:scale(.9)}
@@ -404,7 +411,9 @@
 <div class="sheet" id="sheet"><div class="sheetc" id="sheetc"></div><div class="gclose" id="sheetClose">✕</div></div>
 <div class="sheet" id="sheet2"><div class="sheetc" id="sheet2c"></div><div class="gclose" id="sheet2Close">✕</div></div>
 <div class="sheet" id="globe" style="z-index:45"><canvas id="globeCanvas"></canvas><div class="gclose" id="globeClose">✕</div><div class="gzoom"><button id="globeZoomIn" type="button">+</button><button id="globeZoomOut" type="button">−</button></div><div class="glegend" id="globeLegend"></div></div>
-<div class="sheet" id="libgame" style="z-index:46"><canvas id="libgameCanvas"></canvas><div class="gclose" id="libgameClose">✕</div><div class="libctrls">
+<div class="sheet" id="libgame" style="z-index:46"><canvas id="libgameCanvas"></canvas><div class="gclose" id="libgameClose">✕</div>
+<div id="libErrBanner"></div>
+<div class="libctrls">
   <button id="libUp" type="button">▲</button>
   <button id="libLeft" type="button">◀</button>
   <button id="libDown" type="button">▼</button>
@@ -3092,8 +3101,19 @@ function lgTick(ts) {
     lgDrawMiniMap();
   } catch (e) {
     console.error('lgTick frame error (recovered):', e);
+    lgShowErrBanner(e);
   }
   LG.raf = requestAnimationFrame(lgTick);
+}
+let lgLastErrShownAt = 0;
+function lgShowErrBanner(e) {
+  const now = performance.now();
+  if (now - lgLastErrShownAt < 1500) return; // this can recur every frame — don't hammer the DOM
+  lgLastErrShownAt = now;
+  const banner = document.getElementById('libErrBanner');
+  if (!banner) return;
+  banner.textContent = '⚠️ ' + (e?.message || String(e));
+  banner.classList.add('show');
 }
 
 const lgRay = new THREE.Raycaster();
@@ -3483,6 +3503,7 @@ function closeLibGame() {
   document.getElementById('libInteriorBack').classList.remove('show');
   document.getElementById('libGenreLabel').classList.remove('show');
   document.getElementById('libKnock').classList.remove('show');
+  document.getElementById('libErrBanner')?.classList.remove('show');
   document.getElementById('libChat')?.classList.remove('show');
   document.getElementById('libOnlineList')?.classList.remove('show');
   LG_MP.chatOpen = false;
