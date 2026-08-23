@@ -169,6 +169,19 @@
   #libLeft{grid-column:1; grid-row:2}
   #libDown{grid-column:2; grid-row:2}
   #libRight{grid-column:3; grid-row:2}
+  /* Driving: steering (left/right) moves to the left thumb, throttle/brake (up/down) stays under
+     the right thumb — a car control split, not the single walking D-pad cluster. Position:fixed
+     on the individual buttons pulls them out of the .libctrls grid entirely. */
+  #libgame.car #libLeft,#libgame.car #libRight,#libgame.car #libUp,#libgame.car #libDown{
+    position:fixed; width:54px; height:54px; top:auto}
+  #libgame.car #libLeft{left:14px; right:auto; bottom:calc(env(safe-area-inset-bottom) + 78px)}
+  #libgame.car #libRight{left:80px; right:auto; bottom:calc(env(safe-area-inset-bottom) + 78px)}
+  #libgame.car #libUp{right:16px; left:auto; bottom:calc(env(safe-area-inset-bottom) + 144px)}
+  #libgame.car #libDown{right:16px; left:auto; bottom:calc(env(safe-area-inset-bottom) + 78px)}
+  #libSpeedo{position:fixed; right:16px; bottom:calc(env(safe-area-inset-bottom) + 208px); z-index:1;
+    padding:6px 12px; border-radius:12px; background:rgba(0,0,0,.45); color:#fff; font-size:13px;
+    font-weight:700; font-variant-numeric:tabular-nums; display:none; pointer-events:none}
+  #libgame.car #libSpeedo{display:block}
   #libCarHud{position:fixed; left:0; right:0; bottom:0; height:24vh; pointer-events:none; z-index:1; display:none;
     background:linear-gradient(to top, rgba(0,0,0,.5), rgba(0,0,0,0));
     clip-path:polygon(0 100%, 0 38%, 16% 18%, 84% 18%, 100% 38%, 100% 100%);}
@@ -311,6 +324,7 @@
   <button id="libDown" type="button">▼</button>
   <button id="libRight" type="button">▶</button>
 </div>
+<div id="libSpeedo">0 km/soat</div>
 <div id="libCarHud"></div>
 <button id="libKnock" type="button">🚪 Eshikni taqillatish</button>
 <button id="libCarEnter" type="button">🚗 Haydash</button>
@@ -1460,7 +1474,7 @@ function lgLoadModels() {
   return lgModelsLoadPromise;
 }
 
-const LG_WORLD = { halfX: 115, zMin: -100, zMax: 100, spawnZ: 70, libZ: -40 };
+const LG_WORLD = { halfX: 600, zMin: -550, zMax: 550, spawnZ: 70, libZ: -40 };
 const LG_CITY_CROSS_Z = 25; // where the east-west street crosses the existing north-south path
 const LG_IN_WORLD = { halfX: 25, zMin: -44, zMax: 32 };
 const LG_EYE_HEIGHT = 1.7;
@@ -1517,9 +1531,13 @@ const LG = {
   raf: null, lastTs: 0, built: false, interiorBuilt: false, wired: false,
   renderer: null, camera: null, outdoorScene: null, interiorScene: null, activeScene: null,
   door: null, bookMeshes: [], bookInstanceIds: [], shelfZones: [],
-  carMesh: null, carState: 'parked', carPos: { x: 0, z: 45 }, carYaw: 0, nearCar: false,
+  cars: [], nearCarIndex: -1, drivingCarIndex: -1,
+  sunLight: null, sunTarget: null,
 };
 const LG_CAR_ENTER_DIST = 5;
+// Three separate parked cars (not one shared vehicle) — with more than one real player around,
+// everyone needs somewhere to drive without waiting on whoever grabbed the only car first.
+const LG_CAR_SPAWNS = [{ x: 0, z: 45 }, { x: 60, z: 95 }, { x: -70, z: -80 }];
 // Kenney's sedan.glb is authored front-facing +Z (its wheel nodes are literally named
 // wheel-front-*/wheel-back-* with front at z=+0.66) — opposite of this game's yaw=0 forward
 // (-Z), same mismatch as the character models needed the same fix for.
@@ -1790,18 +1808,29 @@ function lgSetAvatarAnim(o, name) {
   if (prev) prev.fadeOut(0.25);
   o.animName = name;
 }
+function lgMakeOtherCarMesh() {
+  if (!lgCarModel) return null;
+  const car = lgCarModel.clone(true);
+  const box = new THREE.Box3().setFromObject(car);
+  const size = new THREE.Vector3(); box.getSize(size);
+  car.scale.setScalar(4.2 / (size.z || 1));
+  const box2 = new THREE.Box3().setFromObject(car);
+  car.position.y -= box2.min.y;
+  car.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  return car;
+}
 function lgUpsertOther(player) {
   if (!player || player.id === LG_MP.myId) return;
   let o = LG_MP.others.get(player.id);
   if (!o) {
     const av = lgAvatarMesh(player.name, player.id);
-    o = { name: player.name, mesh: av.mesh, mixer: av.mixer, actions: av.actions, animName: av.animName,
-      tx: player.x, tz: player.z, tyaw: player.yaw + LG_AVATAR_FACING_OFFSET, scene: player.scene || 'outdoor' };
+    o = { name: player.name, mesh: av.mesh, carMesh: null, lastActive: null, mixer: av.mixer, actions: av.actions, animName: av.animName,
+      tx: player.x, tz: player.z, tyaw: player.yaw, scene: player.scene || 'outdoor', driving: !!player.driving };
     o.mesh.position.set(o.tx, 0, o.tz);
-    o.mesh.rotation.y = o.tyaw;
+    o.mesh.rotation.y = o.tyaw + LG_AVATAR_FACING_OFFSET;
     LG_MP.others.set(player.id, o);
   } else {
-    o.tx = player.x; o.tz = player.z; o.tyaw = player.yaw + LG_AVATAR_FACING_OFFSET; o.scene = player.scene || o.scene;
+    o.tx = player.x; o.tz = player.z; o.tyaw = player.yaw; o.scene = player.scene || o.scene; o.driving = !!player.driving;
   }
   lgRefreshOnlineCount();
 }
@@ -1811,31 +1840,47 @@ function lgMoveOther(msg) {
   if (!o) return; // haven't received their join/roster entry yet — the next roster sync will catch up
   const moved = Math.hypot(msg.x - o.tx, msg.z - o.tz);
   lgSetAvatarAnim(o, moved > 0.06 ? 'walk' : 'idle');
-  o.tx = msg.x; o.tz = msg.z; o.tyaw = msg.yaw + LG_AVATAR_FACING_OFFSET;
+  o.tx = msg.x; o.tz = msg.z; o.tyaw = msg.yaw;
   if (msg.scene) o.scene = msg.scene;
+  o.driving = !!msg.driving;
 }
 function lgRemoveOther(id) {
   const o = LG_MP.others.get(id);
-  if (o) { o.mesh.parent?.remove(o.mesh); LG_MP.others.delete(id); }
+  if (o) { o.mesh.parent?.remove(o.mesh); o.carMesh?.parent?.remove(o.carMesh); LG_MP.others.delete(id); }
   lgRefreshOnlineCount();
 }
 // Smoothly moves every other-player avatar toward its latest reported position, advances its
 // walk/idle animation, and keeps it added to (or removed from) the scene the local player is
 // currently looking at — someone in the library interior shouldn't appear in the outdoor scene.
+// Whoever's driving shows as a real car to everyone else too, not just to themselves — the car
+// model is created lazily the first time we learn a given player is driving.
 function lgStepOthers(dt) {
   const here = LG.inside ? 'interior' : 'outdoor';
   const sceneObj = LG.inside ? LG.interiorScene : LG.outdoorScene;
   for (const o of LG_MP.others.values()) {
+    if (o.driving && !o.carMesh) {
+      o.carMesh = lgMakeOtherCarMesh();
+      if (o.carMesh) o.carMesh.position.set(o.tx, o.carMesh.position.y, o.tz);
+    }
+    const active = (o.driving && o.carMesh) ? o.carMesh : o.mesh;
+    const inactive = active === o.mesh ? o.carMesh : o.mesh;
+    if (o.lastActive !== active) {
+      active.position.x = o.tx; active.position.z = o.tz; // snap on switch — no fly-in from a stale spot
+      o.lastActive = active;
+    }
     const visible = o.scene === here;
-    if (visible && o.mesh.parent !== sceneObj) { o.mesh.parent?.remove(o.mesh); sceneObj?.add(o.mesh); }
-    else if (!visible && o.mesh.parent) { o.mesh.parent.remove(o.mesh); }
+    if (visible && active.parent !== sceneObj) { active.parent?.remove(active); sceneObj?.add(active); }
+    else if (!visible && active.parent) { active.parent.remove(active); }
+    if (inactive && inactive.parent) inactive.parent.remove(inactive);
     if (visible) {
-      o.mesh.position.x += (o.tx - o.mesh.position.x) * 0.18;
-      o.mesh.position.z += (o.tz - o.mesh.position.z) * 0.18;
-      let dyaw = o.tyaw - o.mesh.rotation.y;
+      const offset = active === o.carMesh ? LG_CAR_FACING_OFFSET : LG_AVATAR_FACING_OFFSET;
+      active.position.x += (o.tx - active.position.x) * 0.18;
+      active.position.z += (o.tz - active.position.z) * 0.18;
+      const targetYaw = o.tyaw + offset;
+      let dyaw = targetYaw - active.rotation.y;
       dyaw = Math.atan2(Math.sin(dyaw), Math.cos(dyaw)); // shortest angular direction, avoids a spin-around
-      o.mesh.rotation.y += dyaw * 0.18;
-      o.mixer?.update(dt);
+      active.rotation.y += dyaw * 0.18;
+      if (active === o.mesh) o.mixer?.update(dt);
     }
   }
 }
@@ -1918,7 +1963,7 @@ function lgDisconnectMultiplayer() {
 async function lgBuildOutdoor(pal) {
   await lgLoadModels(); // kicked off from openLibGame(); usually already resolved by the time this runs
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(pal.fog, 55, 260);
+  scene.fog = new THREE.Fog(pal.fog, 60, 320);
   scene.add(lgSky(pal));
 
   // Three.js (r155+) uses physically-correct light units by default, where the old "looks fine
@@ -1933,27 +1978,24 @@ async function lgBuildOutdoor(pal) {
   const sun = new THREE.DirectionalLight(pal.sun, 2.6);
   sun.position.set(45, 65, 25);
   sun.castShadow = true;
-  // 2048 (was 1024) + a small bias: the shadow camera frustum grew a lot for the city (was
-  // ±70, now ±130) without this, each shadow-map texel covers more world space and self-
-  // shadowing artifacts (a tree's own foliage casting acne onto itself) got a lot more visible.
   sun.shadow.mapSize.set(2048, 2048);
   sun.shadow.bias = -0.0015;
-  Object.assign(sun.shadow.camera, { left: -130, right: 130, top: 130, bottom: -130, near: 1, far: 220 });
+  // The world is now big enough that a shadow frustum sized to cover all of it would leave each
+  // shadow-map texel responsible for a huge area (blocky, aliased shadows) at this resolution.
+  // Instead keep a modest frustum and re-center it on the player every frame (see lgStep) — the
+  // same "shadow camera follows you" trick any open-world game uses, rather than statically
+  // covering ground that's mostly out of view/fogged anyway.
+  Object.assign(sun.shadow.camera, { left: -90, right: 90, top: 90, bottom: -90, near: 1, far: 220 });
+  scene.add(sun.target);
   scene.add(sun);
+  LG.sunLight = sun;
 
-  const grassTex = lgNoiseTexture(pal.grass1, [[pal.grass2, 900, 0.5, 1, 2.5], ['#00000022', 250, 0.15, 1, 3]], 256, 30);
-  const groundMesh = new THREE.Mesh(new THREE.PlaneGeometry(500, 460), new THREE.MeshStandardMaterial({ map: grassTex, roughness: 1 }));
+  const grassTex = lgNoiseTexture(pal.grass1, [[pal.grass2, 900, 0.5, 1, 2.5], ['#00000022', 250, 0.15, 1, 3]], 256, 90);
+  const groundMesh = new THREE.Mesh(new THREE.PlaneGeometry(LG_WORLD.halfX * 2 + 40, (LG_WORLD.zMax - LG_WORLD.zMin) + 40), new THREE.MeshStandardMaterial({ map: grassTex, roughness: 1 }));
   groundMesh.rotation.x = -Math.PI / 2;
+  groundMesh.position.z = (LG_WORLD.zMax + LG_WORLD.zMin) / 2;
   groundMesh.receiveShadow = true;
   scene.add(groundMesh);
-
-  const pathTex = lgNoiseTexture(pal.path1, [[pal.path2, 500, 0.4, 1, 2]], 256, 8);
-  const pathLen = LG_WORLD.spawnZ - LG_WORLD.libZ + 20;
-  const pathMesh = new THREE.Mesh(new THREE.PlaneGeometry(9, pathLen), new THREE.MeshStandardMaterial({ map: pathTex, roughness: 0.9 }));
-  pathMesh.rotation.x = -Math.PI / 2;
-  pathMesh.position.set(0, 0.01, (LG_WORLD.spawnZ + LG_WORLD.libZ) / 2);
-  pathMesh.receiveShadow = true;
-  scene.add(pathMesh);
 
   const brickTex = lgBrickTexture(pal.wall, pal.wallDark, 256, 4, 3);
   const shingleTex = lgBrickTexture(pal.roof, pal.roofDark, 256, 8, 5);
@@ -2020,56 +2062,70 @@ async function lgBuildOutdoor(pal) {
     scene.add(tree);
   }
 
-  // City: an east-west street crossing the existing north-south path, with a scatter of generic
-  // buildings in each of the 4 resulting quadrants — the library keeps its exact original
-  // position/orientation and is now just one building along the main street.
-  const roadTex = lgNoiseTexture(pal.road, [[pal.roadLine, 40, 0.5, 1.5, 3]], 256, 12);
-  const nsRoad = new THREE.Mesh(new THREE.PlaneGeometry(10, 210), new THREE.MeshStandardMaterial({ map: roadTex, roughness: 0.95 }));
+  // City: an east-west street crossing the existing north-south path, both now wide enough to
+  // span the whole (much bigger) world, with generic buildings scattered along both — the
+  // library keeps its exact original position/orientation, just one building among many now.
+  const nsLen = (LG_WORLD.zMax - LG_WORLD.zMin) + 60;
+  const roadTex = lgNoiseTexture(pal.road, [[pal.roadLine, 40, 0.5, 1.5, 3]], 256, Math.round(nsLen / 18));
+  const nsRoad = new THREE.Mesh(new THREE.PlaneGeometry(16, nsLen), new THREE.MeshStandardMaterial({ map: roadTex, roughness: 0.95 }));
   nsRoad.rotation.x = -Math.PI / 2;
-  nsRoad.position.set(0, 0.015, -40);
+  nsRoad.position.set(0, 0.015, (LG_WORLD.zMax + LG_WORLD.zMin) / 2);
   nsRoad.receiveShadow = true;
   scene.add(nsRoad);
-  const ewRoadTex = lgNoiseTexture(pal.road, [[pal.roadLine, 40, 0.5, 1.5, 3]], 256, 12);
-  const ewRoad = new THREE.Mesh(new THREE.PlaneGeometry(10, 210), new THREE.MeshStandardMaterial({ map: ewRoadTex, roughness: 0.95 }));
+  const ewLen = LG_WORLD.halfX * 2 + 60;
+  const ewRoadTex = lgNoiseTexture(pal.road, [[pal.roadLine, 40, 0.5, 1.5, 3]], 256, Math.round(ewLen / 18));
+  const ewRoad = new THREE.Mesh(new THREE.PlaneGeometry(16, ewLen), new THREE.MeshStandardMaterial({ map: ewRoadTex, roughness: 0.95 }));
   ewRoad.rotation.x = -Math.PI / 2;
   ewRoad.rotation.z = Math.PI / 2;
   ewRoad.position.set(0, 0.015, LG_CITY_CROSS_Z);
   ewRoad.receiveShadow = true;
   scene.add(ewRoad);
 
-  const cityPlots = [
-    { x: 35, z: 55, seed: 0 }, { x: 72, z: 72, seed: 1 },   // NE
-    { x: -35, z: 60, seed: 2 }, { x: -72, z: 45, seed: 3 }, // NW
-    { x: 35, z: -15, seed: 4 }, { x: 72, z: -50, seed: 5 }, // SE
-    { x: -35, z: -10, seed: 6 }, { x: -72, z: -55, seed: 7 }, // SW
-  ];
+  // Plots spaced out along both roads (both directions, both sides) rather than clustered near
+  // the original crossroads — 90 apart keeps the mesh/draw-call count sane for a phone GPU even
+  // though the world itself is now much bigger; gaps between buildings read as yards, not gaps.
+  let seed = 0;
+  const cityPlots = [];
+  for (let d = 90; d < LG_WORLD.zMax - 40; d += 90) for (const side of [-1, 1]) cityPlots.push({ x: side * (20 + (seed % 3) * 7), z: d, along: 'ns', seed: seed++ });
+  for (let d = 90; d < -LG_WORLD.zMin - 40; d += 90) for (const side of [-1, 1]) cityPlots.push({ x: side * (20 + (seed % 3) * 7), z: -d, along: 'ns', seed: seed++ });
+  for (let d = 90; d < LG_WORLD.halfX - 40; d += 90) for (const side of [-1, 1]) {
+    cityPlots.push({ x: d, z: LG_CITY_CROSS_Z + side * (20 + (seed % 3) * 7), along: 'ew', seed: seed++ });
+    cityPlots.push({ x: -d, z: LG_CITY_CROSS_Z + side * (20 + (seed % 3) * 7), along: 'ew', seed: seed++ });
+  }
   for (const p of cityPlots) {
     const b = lgCityBuilding(pal, p.seed);
     b.position.set(p.x, 0, p.z);
-    b.rotation.y = (p.x < 0 ? 1 : -1) * Math.PI / 2 + (p.seed % 2 === 0 ? 0 : Math.PI); // face roughly toward the main street
+    // Face roughly toward whichever road this plot is actually along.
+    b.rotation.y = p.along === 'ns' ? (p.x < 0 ? 1 : -1) * Math.PI / 2 : (p.z < LG_CITY_CROSS_Z ? 0 : Math.PI);
     scene.add(b);
   }
-  for (const lp of [[12, 34], [-12, 34], [12, 16], [-12, 16]]) {
+  const lampSpots = [];
+  for (let d = -Math.floor((-LG_WORLD.zMin - 60) / 130) * 130; d <= LG_WORLD.zMax - 60; d += 130) for (const side of [-1, 1]) lampSpots.push([side * 12, d]);
+  for (let d = -Math.floor((LG_WORLD.halfX - 60) / 130) * 130; d <= LG_WORLD.halfX - 60; d += 130) for (const side of [-1, 1]) lampSpots.push([d, LG_CITY_CROSS_Z + side * 12]);
+  for (const lp of lampSpots) {
     const lamp = lgStreetLamp(pal);
     lamp.position.set(lp[0], 0, lp[1]);
     scene.add(lamp);
   }
 
-  // A real parked car sitting in the street — walk up to it for a "Drive" prompt, same pattern
-  // as the library door. Hidden (not omitted) while someone's actually driving it.
+  // Real parked cars sitting in the street — walk up to any of them for a "Drive" prompt, same
+  // pattern as the library door. Three separate cars (not one shared vehicle) so more than one
+  // real player can each be driving at once without waiting on whoever got there first.
+  LG.cars = [];
   if (lgCarModel) {
-    const car = lgCarModel.clone(true);
-    const box = new THREE.Box3().setFromObject(car);
-    const size = new THREE.Vector3(); box.getSize(size);
-    car.scale.setScalar(4.2 / (size.z || 1)); // real sedan length, the car's most recognizable dimension
-    const box2 = new THREE.Box3().setFromObject(car);
-    car.position.y -= box2.min.y;
-    car.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-    car.position.x = LG.carPos.x; car.position.z = LG.carPos.z;
-    car.rotation.y = LG.carYaw + LG_CAR_FACING_OFFSET;
-    car.visible = LG.carState !== 'driving';
-    scene.add(car);
-    LG.carMesh = car;
+    for (const spawn of LG_CAR_SPAWNS) {
+      const car = lgCarModel.clone(true);
+      const box = new THREE.Box3().setFromObject(car);
+      const size = new THREE.Vector3(); box.getSize(size);
+      car.scale.setScalar(4.2 / (size.z || 1)); // real sedan length, the car's most recognizable dimension
+      const box2 = new THREE.Box3().setFromObject(car);
+      car.position.y -= box2.min.y;
+      car.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+      car.position.x = spawn.x; car.position.z = spawn.z;
+      car.rotation.y = LG_CAR_FACING_OFFSET;
+      scene.add(car);
+      LG.cars.push({ mesh: car, pos: { x: spawn.x, z: spawn.z }, yaw: 0, state: 'parked' });
+    }
   }
 
   const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('libgameCanvas'), antialias: true });
@@ -2258,13 +2314,24 @@ function lgStep(dt) {
       document.getElementById('libKnock').classList.toggle('show', near);
     }
   }
-  if (!LG.inside && LG.carState === 'parked' && LG.carMesh) {
-    const cdist = Math.hypot(LG.x - LG.carPos.x, LG.z - LG.carPos.z);
-    const cnear = cdist < LG_CAR_ENTER_DIST;
-    if (cnear !== LG.nearCar) {
-      LG.nearCar = cnear;
-      document.getElementById('libCarEnter').classList.toggle('show', cnear);
+  if (!LG.inside && LG.drivingCarIndex < 0 && LG.cars.length) {
+    let bestIdx = -1, bestD = LG_CAR_ENTER_DIST;
+    for (let i = 0; i < LG.cars.length; i++) {
+      if (LG.cars[i].state !== 'parked') continue;
+      const d = Math.hypot(LG.x - LG.cars[i].pos.x, LG.z - LG.cars[i].pos.z);
+      if (d < bestD) { bestD = d; bestIdx = i; }
     }
+    if (bestIdx !== LG.nearCarIndex) {
+      LG.nearCarIndex = bestIdx;
+      document.getElementById('libCarEnter').classList.toggle('show', bestIdx >= 0);
+    }
+  }
+  if (!LG.inside && LG.sunLight) {
+    LG.sunLight.position.set(LG.x + 45, 65, LG.z + 25);
+    LG.sunLight.target.position.set(LG.x, 0, LG.z);
+  }
+  if (LG.mode === 'car') {
+    document.getElementById('libSpeedo').textContent = Math.round(Math.abs(LG.speed) * 3.6) + ' km/soat';
   }
   if (LG.inside && LG.shelfZones.length) {
     let closest = null, bestD = Infinity;
@@ -2286,7 +2353,7 @@ function lgTick(ts) {
   lgStepOthers(dt);
   if (LG_MP.ws && LG_MP.ws.readyState === WebSocket.OPEN && ts - LG_MP.lastSend > LG_MOVE_SEND_MS) {
     LG_MP.lastSend = ts;
-    LG_MP.ws.send(JSON.stringify({ t: 'move', x: LG.x, z: LG.z, yaw: LG.yaw, scene: LG.inside ? 'interior' : 'outdoor' }));
+    LG_MP.ws.send(JSON.stringify({ t: 'move', x: LG.x, z: LG.z, yaw: LG.yaw, scene: LG.inside ? 'interior' : 'outdoor', driving: LG.mode === 'car' }));
   }
   LG.renderer.render(LG.activeScene, LG.camera);
   LG.raf = requestAnimationFrame(lgTick);
@@ -2435,42 +2502,51 @@ function lgLeaveInterior() {
 }
 
 function lgEnterCar() {
-  if (LG.carState !== 'parked') return;
+  if (LG.drivingCarIndex >= 0 || LG.nearCarIndex < 0) return;
+  const car = LG.cars[LG.nearCarIndex];
+  if (!car || car.state !== 'parked') return;
   window.haptic?.('medium');
-  LG.carState = 'driving';
+  car.state = 'driving';
+  LG.drivingCarIndex = LG.nearCarIndex;
+  LG.nearCarIndex = -1;
   LG.mode = 'car';
-  if (LG.carMesh) LG.carMesh.visible = false;
+  car.mesh.visible = false;
   document.getElementById('libgame').classList.add('car');
   document.getElementById('libCarEnter').classList.remove('show');
   document.getElementById('libCarExit').classList.add('show');
-  LG.nearCar = false;
 }
 function lgExitCar() {
-  if (LG.carState !== 'driving') return;
+  if (LG.drivingCarIndex < 0) return;
   window.haptic?.('light');
-  LG.carState = 'parked';
-  LG.mode = 'foot';
-  LG.carPos = { x: LG.x, z: LG.z };
-  LG.carYaw = LG.yaw;
-  if (LG.carMesh) {
-    LG.carMesh.position.set(LG.carPos.x, LG.carMesh.position.y, LG.carPos.z);
-    LG.carMesh.rotation.y = LG.carYaw + LG_CAR_FACING_OFFSET;
-    LG.carMesh.visible = true;
+  const car = LG.cars[LG.drivingCarIndex];
+  if (car) {
+    car.state = 'parked';
+    car.pos = { x: LG.x, z: LG.z };
+    car.yaw = LG.yaw;
+    car.mesh.position.set(car.pos.x, car.mesh.position.y, car.pos.z);
+    car.mesh.rotation.y = car.yaw + LG_CAR_FACING_OFFSET;
+    car.mesh.visible = true;
   }
+  LG.drivingCarIndex = -1;
+  LG.mode = 'foot';
   document.getElementById('libgame').classList.remove('car');
   document.getElementById('libCarExit').classList.remove('show');
 }
 
 async function startLibGame(mode) {
   LG.mode = mode; LG.outdoorMode = mode;
-  // Choosing "Mashinada" up front means you're already driving the same world car the "Drive"
-  // prompt would otherwise put you in — keep both paths in sync rather than having a second,
-  // untouched parked car sitting ignored at its spawn point.
-  LG.carState = mode === 'car' ? 'driving' : 'parked';
   document.getElementById('libChoice').classList.remove('show');
   document.getElementById('libgame').classList.toggle('car', mode === 'car');
   document.getElementById('libCarExit').classList.toggle('show', mode === 'car');
   if (!LG.built) await lgBuildOutdoor(lgPalette());
+  // Choosing "Mashinada" up front means you're already driving the first world car the "Drive"
+  // prompt would otherwise put you in — keep both paths in sync rather than leaving a second,
+  // untouched parked copy sitting ignored at its spawn point.
+  if (mode === 'car' && LG.cars[0]) {
+    LG.cars[0].state = 'driving';
+    LG.cars[0].mesh.visible = false;
+    LG.drivingCarIndex = 0;
+  }
   LG.x = 0; LG.z = LG_WORLD.spawnZ; LG.yaw = 0; LG.pitch = 0; LG.speed = 0; LG.atDoor = false; LG.nearDoor = false; LG.inside = false;
   LG.activeScene = LG.outdoorScene;
   lgResize();
