@@ -183,17 +183,16 @@
     font-size:14px; font-weight:700; font-variant-numeric:tabular-nums; box-shadow:var(--shadow);
     display:none; pointer-events:none}
   #libgame.car #libSpeedo{display:block}
-  #libCarHud{position:fixed; left:0; right:0; bottom:0; height:24vh; pointer-events:none; z-index:1; display:none;
-    background:linear-gradient(to top, rgba(0,0,0,.5), rgba(0,0,0,0));
-    clip-path:polygon(0 100%, 0 38%, 16% 18%, 84% 18%, 100% 38%, 100% 100%);}
-  #libgame.car #libCarHud{display:block}
   #libKnock{position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom) + 96px); transform:translateX(-50%) scale(.92);
     padding:12px 20px; border-radius:999px; border:1px solid var(--line); background:var(--accent); color:#fff;
     font-size:15px; font-weight:700; font-family:inherit; box-shadow:var(--shadow); z-index:2; cursor:pointer;
     display:none; opacity:0; transition:opacity .2s, transform .2s;}
   #libKnock.show{display:block; opacity:1; transform:translateX(-50%) scale(1); animation:libKnockPulse 1.3s ease-in-out infinite}
   @keyframes libKnockPulse{0%,100%{box-shadow:0 0 0 0 rgba(0,0,0,0)}50%{box-shadow:0 0 0 9px rgba(0,0,0,0)}}
-  #libCarEnter{position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom) + 96px); transform:translateX(-50%) scale(.92);
+  /* Sits noticeably higher than #libKnock — a foot player can be near both a parked car and the
+     library door at once (they're both roadside landmarks), and the two prompts must never land
+     exactly on top of each other in that case. */
+  #libCarEnter{position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom) + 156px); transform:translateX(-50%) scale(.92);
     padding:12px 20px; border-radius:999px; border:1px solid var(--line); background:var(--accent2); color:#fff;
     font-size:15px; font-weight:700; font-family:inherit; box-shadow:var(--shadow); z-index:2; cursor:pointer;
     display:none; opacity:0; transition:opacity .2s, transform .2s;}
@@ -240,6 +239,12 @@
     max-width:400px; margin:0 auto; display:none; flex-direction:column; background:var(--card);
     border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow); overflow:hidden}
   #libChat.show{display:flex}
+  /* Telegram Desktop / the web client draw their own title bar over the top of the app, which
+     otherwise sits right on top of these — push the whole top row down clear of it. */
+  #libgame.desktopTg #libOnline,#libgame.desktopTg #libChatToggle{top:calc(env(safe-area-inset-top) + 46px)}
+  #libgame.desktopTg #libOnlineList{top:calc(env(safe-area-inset-top) + 86px)}
+  #libgame.desktopTg #libChat{top:calc(env(safe-area-inset-top) + 96px)}
+  #libgame.desktopTg #libGenreLabel{top:calc(env(safe-area-inset-top) + 46px)}
   #libChatMsgs{max-height:34vh; overflow-y:auto; padding:10px 12px; display:flex; flex-direction:column; gap:6px}
   #libChatMsgs .lm{font-size:13px; color:var(--text); line-height:1.35; transition:opacity .2s}
   #libChatMsgs .lm b{color:var(--accent2)}
@@ -336,7 +341,6 @@
   <button id="libRight" type="button">▶</button>
 </div>
 <div id="libSpeedo">0 km/soat</div>
-<div id="libCarHud"></div>
 <button id="libKnock" type="button">🚪 Eshikni taqillatish</button>
 <button id="libCarEnter" type="button">🚗 Haydash</button>
 <button id="libCarExit" type="button">🚶 Tushish</button>
@@ -1488,7 +1492,14 @@ function lgLoadModels() {
   return lgModelsLoadPromise;
 }
 
-const LG_WORLD = { halfX: 600, zMin: -550, zMax: 550, spawnZ: 70, libZ: -40 };
+// Linear dimensions are ~8x the previous build (~64x the explorable area) — short of a literal
+// "200x" because Three.js positions lose float32 precision far from the origin (visible jitter on
+// shadows/instancing well before four-digit coordinates) and because fog already caps visibility
+// at 320 units regardless of total world size, so extra empty distance past that wouldn't even be
+// seen. Buildings/lamps are spaced out proportionally (see LG_CITY_SPACING_SCALE below) rather
+// than added in bulk, so the much bigger map costs the same draw calls as before.
+const LG_WORLD = { halfX: 4800, zMin: -4400, zMax: 4400, spawnZ: 70, libZ: -40 };
+const LG_CITY_SPACING_SCALE = LG_WORLD.halfX / 600;
 const LG_CITY_CROSS_Z = 25; // where the east-west street crosses the existing north-south path
 const LG_IN_WORLD = { halfX: 25, zMin: -44, zMax: 32 };
 const LG_EYE_HEIGHT = 1.7;
@@ -1548,8 +1559,8 @@ const LG = {
   raf: null, lastTs: 0, built: false, interiorBuilt: false, wired: false,
   renderer: null, camera: null, outdoorScene: null, interiorScene: null, activeScene: null,
   door: null, bookMeshes: [], bookInstanceIds: [], shelfZones: [],
-  cars: [], nearCarIndex: -1, drivingCarIndex: -1,
-  sunLight: null, sunTarget: null,
+  cars: [], nearCarIndex: -1, drivingCarIndex: -1, hoodMesh: null,
+  sunLight: null, sunTarget: null, fountainBooks: null,
 };
 const LG_CAR_ENTER_DIST = 5;
 // Three separate parked cars (not one shared vehicle) — with more than one real player around,
@@ -1559,6 +1570,10 @@ const LG_CAR_SPAWNS = [{ x: 0, z: 45 }, { x: 60, z: 95 }, { x: -70, z: -80 }];
 // wheel-front-*/wheel-back-* with front at z=+0.66) — opposite of this game's yaw=0 forward
 // (-Z), same mismatch as the character models needed the same fix for.
 const LG_CAR_FACING_OFFSET = Math.PI;
+// Where the cloned hood mesh sits relative to the camera while driving — tuned by direct render
+// inspection (see scratchpad render tests) rather than guessed, since "does the hood actually
+// read as a hood from the driver's eye point" isn't something math alone gets right first try.
+const LG_HOOD_OFFSET = { y: -1.15, z: 0.3 };
 
 // Live multiplayer: presence, movement, chat, all over one WebSocket per player. `others` maps
 // player id -> {name, mesh, tx/tz/tyaw (latest server-reported position, interpolated toward
@@ -1753,6 +1768,82 @@ function lgStreetLamp(pal) {
   const pl = new THREE.PointLight(pal.lamp, 6, 14, 2);
   pl.position.y = 5.6;
   g.add(pl);
+  return g;
+}
+// A big roadside sign: two posts + a plank with canvas-rendered text. A real mesh (not a
+// billboard sprite) so it has a fixed orientation like an actual sign rather than always facing
+// the camera — reads correctly as a landmark you approach and pass, not a UI label floating in
+// the world. The single material maps onto every box face, so front and back both show the text
+// (handy — readable walking either direction) and the thin edges just get an unnoticeable sliver.
+function lgSignBoard(pal, text) {
+  const g = new THREE.Group();
+  const postMat = new THREE.MeshStandardMaterial({ color: pal.roofDark, roughness: 0.75 });
+  const postH = 7.6;
+  for (const px of [-4.3, 4.3]) {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.34, postH, 10), postMat);
+    post.position.set(px, postH / 2, 0);
+    post.castShadow = true;
+    g.add(post);
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024; canvas.height = 320;
+  const c = canvas.getContext('2d');
+  c.fillStyle = pal.plinth; c.fillRect(0, 0, canvas.width, canvas.height);
+  c.strokeStyle = pal.roofDark; c.lineWidth = 16;
+  c.strokeRect(8, 8, canvas.width - 16, canvas.height - 16);
+  c.font = '700 148px system-ui, sans-serif';
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillStyle = pal.text;
+  c.fillText(text, canvas.width / 2, canvas.height / 2 + 10);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const board = new THREE.Mesh(new THREE.BoxGeometry(9.8, 3.1, 0.35), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8 }));
+  board.position.set(0, postH - 1.7, 0);
+  board.castShadow = true;
+  g.add(board);
+  return g;
+}
+// A fountain where the "water" is a raft of small floating books instead — a stone basin with a
+// central pedestal, books ringed around it at slightly different radii/heights/spin speeds so
+// they read as bobbing rather than rigidly orbiting. Reuses the same per-instance hash-driven
+// size/color variation as the interior shelf books, so they look like real books, not blocks.
+// The returned group's userData.books list is what lgStep animates each frame.
+function lgBookFountain(pal) {
+  const g = new THREE.Group();
+  const stoneMat = new THREE.MeshStandardMaterial({ color: pal.plinth, roughness: 0.85 });
+  const basin = new THREE.Mesh(new THREE.CylinderGeometry(5.2, 5.6, 0.8, 22), stoneMat);
+  basin.position.y = 0.4; basin.receiveShadow = true; basin.castShadow = true;
+  g.add(basin);
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(5.2, 0.22, 8, 26), stoneMat);
+  rim.rotation.x = Math.PI / 2; rim.position.y = 0.85;
+  g.add(rim);
+  const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.15, 1.6, 12), stoneMat);
+  pedestal.position.y = 0.75;
+  g.add(pedestal);
+  const books = [];
+  const count = 26;
+  for (let i = 0; i < count; i++) {
+    const id = 'fountain#' + i;
+    const sy = 0.55 + lgHash01(id + 'h') * 0.5;
+    const sz = 0.5 + lgHash01(id + 't') * 0.9;
+    const mat = new THREE.MeshStandardMaterial({ color: lgHashColor(id), roughness: 0.6 });
+    const book = new THREE.Mesh(new THREE.BoxGeometry(0.42, sy, sz), mat);
+    book.castShadow = true;
+    const ang = (i / count) * Math.PI * 2 + lgHash01(id + 'a') * 0.5;
+    const rad = 1.7 + lgHash01(id + 'r') * 3.0;
+    book.rotation.y = ang + Math.PI / 2;
+    book.rotation.z = (lgHash01(id + 'l') - 0.5) * 0.4;
+    book.userData = {
+      baseX: Math.cos(ang) * rad, baseZ: Math.sin(ang) * rad,
+      baseY: 1.0 + lgHash01(id + 'y') * 0.25,
+      phase: lgHash01(id + 'p') * Math.PI * 2,
+      spin: (lgHash01(id + 's') - 0.5) * 0.5,
+    };
+    book.position.set(book.userData.baseX, book.userData.baseY, book.userData.baseZ);
+    g.add(book);
+    books.push(book);
+  }
+  g.userData.books = books;
   return g;
 }
 // Same hash formula as the app's own coverFor() (duplicated on purpose, not shared — keeps this
@@ -2011,10 +2102,18 @@ let lgChatRecorder = null;
 let lgChatRecChunks = [];
 let lgChatRecStart = 0;
 let lgChatRecTimer = null;
+// Kept alive across recordings (not stopped after each message) so the browser's mic permission
+// stays granted for the rest of the session instead of re-prompting on every single voice message.
+let lgChatMicStream = null;
+async function lgGetChatMicStream() {
+  if (lgChatMicStream && lgChatMicStream.getAudioTracks().some(t => t.readyState === 'live')) return lgChatMicStream;
+  lgChatMicStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  return lgChatMicStream;
+}
 async function lgStartChatVoice() {
   if (lgChatRecorder) return;
   let stream;
-  try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+  try { stream = await lgGetChatMicStream(); }
   catch (e) { return; }
   const rec = new MediaRecorder(stream);
   lgChatRecorder = rec;
@@ -2022,7 +2121,6 @@ async function lgStartChatVoice() {
   lgChatRecStart = Date.now();
   rec.ondataavailable = (e) => { if (e.data.size) lgChatRecChunks.push(e.data); };
   rec.onstop = () => {
-    stream.getTracks().forEach(t => t.stop());
     const durMs = Date.now() - lgChatRecStart;
     const mime = rec.mimeType || 'audio/webm';
     const blob = new Blob(lgChatRecChunks, { type: mime });
@@ -2040,6 +2138,9 @@ async function lgStartChatVoice() {
 function lgStopChatVoice() {
   clearTimeout(lgChatRecTimer);
   if (lgChatRecorder && lgChatRecorder.state !== 'inactive') lgChatRecorder.stop();
+}
+function lgReleaseChatMic() {
+  if (lgChatMicStream) { lgChatMicStream.getTracks().forEach(t => t.stop()); lgChatMicStream = null; }
 }
 function lgToggleOnlineList() {
   document.getElementById('libOnlineList')?.classList.toggle('show');
@@ -2106,8 +2207,13 @@ async function lgBuildOutdoor(pal) {
   scene.add(sun);
   LG.sunLight = sun;
 
-  const grassTex = lgNoiseTexture(pal.grass1, [[pal.grass2, 900, 0.5, 1, 2.5], ['#00000022', 250, 0.15, 1, 3]], 256, 90);
-  const groundMesh = new THREE.Mesh(new THREE.PlaneGeometry(LG_WORLD.halfX * 2 + 40, (LG_WORLD.zMax - LG_WORLD.zMin) + 40), new THREE.MeshStandardMaterial({ map: grassTex, roughness: 1 }));
+  // Repeat count scales with the plane's own size (not a fixed constant) so tile density — and
+  // therefore sharpness — stays the same regardless of how big the world is; a fixed repeat count
+  // stretched over a much bigger plane would blur into an unrecognizable smear.
+  const groundW = LG_WORLD.halfX * 2 + 40, groundD = (LG_WORLD.zMax - LG_WORLD.zMin) + 40;
+  const grassRepeat = Math.round(90 * LG_CITY_SPACING_SCALE);
+  const grassTex = lgNoiseTexture(pal.grass1, [[pal.grass2, 900, 0.5, 1, 2.5], ['#00000022', 250, 0.15, 1, 3]], 256, grassRepeat);
+  const groundMesh = new THREE.Mesh(new THREE.PlaneGeometry(groundW, groundD), new THREE.MeshStandardMaterial({ map: grassTex, roughness: 1 }));
   groundMesh.rotation.x = -Math.PI / 2;
   groundMesh.position.z = (LG_WORLD.zMax + LG_WORLD.zMin) / 2;
   groundMesh.receiveShadow = true;
@@ -2169,6 +2275,18 @@ async function lgBuildOutdoor(pal) {
   lib.add(label);
   scene.add(lib);
 
+  // Landmarks flanking the approach to the library, between the road and the entrance steps —
+  // the sign on the right side of the path (as you walk toward the library, heading -Z, "right"
+  // is +X), the book fountain as a bookend on the left.
+  const banner = lgSignBoard(pal, "Ro'zagul");
+  banner.position.set(16, 0, 22);
+  banner.rotation.y = Math.PI / 2;
+  scene.add(banner);
+  const fountain = lgBookFountain(pal);
+  fountain.position.set(-16, 0, 20);
+  scene.add(fountain);
+  LG.fountainBooks = fountain.userData.books;
+
   for (let i = 0; i < 7; i++) {
     const side = i % 2 === 0 ? -1 : 1;
     const tz = LG_WORLD.spawnZ - 8 - (i * 13);
@@ -2198,13 +2316,17 @@ async function lgBuildOutdoor(pal) {
   scene.add(ewRoad);
 
   // Plots spaced out along both roads (both directions, both sides) rather than clustered near
-  // the original crossroads — 90 apart keeps the mesh/draw-call count sane for a phone GPU even
-  // though the world itself is now much bigger; gaps between buildings read as yards, not gaps.
+  // the original crossroads. Spacing scales with LG_CITY_SPACING_SCALE (not a fixed 90/130) so a
+  // much bigger world spreads the SAME number of buildings/lamps further apart instead of adding
+  // more of them — keeps the mesh/draw-call count sane for a phone GPU regardless of world size;
+  // gaps between buildings just read as bigger yards on a bigger map.
+  const buildingSpacing = Math.round(90 * LG_CITY_SPACING_SCALE);
+  const lampSpacing = Math.round(130 * LG_CITY_SPACING_SCALE);
   let seed = 0;
   const cityPlots = [];
-  for (let d = 90; d < LG_WORLD.zMax - 40; d += 90) for (const side of [-1, 1]) cityPlots.push({ x: side * (20 + (seed % 3) * 7), z: d, along: 'ns', seed: seed++ });
-  for (let d = 90; d < -LG_WORLD.zMin - 40; d += 90) for (const side of [-1, 1]) cityPlots.push({ x: side * (20 + (seed % 3) * 7), z: -d, along: 'ns', seed: seed++ });
-  for (let d = 90; d < LG_WORLD.halfX - 40; d += 90) for (const side of [-1, 1]) {
+  for (let d = buildingSpacing; d < LG_WORLD.zMax - 40; d += buildingSpacing) for (const side of [-1, 1]) cityPlots.push({ x: side * (20 + (seed % 3) * 7), z: d, along: 'ns', seed: seed++ });
+  for (let d = buildingSpacing; d < -LG_WORLD.zMin - 40; d += buildingSpacing) for (const side of [-1, 1]) cityPlots.push({ x: side * (20 + (seed % 3) * 7), z: -d, along: 'ns', seed: seed++ });
+  for (let d = buildingSpacing; d < LG_WORLD.halfX - 40; d += buildingSpacing) for (const side of [-1, 1]) {
     cityPlots.push({ x: d, z: LG_CITY_CROSS_Z + side * (20 + (seed % 3) * 7), along: 'ew', seed: seed++ });
     cityPlots.push({ x: -d, z: LG_CITY_CROSS_Z + side * (20 + (seed % 3) * 7), along: 'ew', seed: seed++ });
   }
@@ -2216,8 +2338,8 @@ async function lgBuildOutdoor(pal) {
     scene.add(b);
   }
   const lampSpots = [];
-  for (let d = -Math.floor((-LG_WORLD.zMin - 60) / 130) * 130; d <= LG_WORLD.zMax - 60; d += 130) for (const side of [-1, 1]) lampSpots.push([side * 12, d]);
-  for (let d = -Math.floor((LG_WORLD.halfX - 60) / 130) * 130; d <= LG_WORLD.halfX - 60; d += 130) for (const side of [-1, 1]) lampSpots.push([d, LG_CITY_CROSS_Z + side * 12]);
+  for (let d = -Math.floor((-LG_WORLD.zMin - 60) / lampSpacing) * lampSpacing; d <= LG_WORLD.zMax - 60; d += lampSpacing) for (const side of [-1, 1]) lampSpots.push([side * 12, d]);
+  for (let d = -Math.floor((LG_WORLD.halfX - 60) / lampSpacing) * lampSpacing; d <= LG_WORLD.halfX - 60; d += lampSpacing) for (const side of [-1, 1]) lampSpots.push([d, LG_CITY_CROSS_Z + side * 12]);
   for (const lp of lampSpots) {
     const lamp = lgStreetLamp(pal);
     lamp.position.set(lp[0], 0, lp[1]);
@@ -2257,6 +2379,25 @@ async function lgBuildOutdoor(pal) {
   // YXZ (not the default XYZ) so a swipe applies yaw around world-up first and pitch around the
   // camera's own local axis after — the standard order for an FPS-style look, avoids roll drift.
   camera.rotation.order = 'YXZ';
+
+  // First-person "in the driver's seat" view: the real car model, cloned and parented to the
+  // camera (so it rides along with every turn), replacing the old flat CSS windshield vignette
+  // with actual hood/bumper geometry sitting in front of the driver. A camera's own children only
+  // render if the camera itself is part of the scene graph, hence adding it here.
+  scene.add(camera);
+  let hoodMesh = null;
+  if (lgCarModel) {
+    hoodMesh = lgCarModel.clone(true);
+    const hbox = new THREE.Box3().setFromObject(hoodMesh);
+    const hsize = new THREE.Vector3(); hbox.getSize(hsize);
+    hoodMesh.scale.setScalar(4.2 / (hsize.z || 1));
+    hoodMesh.traverse(o => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
+    hoodMesh.rotation.y = LG_CAR_FACING_OFFSET;
+    hoodMesh.position.set(0, LG_HOOD_OFFSET.y, LG_HOOD_OFFSET.z);
+    hoodMesh.visible = false;
+    camera.add(hoodMesh);
+  }
+  LG.hoodMesh = hoodMesh;
 
   LG.renderer = renderer; LG.camera = camera; LG.outdoorScene = scene; LG.activeScene = scene;
   LG.built = true;
@@ -2426,13 +2567,17 @@ function lgStep(dt) {
   LG.camera.position.set(LG.x, LG_EYE_HEIGHT + bob, LG.z);
   LG.camera.rotation.set(LG.pitch, LG.yaw, 0);
 
-  if (!LG.inside && !LG.atDoor) {
+  // No knocking your way into the library from behind the wheel — the door prompt is foot-only.
+  if (!LG.inside && !LG.atDoor && LG.mode !== 'car') {
     const dist = Math.hypot(LG.x - LG_DOOR.x, LG.z - LG_DOOR.z);
     const near = dist < LG_KNOCK_DIST;
     if (near !== LG.nearDoor) {
       LG.nearDoor = near;
       document.getElementById('libKnock').classList.toggle('show', near);
     }
+  } else if (LG.nearDoor) {
+    LG.nearDoor = false;
+    document.getElementById('libKnock').classList.remove('show');
   }
   if (!LG.inside && LG.drivingCarIndex < 0 && LG.cars.length) {
     let bestIdx = -1, bestD = LG_CAR_ENTER_DIST;
@@ -2449,6 +2594,14 @@ function lgStep(dt) {
   if (!LG.inside && LG.sunLight) {
     LG.sunLight.position.set(LG.x + 45, 65, LG.z + 25);
     LG.sunLight.target.position.set(LG.x, 0, LG.z);
+  }
+  if (!LG.inside && LG.fountainBooks) {
+    const t = performance.now() / 1000;
+    for (const b of LG.fountainBooks) {
+      const u = b.userData;
+      b.position.y = u.baseY + Math.sin(t * 0.9 + u.phase) * 0.18;
+      b.rotation.y += dt * u.spin;
+    }
   }
   if (LG.mode === 'car') {
     document.getElementById('libSpeedo').textContent = Math.round(Math.abs(LG.speed) * 3.6) + ' km/soat';
@@ -2588,7 +2741,7 @@ function lgWireControls() {
 // Fades the door out in place (no hinge geometry — reads fine as "opening" for a stylized
 // scene) then walks the camera into the real interior shelf scene.
 function lgKnock() {
-  if (LG.atDoor) return;
+  if (LG.atDoor || LG.mode === 'car') return;
   LG.atDoor = true;
   window.haptic?.('medium');
   Object.keys(LG.keys).forEach(k => LG.keys[k] = false);
@@ -2670,6 +2823,7 @@ function lgEnterCar() {
   LG.nearCarIndex = -1;
   LG.mode = 'car';
   car.mesh.visible = false;
+  if (LG.hoodMesh) LG.hoodMesh.visible = true;
   document.getElementById('libgame').classList.add('car');
   document.getElementById('libCarEnter').classList.remove('show');
   document.getElementById('libCarExit').classList.add('show');
@@ -2689,6 +2843,7 @@ function lgExitCar() {
   }
   LG.drivingCarIndex = -1;
   LG.mode = 'foot';
+  if (LG.hoodMesh) LG.hoodMesh.visible = false;
   document.getElementById('libgame').classList.remove('car');
   document.getElementById('libCarExit').classList.remove('show');
   lgEngineStop();
@@ -2707,6 +2862,7 @@ async function startLibGame(mode) {
     LG.cars[0].state = 'driving';
     LG.cars[0].mesh.visible = false;
     LG.drivingCarIndex = 0;
+    if (LG.hoodMesh) LG.hoodMesh.visible = true;
     lgEngineStart();
   }
   LG.x = 0; LG.z = LG_WORLD.spawnZ; LG.yaw = 0; LG.pitch = 0; LG.speed = 0; LG.atDoor = false; LG.nearDoor = false; LG.inside = false;
@@ -2718,7 +2874,14 @@ async function startLibGame(mode) {
 
 function openLibGame() {
   if (!LG.wired) lgWireControls();
-  document.getElementById('libgame').classList.add('open');
+  const gameEl = document.getElementById('libgame');
+  gameEl.classList.add('open');
+  // Telegram Desktop (and the plain web client) draws its own title bar over the top of the
+  // Mini App — unlike the mobile clients' true fullscreen — which otherwise sits right on top of
+  // the online pill / chat toggle / chat panel. `env(safe-area-inset-top)` doesn't know about
+  // that chrome (it's not a real device notch), so detect it via the WebApp platform string.
+  const platform = window.Telegram?.WebApp?.platform || '';
+  gameEl.classList.toggle('desktopTg', !['ios', 'android'].includes(platform));
   document.getElementById('libChoice').classList.add('show');
   window.Telegram?.WebApp?.BackButton?.show();
   lgLoadModels();
@@ -2738,6 +2901,7 @@ function closeLibGame() {
   Object.keys(LG.keys).forEach(k => LG.keys[k] = false);
   LG.mode = null;
   lgEngineStop();
+  lgReleaseChatMic();
   lgDisconnectMultiplayer();
 }
 window.lgResumeAfterDetail = function () {
