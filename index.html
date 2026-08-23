@@ -200,6 +200,19 @@
     display:none; opacity:0; transition:opacity .2s, transform .2s;}
   #libKnock.show{display:block; opacity:1; transform:translateX(-50%) scale(1); animation:libKnockPulse 1.3s ease-in-out infinite}
   @keyframes libKnockPulse{0%,100%{box-shadow:0 0 0 0 rgba(0,0,0,0)}50%{box-shadow:0 0 0 9px rgba(0,0,0,0)}}
+  /* Same slot as #libKnock — outdoor (knock) and indoor (talk to the librarian) prompts are
+     mutually exclusive by definition, so reusing the position is safe. */
+  #libNpcTalk{position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom) + 96px); transform:translateX(-50%) scale(.92);
+    padding:12px 20px; border-radius:999px; border:1px solid var(--line); background:var(--accent2); color:#fff;
+    font-size:15px; font-weight:700; font-family:inherit; box-shadow:var(--shadow); z-index:2; cursor:pointer;
+    display:none; opacity:0; transition:opacity .2s, transform .2s;}
+  #libNpcTalk.show{display:block; opacity:1; transform:translateX(-50%) scale(1); animation:libKnockPulse 1.3s ease-in-out infinite}
+  #libChatMsgs .lm.lmNpc{background:var(--chip); border-radius:12px; padding:8px 10px; margin:2px 0}
+  #libChatMsgs .lmBooks{display:flex; flex-direction:column; gap:4px; margin-top:6px}
+  #libChatMsgs .lmBookBtn{text-align:left; border:1px solid var(--line); background:var(--card); color:var(--accent2);
+    border-radius:10px; padding:6px 9px; font-size:12px; font-weight:600; font-family:inherit; cursor:pointer}
+  #libChatMsgs .lmBookBtn:active{background:var(--chip)}
+  #libChatMsgs .lmTyping{color:var(--muted); font-style:italic}
   /* Sits noticeably higher than #libKnock — a foot player can be near both a parked car and the
      library door at once (they're both roadside landmarks), and the two prompts must never land
      exactly on top of each other in that case. */
@@ -408,6 +421,7 @@
   <button id="libCar" type="button">🚗 Mashinada</button>
 </div></div>
 <button id="libInteriorBack" type="button">🔙 Tashqariga</button>
+<button id="libNpcTalk" type="button">💬 Kutubxonachi bilan gaplashish</button>
 <div id="libGenreLabel"></div>
 <canvas id="libMiniMap" width="100" height="100"></canvas>
 <div id="libEmotePicker">
@@ -1655,7 +1669,7 @@ const LG = {
   renderer: null, camera: null, outdoorScene: null, interiorScene: null, activeScene: null,
   door: null, bookMeshes: [], bookInstanceIds: [], shelfZones: [],
   cars: [], nearCarIndex: -1, drivingCarIndex: -1, hoodMesh: null, mySeat: null, lookYaw: 0,
-  sunLight: null, sunTarget: null, fountainBooks: null,
+  sunLight: null, sunTarget: null, fountainBooks: null, npc: null, nearNpc: false,
 };
 const LG_CAR_ENTER_DIST = 5;
 // Three separate parked cars (not one shared vehicle) — with more than one real player around,
@@ -2168,6 +2182,23 @@ function lgBuildMsgEl(entry) {
   div.appendChild(lgChatSenderLabel(entry.id, entry.name));
   if (entry.kind === 'text') {
     div.appendChild(document.createTextNode(entry.text || ''));
+  } else if (entry.kind === 'npc') {
+    div.classList.add('lmNpc');
+    div.appendChild(document.createTextNode(entry.text || ''));
+    const books = (entry.books || []).filter(b => b.id);
+    if (books.length) {
+      const wrap = document.createElement('div');
+      wrap.className = 'lmBooks';
+      for (const b of books) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'lmBookBtn';
+        btn.textContent = '📖 ' + (b.title || '');
+        btn.onclick = () => window.openDetail(b.id);
+        wrap.appendChild(btn);
+      }
+      div.appendChild(wrap);
+    }
   } else {
     div.appendChild(document.createElement('br'));
     if (entry.kind === 'image') {
@@ -2187,9 +2218,13 @@ function lgBuildMsgEl(entry) {
 // Threads are stored as plain arrays of render descriptors (not DOM), so switching between the
 // group chat and a DM is just "clear the box, rebuild from whichever array is active now" —
 // there's only ever one live DOM tree for #libChatMsgs regardless of how many threads exist.
-function lgThreadKey() { return LG_MP.chatMode === 'dm' && LG_MP.dmPartner ? 'dm:' + LG_MP.dmPartner.id : 'global'; }
+function lgThreadKey() {
+  if (LG_MP.chatMode === 'npc') return 'npc';
+  return LG_MP.chatMode === 'dm' && LG_MP.dmPartner ? 'dm:' + LG_MP.dmPartner.id : 'global';
+}
 function lgThreadLog(key) {
   if (key === 'global') return LG_MP.groupLog;
+  if (key === 'npc') { if (!LG_MP.npcLog) LG_MP.npcLog = []; return LG_MP.npcLog; }
   const id = Number(key.slice(3));
   if (!LG_MP.dmLogs.has(id)) LG_MP.dmLogs.set(id, []);
   return LG_MP.dmLogs.get(id);
@@ -2313,6 +2348,39 @@ function lgOpenDM(id, name) {
   if (!LG_MP.chatOpen) lgToggleChat();
   else document.getElementById('libChatInput')?.focus();
 }
+function lgOpenNpcChat() {
+  LG_MP.chatMode = 'npc';
+  LG_MP.dmPartner = null;
+  const bar = document.getElementById('libChatModeBar');
+  bar?.classList.add('show');
+  const nameEl = document.getElementById('libChatModeName');
+  if (nameEl) nameEl.textContent = '📚 Kutubxonachi';
+  lgSetChatWithLabel('Kutubxonachi');
+  lgRenderThread('npc');
+  document.getElementById('libOnlineList')?.classList.remove('show');
+  if (!LG_MP.chatOpen) lgToggleChat();
+  else document.getElementById('libChatInput')?.focus();
+}
+// A plain REST call, not the multiplayer WebSocket — other players never see this conversation.
+// Shows a transient "typing..." row (not persisted to the thread log) while the AI call is in
+// flight, same idea as a real chat app's typing indicator.
+async function lgSendNpcMessage(text) {
+  lgLogEntry('npc', { kind: 'text', id: LG_MP.myId, name: 'Siz', text }, true);
+  const box = document.getElementById('libChatMsgs');
+  const typingEl = document.createElement('div');
+  typingEl.className = 'lm lmTyping';
+  typingEl.textContent = 'Kutubxonachi yozmoqda...';
+  if (box && lgThreadKey() === 'npc') { box.appendChild(typingEl); box.scrollTop = box.scrollHeight; }
+  let answer, books;
+  try {
+    const data = await window.api('/api/npc-chat', { method: 'POST', body: JSON.stringify({ text }) });
+    answer = data.answer; books = data.matched_books || [];
+  } catch (e) {
+    answer = 'Kechirasiz, hozir javob bera olmadim. Birozdan keyin qayta urinib ko\'ring.'; books = [];
+  }
+  typingEl.remove();
+  lgLogEntry('npc', { kind: 'npc', id: 'npc', name: 'Kutubxonachi', text: answer, books }, false);
+}
 function lgToggleChat() {
   LG_MP.chatOpen = !LG_MP.chatOpen;
   document.getElementById('libChat').classList.toggle('show', LG_MP.chatOpen);
@@ -2328,7 +2396,15 @@ function lgToggleChat() {
 function lgSendChat() {
   const input = document.getElementById('libChatInput');
   const text = (input?.value || '').trim();
-  if (!text || !LG_MP.ws || LG_MP.ws.readyState !== WebSocket.OPEN) return;
+  if (!text) return;
+  // The librarian NPC is a plain REST call (see lgSendNpcMessage), not the multiplayer
+  // WebSocket at all — checked first so it still works even if that connection is down.
+  if (LG_MP.chatMode === 'npc') {
+    input.value = '';
+    lgSendNpcMessage(text);
+    return;
+  }
+  if (!LG_MP.ws || LG_MP.ws.readyState !== WebSocket.OPEN) return;
   if (LG_MP.chatMode === 'dm' && LG_MP.dmPartner) {
     LG_MP.ws.send(JSON.stringify({ t: 'dm', to: LG_MP.dmPartner.id, text }));
   } else {
@@ -2690,6 +2766,10 @@ async function lgBuildOutdoor(pal) {
 // unique cover texture; tapping still opens the real detail sheet with the real cover.
 const LG_RANGE_COUNT = 8, LG_TIERS = 5, LG_RANGE_SPACING = 6;
 const LG_ROOM_HALF_X = 26, LG_ROOM_Z_NEAR = 34, LG_ROOM_Z_FAR = -46;
+// Off to the side of the entrance aisle (shelves start at x=-21) rather than blocking the main
+// walk-in path — a little "front desk" nook you notice on the way to the stacks, not in the way.
+const LG_NPC_POS = { x: -20, z: 26 };
+const LG_NPC_TALK_DIST = 4;
 
 function lgBuildInterior(pal) {
   const scene = new THREE.Scene();
@@ -2803,6 +2883,17 @@ function lgBuildInterior(pal) {
 
   LG.bookMeshes = [instMesh];
   LG.bookInstanceIds = idsByInstance;
+
+  // The librarian NPC — a fixed, deterministic character (always the same look/name, not
+  // hash-varied like other players) standing at a small front-desk nook. Talking to them opens
+  // the same threaded chat panel used for global/DM, routed to the AI librarian instead of a
+  // WebSocket peer (see lgOpenNpcChat / lgSendNpcMessage).
+  const npcAv = lgAvatarMesh('Kutubxonachi', 'npc-librarian-fixed');
+  npcAv.mesh.position.set(LG_NPC_POS.x, 0, LG_NPC_POS.z);
+  npcAv.mesh.rotation.y = Math.PI * 0.15; // angled slightly toward the entrance, not dead-on
+  scene.add(npcAv.mesh);
+  LG.npc = npcAv;
+
   LG.interiorScene = scene;
   LG.interiorBuilt = true;
 }
@@ -2965,6 +3056,18 @@ function lgStep(dt) {
     if (closest && bestD < 14) { lbl?.classList.add('show'); if (lbl) lbl.textContent = closest.name; }
     else lbl?.classList.remove('show');
   }
+  if (LG.inside && LG.npc) {
+    LG.npc.mixer?.update(dt);
+    const d = Math.hypot(LG.x - LG_NPC_POS.x, LG.z - LG_NPC_POS.z);
+    const near = d < LG_NPC_TALK_DIST;
+    if (near !== LG.nearNpc) {
+      LG.nearNpc = near;
+      document.getElementById('libNpcTalk')?.classList.toggle('show', near);
+    }
+  } else if (LG.nearNpc) {
+    LG.nearNpc = false;
+    document.getElementById('libNpcTalk')?.classList.remove('show');
+  }
 }
 
 function lgTick(ts) {
@@ -3094,6 +3197,11 @@ function lgWireControls() {
   document.getElementById('libFoot').addEventListener('click', () => startLibGame('foot'));
   document.getElementById('libCar').addEventListener('click', () => startLibGame('car'));
   document.getElementById('libInteriorBack').addEventListener('click', lgLeaveInterior);
+  document.getElementById('libNpcTalk').addEventListener('click', () => {
+    if (!window.canAct?.()) { window.toast?.('Suhbat uchun botni Telegram ichida oching'); return; }
+    window.haptic?.('medium');
+    lgOpenNpcChat();
+  });
   document.getElementById('libOnline').addEventListener('click', lgToggleOnlineList);
   document.getElementById('libOnlineList').addEventListener('click', (e) => {
     const row = e.target.closest('.lo[data-id]');
