@@ -1246,6 +1246,10 @@ $('#pdfNext').onclick=()=>{if(pdfPageNum<pdfPageCount)pdfRenderPage(pdfPageNum+1
 
 // ---- audio player ----
 const AP={audio:new Audio(),bookId:null,audioBookId:null,parts:[],partIdx:0,speeds:[1,1.25,1.5,1.75,2,0.75]};
+// Without this, <audio src="https://otherOrigin/..."> fetches "no-cors" by default, which the
+// service worker sees as an opaque response it can't read/slice — silently breaking the media
+// caching in sw.js (PDF reads are unaffected; PDF.js's own fetch() is already CORS-mode).
+AP.audio.crossOrigin='anonymous';
 AP.audio.addEventListener('timeupdate',()=>{
   if(!AP.audio.duration)return;
   $('#apSeek').value=Math.round((AP.audio.currentTime/AP.audio.duration)*1000);
@@ -1611,6 +1615,7 @@ const LG_MODE_CFG = {
 
 const LG_LOOK_SENS = 0.0048; // radians of yaw/pitch per pixel of swipe
 const LG_PITCH_MAX = Math.PI / 2 * 0.85; // clamp so looking up/down never flips past vertical
+const LG_CAR_LOOK_YAW_MAX = Math.PI * 0.65; // ~117° each way — glancing out a side window, not spinning around
 
 const LG = {
   x: 0, z: LG_WORLD.spawnZ, yaw: 0, pitch: 0, speed: 0, walk: 0,
@@ -1619,7 +1624,7 @@ const LG = {
   raf: null, lastTs: 0, built: false, interiorBuilt: false, wired: false,
   renderer: null, camera: null, outdoorScene: null, interiorScene: null, activeScene: null,
   door: null, bookMeshes: [], bookInstanceIds: [], shelfZones: [],
-  cars: [], nearCarIndex: -1, drivingCarIndex: -1, hoodMesh: null, mySeat: null,
+  cars: [], nearCarIndex: -1, drivingCarIndex: -1, hoodMesh: null, mySeat: null, lookYaw: 0,
   sunLight: null, sunTarget: null, fountainBooks: null,
 };
 const LG_CAR_ENTER_DIST = 5;
@@ -2866,7 +2871,13 @@ function lgStep(dt) {
 
   const bob = Math.abs(LG.speed) > 0.3 ? Math.sin(LG.walk) * cfg.bobAmp : 0;
   LG.camera.position.set(LG.x, LG_EYE_HEIGHT + bob, LG.z);
-  LG.camera.rotation.set(LG.pitch, LG.yaw, 0);
+  // Driving: swipe turns your head, not the car — LG.yaw (actual heading, used above for
+  // movement) stays button-only, and lookYaw is a camera-only offset on top of it. The hood mesh
+  // counter-rotates by the same amount so it stays fixed to the car's body instead of swinging
+  // around with your view (it's a camera child, so without this it would visually follow your
+  // look direction like it was bolted to your head instead of the car).
+  LG.camera.rotation.set(LG.pitch, LG.yaw + (LG.mode === 'car' ? LG.lookYaw : 0), 0);
+  if (LG.mode === 'car' && LG.hoodMesh) LG.hoodMesh.rotation.y = LG_CAR_FACING_OFFSET - LG.lookYaw;
 
   // No knocking your way into the library from behind the wheel — the door prompt is foot-only.
   if (!LG.inside && !LG.atDoor && LG.mode !== 'car') {
@@ -2967,12 +2978,17 @@ function lgCanvasMove(e) {
   if (!lgLookLast) return;
   const dx = e.clientX - lgLookLast.x, dy = e.clientY - lgLookLast.y;
   lgLookLast = { x: e.clientX, y: e.clientY };
-  // Turning is button-only on foot and while driving — a horizontal swipe used to also spin the
-  // character/car's actual heading, which felt like losing steering control by accident just from
-  // dragging to look around. A passenger doesn't control the car's heading either way, so they
-  // still get free horizontal look. Vertical swipe (look up/down) never affected movement and
-  // stays on for everyone.
-  if (LG.mode === 'passenger') LG.yaw -= dx * LG_LOOK_SENS;
+  // On foot, swipe still turns the whole body (character's actual heading) — that's normal
+  // first-person-game behavior and was never the complaint. While driving, a horizontal swipe
+  // used to also spin the CAR's actual heading, which felt like losing steering control by
+  // accident just from dragging to look around — so driving gets its own free-look-only offset
+  // (lookYaw, applied on top of the real heading in lgStep/lgCarHood, steering stays button-only).
+  // A passenger doesn't control the car's heading at all, so plain LG.yaw is already look-only.
+  if (LG.mode === 'car') {
+    LG.lookYaw = Math.max(-LG_CAR_LOOK_YAW_MAX, Math.min(LG_CAR_LOOK_YAW_MAX, LG.lookYaw - dx * LG_LOOK_SENS));
+  } else {
+    LG.yaw -= dx * LG_LOOK_SENS;
+  }
   LG.pitch = Math.max(-LG_PITCH_MAX, Math.min(LG_PITCH_MAX, LG.pitch - dy * LG_LOOK_SENS));
 }
 function lgCanvasEnd() { lgLookLast = null; }
@@ -3191,6 +3207,7 @@ function lgEnterCar() {
   LG.drivingCarIndex = idx;
   LG.nearCarIndex = -1;
   LG.mode = 'car';
+  LG.lookYaw = 0;
   car.driverId = LG_MP.myId; car.driverName = 'Siz'; car.driving = true;
   car.mesh.visible = false;
   if (LG.hoodMesh) LG.hoodMesh.visible = true;
@@ -3242,7 +3259,8 @@ function lgLeaveCarOrSeat() {
     }
     LG.drivingCarIndex = -1;
     LG.mode = 'foot';
-    if (LG.hoodMesh) LG.hoodMesh.visible = false;
+    LG.lookYaw = 0;
+    if (LG.hoodMesh) { LG.hoodMesh.visible = false; LG.hoodMesh.rotation.y = LG_CAR_FACING_OFFSET; }
     document.getElementById('libgame').classList.remove('car');
     document.getElementById('libCarExit').classList.remove('show');
     lgEngineStop();
@@ -3299,7 +3317,7 @@ async function startLibGame(mode) {
   } else {
     LG.x = 0; LG.z = LG_WORLD.spawnZ; LG.yaw = 0;
   }
-  LG.pitch = 0; LG.speed = 0; LG.atDoor = false; LG.nearDoor = false; LG.inside = false;
+  LG.pitch = 0; LG.lookYaw = 0; LG.speed = 0; LG.atDoor = false; LG.nearDoor = false; LG.inside = false;
   LG.activeScene = LG.outdoorScene;
   lgResize();
   LG.lastTs = 0;

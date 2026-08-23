@@ -1,10 +1,17 @@
 // Kutubxona PWA service worker.
 // Bump CACHE_VERSION on any shell (HTML/CSS/JS) change so old clients pick up the new
 // version instead of serving a stale cached shell forever.
-const CACHE_VERSION = 'v56';
+const CACHE_VERSION = 'v57';
 const SHELL_CACHE = `kutubxona-shell-${CACHE_VERSION}`;
 const DATA_CACHE = `kutubxona-data-${CACHE_VERSION}`;
 const COVER_CACHE = `kutubxona-covers-${CACHE_VERSION}`;
+// Deliberately NOT tied to CACHE_VERSION — this one holds actual book/audio content, which is
+// expensive (megabytes, sometimes hundreds of MB) and slow to re-download. Every other cache gets
+// wiped and rebuilt on each deploy; this one has to survive that or "read once, opens instantly
+// next time" would reset on every shell update. Only bump it if the STORED FORMAT here changes
+// (e.g. the header scheme below), not for ordinary app changes.
+const MEDIA_CACHE = 'kutubxona-media-v1';
+const MEDIA_CACHE_MAX_BYTES = 400 * 1024 * 1024; // ~a handful of full audiobooks/PDFs, not the whole catalog
 
 const SHELL_FILES = [
   './index.html',
@@ -24,7 +31,7 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-  const keep = new Set([SHELL_CACHE, DATA_CACHE, COVER_CACHE]);
+  const keep = new Set([SHELL_CACHE, DATA_CACHE, COVER_CACHE, MEDIA_CACHE]);
   event.waitUntil(
     caches.keys()
       .then((names) => Promise.all(names.filter((n) => !keep.has(n)).map((n) => caches.delete(n))))
@@ -32,10 +39,113 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// The book/audio streaming endpoints live on the API's own origin (not this Pages origin), so
+// they need to be checked and handled BEFORE the same-origin bailout below.
+function mediaStreamPath(pathname) {
+  if (/^\/api\/books\/[^/]+\/read$/.test(pathname)) return true;
+  if (/^\/api\/audiobook-parts\/[^/]+\/stream$/.test(pathname)) return true;
+  return false;
+}
+// The real streaming URL carries a short-lived, per-session auth token in the query string —
+// caching by the literal URL would mean every new token (a new /api/stream-token call) misses the
+// cache entirely, even for a book already downloaded minutes ago. Caching by origin+pathname
+// alone (the book/part id) makes the cache reusable across sessions and token refreshes.
+function mediaCacheKey(url) {
+  return url.origin + url.pathname;
+}
+async function sliceFromCached(cached, rangeHeader) {
+  const blob = await cached.blob();
+  const total = blob.size;
+  const type = cached.headers.get('Content-Type') || 'application/octet-stream';
+  if (!rangeHeader) {
+    return new Response(blob, { status: 200, headers: { 'Content-Type': type, 'Content-Length': String(total), 'Accept-Ranges': 'bytes' } });
+  }
+  const m = /bytes=(\d*)-(\d*)/.exec(rangeHeader);
+  let start = m && m[1] ? parseInt(m[1], 10) : 0;
+  let end = m && m[2] ? parseInt(m[2], 10) : total - 1;
+  if (Number.isNaN(start) || start < 0) start = 0;
+  if (Number.isNaN(end) || end >= total) end = total - 1;
+  if (end < start) end = start;
+  return new Response(blob.slice(start, end + 1), {
+    status: 206,
+    headers: {
+      'Content-Type': type,
+      'Content-Range': `bytes ${start}-${end}/${total}`,
+      'Content-Length': String(end - start + 1),
+      'Accept-Ranges': 'bytes',
+    },
+  });
+}
+// Evicts the oldest cached entries (by when they were stored, tracked via the X-Cached-At header
+// below — Cache API has no built-in last-accessed tracking) until there's room for the incoming
+// file. A simple "oldest first" policy, not true LRU, but keeps total size bounded without needing
+// a separate metadata store.
+async function evictForSpace(cache, incomingBytes) {
+  const keys = await cache.keys();
+  const entries = [];
+  let total = 0;
+  for (const req of keys) {
+    const res = await cache.match(req);
+    if (!res) continue;
+    const size = parseInt(res.headers.get('Content-Length') || '0', 10) || 0;
+    const cachedAt = parseInt(res.headers.get('X-Cached-At') || '0', 10) || 0;
+    entries.push({ req, size, cachedAt });
+    total += size;
+  }
+  entries.sort((a, b) => a.cachedAt - b.cachedAt);
+  let i = 0;
+  while (total + incomingBytes > MEDIA_CACHE_MAX_BYTES && i < entries.length) {
+    await cache.delete(entries[i].req);
+    total -= entries[i].size;
+    i++;
+  }
+}
+// Downloads the FULL file (no Range header — the backend returns 200 with the complete body for
+// a rangeless request) and stores it under the token-independent key, so every future open of
+// this same book/part — this session or a later one — is served straight from disk.
+async function cacheFullMediaInBackground(reqUrl, cacheKey, cache) {
+  try {
+    const res = await fetch(reqUrl, { headers: {} });
+    if (!res.ok) return;
+    const blob = await res.blob();
+    await evictForSpace(cache, blob.size);
+    const stored = new Response(blob, {
+      status: 200,
+      headers: {
+        'Content-Type': res.headers.get('Content-Type') || 'application/octet-stream',
+        'Content-Length': String(blob.size),
+        'X-Cached-At': String(Date.now()),
+      },
+    });
+    await cache.put(cacheKey, stored);
+  } catch (e) {
+    // Offline, network hiccup, or the book turned out too big to fit even after eviction —
+    // nothing to do but let the next open try again.
+  }
+}
+async function handleMediaRequest(event, url) {
+  const cache = await caches.open(MEDIA_CACHE);
+  const cacheKey = mediaCacheKey(url);
+  const cached = await cache.match(cacheKey);
+  if (cached) return sliceFromCached(cached, event.request.headers.get('range'));
+  // Not cached yet — serve THIS request straight from the network (with whatever Range the
+  // player/reader actually asked for, so first playback/read isn't stalled on a full download),
+  // and separately populate the cache in the background for next time.
+  const netRes = await fetch(event.request);
+  event.waitUntil(cacheFullMediaInBackground(url.href, cacheKey, cache));
+  return netRes;
+}
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
+
+  if (mediaStreamPath(url.pathname)) {
+    event.respondWith(handleMediaRequest(event, url));
+    return;
+  }
+
   if (url.origin !== self.location.origin) return; // don't touch telegram.org's script etc.
 
   // books.json / quran data: stale-while-revalidate — instant from cache, refreshed in the
