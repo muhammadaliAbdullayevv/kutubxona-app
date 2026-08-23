@@ -178,9 +178,10 @@
   #libgame.car #libRight{left:80px; right:auto; bottom:calc(env(safe-area-inset-bottom) + 78px)}
   #libgame.car #libUp{right:16px; left:auto; bottom:calc(env(safe-area-inset-bottom) + 144px)}
   #libgame.car #libDown{right:16px; left:auto; bottom:calc(env(safe-area-inset-bottom) + 78px)}
-  #libSpeedo{position:fixed; right:16px; bottom:calc(env(safe-area-inset-bottom) + 208px); z-index:1;
-    padding:6px 12px; border-radius:12px; background:rgba(0,0,0,.45); color:#fff; font-size:13px;
-    font-weight:700; font-variant-numeric:tabular-nums; display:none; pointer-events:none}
+  #libSpeedo{position:fixed; top:calc(env(safe-area-inset-top) + 58px); right:14px; z-index:2;
+    padding:7px 14px; border-radius:20px; border:1px solid var(--line); background:rgba(0,0,0,.55); color:#fff;
+    font-size:14px; font-weight:700; font-variant-numeric:tabular-nums; box-shadow:var(--shadow);
+    display:none; pointer-events:none}
   #libgame.car #libSpeedo{display:block}
   #libCarHud{position:fixed; left:0; right:0; bottom:0; height:24vh; pointer-events:none; z-index:1; display:none;
     background:linear-gradient(to top, rgba(0,0,0,.5), rgba(0,0,0,0));
@@ -1517,7 +1518,10 @@ function lgPalette() {
 // (heavier) and turns less sharply than a person can pivot on foot; indoors everyone walks.
 const LG_MODE_CFG = {
   foot: { maxSpeed: 9, accel: 24, decel: 30, turnRate: 1.8, bobAmp: 0.045 },
-  car: { maxSpeed: 24, accel: 14, decel: 20, turnRate: 1.0, bobAmp: 0.015 },
+  // autoCruise: a car keeps rolling forward on its own (holding the accelerator the whole time
+  // on a phone, on top of steering, is awkward) — ▲ speeds up to maxSpeed, ▼ brakes/reverses,
+  // letting go just settles back to this cruising pace instead of stopping dead.
+  car: { maxSpeed: 24, accel: 14, decel: 20, turnRate: 1.0, bobAmp: 0.015, autoCruise: 7 },
   inside: { maxSpeed: 4, accel: 16, decel: 22, turnRate: 2.0, bobAmp: 0.03 },
 };
 
@@ -2286,9 +2290,13 @@ window.addEventListener('resize', lgResize);
 
 function lgStep(dt) {
   const cfg = LG_MODE_CFG[LG.mode] || LG_MODE_CFG.foot;
-  if (LG.keys.left) LG.yaw += cfg.turnRate * dt;
-  if (LG.keys.right) LG.yaw -= cfg.turnRate * dt;
-  let target = 0;
+  // Steering while backing up: turning "left" while reversing needs to swing the car the way a
+  // real driver expects looking back over their shoulder, which is the opposite screen-rotation
+  // from turning left while moving forward — without this it feels backwards in reverse.
+  const steerFlip = LG.speed < -0.05 ? -1 : 1;
+  if (LG.keys.left) LG.yaw += cfg.turnRate * dt * steerFlip;
+  if (LG.keys.right) LG.yaw -= cfg.turnRate * dt * steerFlip;
+  let target = LG.mode === 'car' ? cfg.autoCruise : 0;
   if (LG.keys.fwd) target = cfg.maxSpeed;
   else if (LG.keys.back) target = -cfg.maxSpeed * 0.5; // reversing is slower, like backing up
   if (LG.speed < target) LG.speed = Math.min(target, LG.speed + cfg.accel * dt);
@@ -2332,6 +2340,7 @@ function lgStep(dt) {
   }
   if (LG.mode === 'car') {
     document.getElementById('libSpeedo').textContent = Math.round(Math.abs(LG.speed) * 3.6) + ' km/soat';
+    lgEngineUpdate(LG.speed);
   }
   if (LG.inside && LG.shelfZones.length) {
     let closest = null, bestD = Infinity;
@@ -2501,6 +2510,39 @@ function lgLeaveInterior() {
   document.getElementById('libgame').classList.remove('hasInteriorBack');
 }
 
+// Synthesized engine hum (Web Audio, no sound file) — sawtooth through a lowpass filter reads as
+// a rough engine rumble rather than a harsh buzz; pitch/volume/brightness all track LG.speed each
+// frame, so it actually revs as you speed up instead of playing a flat loop.
+let lgEngineCtx = null, lgEngineOsc = null, lgEngineGain = null, lgEngineFilter = null;
+function lgEngineStart() {
+  if (lgEngineCtx) return;
+  try {
+    lgEngineCtx = new (window.AudioContext || window.webkitAudioContext)();
+    lgEngineOsc = lgEngineCtx.createOscillator();
+    lgEngineOsc.type = 'sawtooth';
+    lgEngineOsc.frequency.value = 55;
+    lgEngineFilter = lgEngineCtx.createBiquadFilter();
+    lgEngineFilter.type = 'lowpass';
+    lgEngineFilter.frequency.value = 300;
+    lgEngineGain = lgEngineCtx.createGain();
+    lgEngineGain.gain.value = 0;
+    lgEngineOsc.connect(lgEngineFilter).connect(lgEngineGain).connect(lgEngineCtx.destination);
+    lgEngineOsc.start();
+  } catch (e) { lgEngineCtx = null; }
+}
+function lgEngineStop() {
+  if (!lgEngineCtx) return;
+  try { lgEngineOsc.stop(); lgEngineCtx.close(); } catch (e) {}
+  lgEngineCtx = null; lgEngineOsc = null; lgEngineGain = null; lgEngineFilter = null;
+}
+function lgEngineUpdate(speed) {
+  if (!lgEngineCtx) return;
+  const s = Math.min(1, Math.abs(speed) / LG_MODE_CFG.car.maxSpeed);
+  const now = lgEngineCtx.currentTime;
+  lgEngineOsc.frequency.setTargetAtTime(55 + s * 140, now, 0.08);
+  lgEngineGain.gain.setTargetAtTime(0.025 + s * 0.09, now, 0.08);
+  lgEngineFilter.frequency.setTargetAtTime(300 + s * 900, now, 0.08);
+}
 function lgEnterCar() {
   if (LG.drivingCarIndex >= 0 || LG.nearCarIndex < 0) return;
   const car = LG.cars[LG.nearCarIndex];
@@ -2514,6 +2556,7 @@ function lgEnterCar() {
   document.getElementById('libgame').classList.add('car');
   document.getElementById('libCarEnter').classList.remove('show');
   document.getElementById('libCarExit').classList.add('show');
+  lgEngineStart();
 }
 function lgExitCar() {
   if (LG.drivingCarIndex < 0) return;
@@ -2531,6 +2574,7 @@ function lgExitCar() {
   LG.mode = 'foot';
   document.getElementById('libgame').classList.remove('car');
   document.getElementById('libCarExit').classList.remove('show');
+  lgEngineStop();
 }
 
 async function startLibGame(mode) {
@@ -2546,6 +2590,7 @@ async function startLibGame(mode) {
     LG.cars[0].state = 'driving';
     LG.cars[0].mesh.visible = false;
     LG.drivingCarIndex = 0;
+    lgEngineStart();
   }
   LG.x = 0; LG.z = LG_WORLD.spawnZ; LG.yaw = 0; LG.pitch = 0; LG.speed = 0; LG.atDoor = false; LG.nearDoor = false; LG.inside = false;
   LG.activeScene = LG.outdoorScene;
@@ -2575,6 +2620,7 @@ function closeLibGame() {
   if (LG.raf) { cancelAnimationFrame(LG.raf); LG.raf = null; }
   Object.keys(LG.keys).forEach(k => LG.keys[k] = false);
   LG.mode = null;
+  lgEngineStop();
   lgDisconnectMultiplayer();
 }
 window.lgResumeAfterDetail = function () {
