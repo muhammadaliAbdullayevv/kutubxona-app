@@ -225,13 +225,15 @@
     border-radius:14px; box-shadow:var(--shadow); padding:8px}
   #libOnlineList.show{display:block}
   #libOnlineList .lo{padding:6px 8px; font-size:13px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
-  #libChatToggle{position:fixed; left:14px; bottom:calc(env(safe-area-inset-bottom) + 16px); z-index:2;
+  /* Top row, next to the online-count pill — the bottom of the screen is all movement/driving
+     controls now (split steering while driving made that area cramped), so chat lives up top
+     where it can never overlap a control you're mid-touch on. */
+  #libChatToggle{position:fixed; top:calc(env(safe-area-inset-top) + 14px); left:74px; z-index:2;
     width:44px; height:44px; border-radius:50%; border:1px solid var(--line); background:var(--chip);
     font-size:19px; box-shadow:var(--shadow); cursor:pointer; display:flex; align-items:center; justify-content:center}
-  #libgame.hasInteriorBack #libChatToggle{bottom:calc(env(safe-area-inset-bottom) + 70px)}
   .libChatDot{position:absolute; top:2px; right:2px; width:10px; height:10px; border-radius:50%; background:var(--danger); display:none}
   .libChatDot.show{display:block}
-  #libChat{position:fixed; left:14px; right:14px; bottom:calc(env(safe-area-inset-bottom) + 70px); z-index:3;
+  #libChat{position:fixed; left:14px; right:14px; top:calc(env(safe-area-inset-top) + 64px); z-index:3;
     max-width:400px; margin:0 auto; display:none; flex-direction:column; background:var(--card);
     border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow); overflow:hidden}
   #libChat.show{display:flex}
@@ -2495,7 +2497,6 @@ function lgEnterInterior() {
   LG.mode = 'inside';
   LG.x = 0; LG.z = 30; LG.yaw = 0; LG.pitch = 0; LG.speed = 0;
   document.getElementById('libInteriorBack').classList.add('show');
-  document.getElementById('libgame').classList.add('hasInteriorBack');
 }
 function lgLeaveInterior() {
   LG.inside = false;
@@ -2507,7 +2508,6 @@ function lgLeaveInterior() {
   LG.x = 0; LG.z = LG_DOOR.z + LG_KNOCK_DIST + 3; LG.yaw = 0; LG.pitch = 0;
   document.getElementById('libInteriorBack').classList.remove('show');
   document.getElementById('libGenreLabel').classList.remove('show');
-  document.getElementById('libgame').classList.remove('hasInteriorBack');
 }
 
 // Synthesized engine hum (Web Audio, no sound file) — sawtooth through a lowpass filter reads as
