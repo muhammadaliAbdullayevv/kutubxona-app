@@ -17,6 +17,9 @@
     --bg:#14100b; --card:#1f1710; --card2:#291f14; --text:#f4ecdc; --muted:#a89172;
     --accent:#d9a441; --accent2:#b5672e; --line:#34281a; --chip:#241b12; --danger:#e2685a;
     --radius:16px; --shadow:0 6px 24px rgba(0,0,0,.5);
+    /* Set from JS (measured, not guessed) whenever the audio mini-player shows/hides — lets
+       .actions below make room for it instead of being covered by it. */
+    --audio-player-h:0px;
   }
   /* Day — parchment & ink */
   :root[data-theme="day"]{
@@ -120,7 +123,10 @@
   .sec p{margin:0; font-size:14.5px; line-height:1.6; white-space:pre-wrap}
   .subs{display:flex; flex-wrap:wrap; gap:6px}
   .sub{background:var(--card2); border-radius:8px; padding:4px 10px; font-size:12px; color:var(--accent); font-weight:600; cursor:pointer}
-  .actions{position:sticky; bottom:0; background:linear-gradient(180deg,transparent,var(--bg) 24%); padding:16px 18px calc(16px + env(safe-area-inset-bottom)); display:flex; gap:10px; margin-top:8px}
+  /* bottom tracks --audio-player-h so these buttons ("O'qish", "Botda o'qish"...) park above the
+     mini-player instead of sitting right where it now renders (it's a higher z-index than this
+     sheet so it can always be seen — without this, it would just cover these buttons instead). */
+  .actions{position:sticky; bottom:var(--audio-player-h,0px); transition:bottom .25s ease; background:linear-gradient(180deg,transparent,var(--bg) 24%); padding:16px 18px calc(16px + env(safe-area-inset-bottom)); display:flex; gap:10px; margin-top:8px}
   .btn{flex:1; border:0; border-radius:13px; padding:14px; font-weight:800; font-size:15px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:7px}
   .btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff}
   .btn.ghost{flex:0 0 auto; width:52px; background:var(--card); border:1px solid var(--line); color:var(--text)}
@@ -1279,15 +1285,26 @@ async function apPlayPart(idx){
     apSaveProgress();
   }catch(e){toast('Audio yuklanmadi');}
 }
+// Measures the real rendered player height (not a guessed constant — its content/line-wrapping
+// can vary a little by platform) so .actions can reserve exactly that much room and never end up
+// covered by it. Re-measure on resize too — a rotation or on-screen-keyboard can change it.
+function apUpdateSpacer(){
+  const ap=$('#audioPlayer');
+  const showing=ap.classList.contains('show');
+  document.documentElement.style.setProperty('--audio-player-h', showing?(ap.offsetHeight+18)+'px':'0px');
+}
+window.addEventListener('resize',()=>{if($('#audioPlayer').classList.contains('show'))apUpdateSpacer();});
 async function openAudioPlayer(id,title){
   if(!canAct()){toast('Tinglash uchun botni Telegram ichida oching');return;}
   haptic();
-  // The book detail sheet is what "Tinglash" is tapped from — close it so the player (now
-  // above every sheet either way, but this also matches the look of every other app's "tap
-  // play, the detail view dismisses, playback starts") opens against a clean view instead of
-  // leaving its dark backdrop showing behind the player.
+  // Browsing to ANOTHER book while audio keeps playing is the whole point of a persistent
+  // mini-player — so unlike before, this only dismisses the CURRENT detail sheet (the one
+  // "Tinglash" was actually tapped from) rather than blocking navigation afterward. .actions
+  // makes room for the player (via apUpdateSpacer below) so its buttons stay reachable on
+  // whichever book you open next while listening.
   if($('#sheet').classList.contains('open'))closeSheet();
   $('#audioPlayer').classList.add('show');
+  apUpdateSpacer();
   $('#apTitle').textContent=title||'';
   $('#apPart').textContent='Yuklanmoqda...';
   try{
@@ -1302,6 +1319,7 @@ function closeAudioPlayer(){
   AP.audio.pause();
   if(AP.parts.length)apSaveProgress();
   $('#audioPlayer').classList.remove('show');
+  apUpdateSpacer();
   AP.parts=[]; AP.bookId=null;
 }
 $('#apClose').onclick=()=>closeAudioPlayer();
