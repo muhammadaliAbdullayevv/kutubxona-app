@@ -1770,38 +1770,38 @@ function lgStreetLamp(pal) {
   g.add(pl);
   return g;
 }
-// A big roadside sign: two posts + a plank with canvas-rendered text. A real mesh (not a
-// billboard sprite) so it has a fixed orientation like an actual sign rather than always facing
-// the camera — reads correctly as a landmark you approach and pass, not a UI label floating in
-// the world. The single material maps onto every box face, so front and back both show the text
-// (handy — readable walking either direction) and the thin edges just get an unnoticeable sliver.
-function lgSignBoard(pal, text) {
-  const g = new THREE.Group();
-  const postMat = new THREE.MeshStandardMaterial({ color: pal.roofDark, roughness: 0.75 });
-  const postH = 7.6;
-  for (const px of [-4.3, 4.3]) {
-    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.34, postH, 10), postMat);
-    post.position.set(px, postH / 2, 0);
-    post.castShadow = true;
-    g.add(post);
-  }
+// The library's name, mounted flush on the facade like a real building's carved nameplate — a
+// fixed-orientation mesh (not a billboard sprite), sized to actually fit the building's own
+// width, with a high-resolution canvas texture so the lettering stays crisp up close instead of
+// pixelating. Font size auto-shrinks to whatever the given text needs so a longer name never
+// clips or overflows the plaque.
+function lgLibraryPlaque(pal, text, width) {
+  const cw = 2048, ch = Math.round(cw * 0.17);
   const canvas = document.createElement('canvas');
-  canvas.width = 1024; canvas.height = 320;
+  canvas.width = cw; canvas.height = ch;
   const c = canvas.getContext('2d');
-  c.fillStyle = pal.plinth; c.fillRect(0, 0, canvas.width, canvas.height);
-  c.strokeStyle = pal.roofDark; c.lineWidth = 16;
-  c.strokeRect(8, 8, canvas.width - 16, canvas.height - 16);
-  c.font = '700 148px system-ui, sans-serif';
+  c.fillStyle = pal.plinth; c.fillRect(0, 0, cw, ch);
+  c.strokeStyle = pal.column; c.lineWidth = 10;
+  c.strokeRect(16, 16, cw - 32, ch - 32);
+  c.strokeStyle = pal.column; c.lineWidth = 3;
+  c.beginPath(); c.moveTo(70, ch * 0.28); c.lineTo(cw - 70, ch * 0.28); c.stroke();
+  c.beginPath(); c.moveTo(70, ch * 0.74); c.lineTo(cw - 70, ch * 0.74); c.stroke();
+  const maxTextW = cw - 260;
+  let fontSize = 160;
   c.textAlign = 'center'; c.textBaseline = 'middle';
-  c.fillStyle = pal.text;
-  c.fillText(text, canvas.width / 2, canvas.height / 2 + 10);
+  c.font = `700 ${fontSize}px Georgia, "Times New Roman", serif`;
+  const tw = c.measureText(text).width;
+  if (tw > maxTextW) fontSize = Math.floor(fontSize * maxTextW / tw);
+  c.font = `700 ${fontSize}px Georgia, "Times New Roman", serif`;
+  c.fillStyle = pal.roofDark;
+  c.fillText(text, cw / 2, ch / 2 + fontSize * 0.04);
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
-  const board = new THREE.Mesh(new THREE.BoxGeometry(9.8, 3.1, 0.35), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8 }));
-  board.position.set(0, postH - 1.7, 0);
-  board.castShadow = true;
-  g.add(board);
-  return g;
+  tex.anisotropy = 4;
+  const height = width * (ch / cw);
+  const plaque = new THREE.Mesh(new THREE.BoxGeometry(width, height, 0.22), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.5 }));
+  plaque.castShadow = true;
+  return plaque;
 }
 // A fountain where the "water" is a raft of small floating books instead — a stone basin with a
 // central pedestal, books ringed around it at slightly different radii/heights/spin speeds so
@@ -2270,18 +2270,14 @@ async function lgBuildOutdoor(pal) {
   col1.position.set(-4.6, 1 + 3.6, 9.3); col1.castShadow = true;
   lib.add(col1);
   const col2 = col1.clone(); col2.position.x = 4.6; lib.add(col2);
-  const label = lgLabelSprite('📚 Kutubxona', pal.text);
-  label.position.set(0, 1 + 22, 0);
-  lib.add(label);
+  // The library's name, mounted on the facade between the windows and the roofline — a real
+  // carved-plaque-style sign sized to the building's own 18-wide front, not a floating UI label.
+  const plaque = lgLibraryPlaque(pal, "Ro'zagulning kutubxonasi", 14);
+  plaque.position.set(0, 1 + 12.7, 9.15);
+  lib.add(plaque);
   scene.add(lib);
 
-  // Landmarks flanking the approach to the library, between the road and the entrance steps —
-  // the sign on the right side of the path (as you walk toward the library, heading -Z, "right"
-  // is +X), the book fountain as a bookend on the left.
-  const banner = lgSignBoard(pal, "Ro'zagul");
-  banner.position.set(16, 0, 22);
-  banner.rotation.y = Math.PI / 2;
-  scene.add(banner);
+  // A landmark along the approach, off to the side of the path.
   const fountain = lgBookFountain(pal);
   fountain.position.set(-16, 0, 20);
   scene.add(fountain);
