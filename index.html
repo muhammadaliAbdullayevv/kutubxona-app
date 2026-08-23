@@ -149,7 +149,12 @@
   #pdfCanvas{max-width:100%; box-shadow:var(--shadow); background:#fff}
   #pdfLoading{position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); color:var(--muted); font-size:14px; display:none}
   #pdfLoading.show{display:block}
-  #audioPlayer{position:fixed; left:10px; right:10px; bottom:calc(env(safe-area-inset-bottom) + 10px); z-index:48;
+  /* Above every sheet (including #pdfSheet at 60) — this is a persistent mini-player meant to
+     stay visible and usable no matter what else is open, the same way a real music app's
+     mini-player does. It used to sit at z-index 48, BELOW the book detail sheet (50) that's
+     almost always what's open right when you tap "Tinglash" — opening from there rendered the
+     player hidden behind that sheet's dark backdrop, which read as "where did the player go". */
+  #audioPlayer{position:fixed; left:10px; right:10px; bottom:calc(env(safe-area-inset-bottom) + 10px); z-index:65;
     background:var(--card); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow); padding:10px 14px 12px; display:none}
   #audioPlayer.show{display:block}
   #apTop{display:flex; align-items:center; gap:10px}
@@ -377,8 +382,8 @@
   <div class="empty" id="empty" style="display:none"><span class="em">🔍</span>Hech narsa topilmadi</div>
 </div>
 
-<div class="sheet" id="sheet"><div class="sheetc" id="sheetc"></div></div>
-<div class="sheet" id="sheet2"><div class="sheetc" id="sheet2c"></div></div>
+<div class="sheet" id="sheet"><div class="sheetc" id="sheetc"></div><div class="gclose" id="sheetClose">✕</div></div>
+<div class="sheet" id="sheet2"><div class="sheetc" id="sheet2c"></div><div class="gclose" id="sheet2Close">✕</div></div>
 <div class="sheet" id="globe" style="z-index:45"><canvas id="globeCanvas"></canvas><div class="gclose" id="globeClose">✕</div><div class="gzoom"><button id="globeZoomIn" type="button">+</button><button id="globeZoomOut" type="button">−</button></div><div class="glegend" id="globeLegend"></div></div>
 <div class="sheet" id="libgame" style="z-index:46"><canvas id="libgameCanvas"></canvas><div class="gclose" id="libgameClose">✕</div><div class="libctrls">
   <button id="libUp" type="button">▲</button>
@@ -1277,6 +1282,11 @@ async function apPlayPart(idx){
 async function openAudioPlayer(id,title){
   if(!canAct()){toast('Tinglash uchun botni Telegram ichida oching');return;}
   haptic();
+  // The book detail sheet is what "Tinglash" is tapped from — close it so the player (now
+  // above every sheet either way, but this also matches the look of every other app's "tap
+  // play, the detail view dismisses, playback starts") opens against a clean view instead of
+  // leaving its dark backdrop showing behind the player.
+  if($('#sheet').classList.contains('open'))closeSheet();
   $('#audioPlayer').classList.add('show');
   $('#apTitle').textContent=title||'';
   $('#apPart').textContent='Yuklanmoqda...';
@@ -1357,6 +1367,8 @@ function loadProfile(){
 }
 $('#btnProfile').onclick=()=>{haptic();openSheet2(profileShellHtml());wireThemeChips();loadProfile();};
 $('#sheet2').onclick=e=>{if(e.target.id==='sheet2')closeSheet2();};
+$('#sheetClose').onclick=()=>closeSheet();
+$('#sheet2Close').onclick=()=>closeSheet2();
 
 // ---- ratings (Play-Store-style 1-5 stars + optional review; flat, not repliable; other
 // readers vote a review "helpful" yes/no) ----
