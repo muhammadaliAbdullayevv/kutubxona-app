@@ -139,6 +139,28 @@
   .gzoom{position:fixed; right:14px; top:50%; transform:translateY(-50%); display:flex; flex-direction:column; gap:10px; z-index:1}
   .gzoom button{width:42px; height:42px; border-radius:50%; background:var(--chip); border:1px solid var(--line); color:var(--text); font-size:21px; font-weight:700; font-family:inherit; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:var(--shadow); padding:0; line-height:1; transition:transform .15s}
   .gzoom button:active{transform:scale(.9)}
+  #pdfToolbar{position:fixed; top:0; left:0; right:0; z-index:2; display:flex; align-items:center; justify-content:center; gap:16px;
+    padding:calc(env(safe-area-inset-top) + 14px) 60px 12px; background:linear-gradient(180deg,var(--bg) 60%,transparent)}
+  #pdfToolbar button{width:38px; height:38px; border-radius:50%; border:1px solid var(--line); background:var(--chip); color:var(--text);
+    font-size:16px; cursor:pointer; box-shadow:var(--shadow)}
+  #pdfToolbar button:disabled{opacity:.4; cursor:default}
+  #pdfPageInfo{font-size:14px; font-weight:600; color:var(--text); min-width:70px; text-align:center}
+  #pdfCanvasWrap{position:absolute; inset:0; overflow:auto; display:flex; align-items:flex-start; justify-content:center; padding:70px 0 20px}
+  #pdfCanvas{max-width:100%; box-shadow:var(--shadow); background:#fff}
+  #pdfLoading{position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); color:var(--muted); font-size:14px; display:none}
+  #pdfLoading.show{display:block}
+  #audioPlayer{position:fixed; left:10px; right:10px; bottom:calc(env(safe-area-inset-bottom) + 10px); z-index:48;
+    background:var(--card); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow); padding:10px 14px 12px; display:none}
+  #audioPlayer.show{display:block}
+  #apTop{display:flex; align-items:center; gap:10px}
+  #apText{flex:1; min-width:0}
+  #apTitle{font-size:13px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  #apPart{font-size:12px; color:var(--muted)}
+  #apClose{border:none; background:none; color:var(--muted); font-size:16px; cursor:pointer; padding:4px}
+  #apSeek{width:100%; margin:8px 0 2px; accent-color:var(--accent)}
+  #apControls{display:flex; align-items:center; justify-content:center; gap:18px}
+  #apControls button{border:none; background:none; color:var(--text); font-size:20px; cursor:pointer; padding:2px}
+  #apSpeed{font-size:13px !important; font-weight:700; border:1px solid var(--line) !important; border-radius:10px; padding:4px 8px !important; background:var(--chip) !important}
   #libgameCanvas{width:100%; height:100%; touch-action:none; display:block}
   .libctrls{position:fixed; right:16px; bottom:calc(env(safe-area-inset-bottom) + 16px); display:grid; grid-template-columns:repeat(3,50px); grid-template-rows:repeat(2,50px); gap:6px; z-index:1; touch-action:none}
   .libctrls button{border:1px solid var(--line); border-radius:14px; background:var(--chip); color:var(--text); font-size:19px; font-weight:700; font-family:inherit; display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0; box-shadow:var(--shadow); user-select:none}
@@ -310,6 +332,30 @@
     <button id="libChatSend" type="button">➤</button>
   </div>
 </div>
+</div>
+<div class="sheet" id="pdfSheet" style="z-index:60; align-items:stretch; background:var(--bg)">
+  <div class="gclose" id="pdfClose">✕</div>
+  <div id="pdfToolbar">
+    <button id="pdfPrev" type="button">◀</button>
+    <span id="pdfPageInfo">— / —</span>
+    <button id="pdfNext" type="button">▶</button>
+  </div>
+  <div id="pdfCanvasWrap"><canvas id="pdfCanvas"></canvas><div id="pdfLoading">Yuklanmoqda...</div></div>
+</div>
+<div id="audioPlayer">
+  <div id="apTop">
+    <div id="apText"><div id="apTitle">—</div><div id="apPart">—</div></div>
+    <button id="apClose" type="button">✕</button>
+  </div>
+  <input type="range" id="apSeek" min="0" max="1000" value="0">
+  <div id="apControls">
+    <button id="apPrevPart" type="button">⏮</button>
+    <button id="apBack" type="button">⏪</button>
+    <button id="apPlay" type="button">▶️</button>
+    <button id="apFwd" type="button">⏩</button>
+    <button id="apNextPart" type="button">⏭</button>
+    <button id="apSpeed" type="button">1x</button>
+  </div>
 </div>
 <div class="toast" id="toast"></div>
 
@@ -994,6 +1040,8 @@ function openDetail(id){
     </div>
     <div class="actions">
       <button class="btn primary" id="openBot">📖 Botda o'qish</button>
+      <button class="btn ghost" id="dRead">📄 O'qish</button>
+      ${b.ha?`<button class="btn ghost" id="dListen">🎧 Tinglash</button>`:''}
       <button class="btn ghost ${fav?'on':''}" id="dFav">${fav?'❤️':'🤍'}</button>
       <button class="btn ghost" id="dShare">↗️</button>
       ${openedFromGlobe?'<button class="btn ghost" id="dBackGlobe">🌐</button>':''}
@@ -1014,6 +1062,9 @@ function openDetail(id){
       openBotFallback();
     });
   };
+  $('#dRead').onclick=()=>openPdfReader(b.i,b.t);
+  const dListen=$('#dListen');
+  if(dListen)dListen.onclick=()=>openAudioPlayer(b.i,b.t);
   $('#dFav').onclick=()=>toggleFav(b.i);
   $('#dShare').onclick=()=>{const txt=`📚 ${b.t}${b.a?' — '+b.a:''}`;const s=`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(txt)}`;tg?.openTelegramLink?tg.openTelegramLink(s):navigator.share?.({title:b.t,url});};
   const dBackGlobe=$('#dBackGlobe');
@@ -1034,6 +1085,138 @@ function closeSheet(){
   openedFromGlobe=false;
   if(openedFromLibGame){window.lgResumeAfterDetail?.();openedFromLibGame=false;}
 }
+
+// ---- in-app reading/listening ----
+// A plain <audio src> or PDF.js's own fetches can never carry our normal Authorization header
+// (HTML media elements don't support custom headers at all), so streaming URLs instead carry a
+// short-lived, single-resource token minted just before opening the reader/player.
+function getStreamToken(scope){
+  return api('/api/stream-token',{method:'POST',body:JSON.stringify({scope})}).then(r=>r.token);
+}
+
+// ---- PDF reader ----
+let pdfDoc=null,pdfPageNum=1,pdfPageCount=0,pdfRendering=false,pdfLib=null;
+function pdfSetLoading(on){$('#pdfLoading').classList.toggle('show',on);}
+async function openPdfReader(id,title){
+  if(!canAct()){toast("Ilovada o'qish uchun botni Telegram ichida oching");return;}
+  haptic();
+  $('#pdfSheet').classList.add('open');
+  tg?.BackButton?.show();
+  pdfSetLoading(true);
+  $('#pdfPageInfo').textContent='— / —';
+  try{
+    if(!pdfLib){
+      pdfLib=await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.7.76/build/pdf.min.mjs');
+      pdfLib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@4.7.76/build/pdf.worker.min.mjs';
+    }
+    const token=await getStreamToken('book_'+id);
+    const url=COMMUNITY_API_BASE+'/api/books/'+encodeURIComponent(id)+'/read?token='+encodeURIComponent(token);
+    pdfDoc=await pdfLib.getDocument(url).promise;
+    pdfPageCount=pdfDoc.numPages;
+    pdfPageNum=1;
+    await pdfRenderPage(1);
+  }catch(e){
+    pdfSetLoading(false);
+    toast("Bu kitobni ilovada o'qib bo'lmadi");
+    closePdfReader();
+  }
+}
+async function pdfRenderPage(n){
+  if(!pdfDoc||pdfRendering)return;
+  pdfRendering=true;
+  pdfSetLoading(true);
+  try{
+    const page=await pdfDoc.getPage(n);
+    const wrap=$('#pdfCanvasWrap');
+    const targetW=wrap.clientWidth-24;
+    const base=page.getViewport({scale:1});
+    const viewport=page.getViewport({scale:Math.max(0.5,targetW/base.width)});
+    const canvas=$('#pdfCanvas');
+    const dpr=Math.min(window.devicePixelRatio||1,2);
+    canvas.width=viewport.width*dpr; canvas.height=viewport.height*dpr;
+    canvas.style.width=viewport.width+'px'; canvas.style.height=viewport.height+'px';
+    const ctx=canvas.getContext('2d');
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    await page.render({canvasContext:ctx,viewport}).promise;
+    pdfPageNum=n;
+    $('#pdfPageInfo').textContent=n+' / '+pdfPageCount;
+    $('#pdfPrev').disabled=n<=1; $('#pdfNext').disabled=n>=pdfPageCount;
+    $('#pdfCanvasWrap').scrollTop=0;
+  }catch(e){/* a single bad page shouldn't kill the whole reader */}
+  pdfRendering=false;
+  pdfSetLoading(false);
+}
+function closePdfReader(){
+  $('#pdfSheet').classList.remove('open');
+  tg?.BackButton?.hide();
+  pdfDoc=null;
+}
+$('#pdfClose').onclick=()=>closePdfReader();
+$('#pdfPrev').onclick=()=>{if(pdfPageNum>1)pdfRenderPage(pdfPageNum-1);};
+$('#pdfNext').onclick=()=>{if(pdfPageNum<pdfPageCount)pdfRenderPage(pdfPageNum+1);};
+
+// ---- audio player ----
+const AP={audio:new Audio(),bookId:null,audioBookId:null,parts:[],partIdx:0,speeds:[1,1.25,1.5,1.75,2,0.75]};
+AP.audio.addEventListener('timeupdate',()=>{
+  if(!AP.audio.duration)return;
+  $('#apSeek').value=Math.round((AP.audio.currentTime/AP.audio.duration)*1000);
+});
+AP.audio.addEventListener('play',()=>{$('#apPlay').textContent='⏸️';});
+AP.audio.addEventListener('pause',()=>{$('#apPlay').textContent='▶️';});
+AP.audio.addEventListener('ended',()=>{ if(AP.partIdx<AP.parts.length-1)apPlayPart(AP.partIdx+1); });
+function apSaveProgress(){
+  const part=AP.parts[AP.partIdx];
+  if(part)api('/api/audiobook-parts/'+encodeURIComponent(part.id)+'/progress',{method:'POST',body:JSON.stringify({part_index:part.index})}).catch(()=>{});
+}
+async function apPlayPart(idx){
+  const part=AP.parts[idx];
+  if(!part)return;
+  AP.partIdx=idx;
+  $('#apPart').textContent='Qism '+(part.index+1)+' / '+AP.parts.length+(part.title?(' — '+part.title):'');
+  $('#apPrevPart').disabled=idx<=0; $('#apNextPart').disabled=idx>=AP.parts.length-1;
+  try{
+    const token=await getStreamToken('part_'+part.id);
+    AP.audio.src=COMMUNITY_API_BASE+'/api/audiobook-parts/'+encodeURIComponent(part.id)+'/stream?token='+encodeURIComponent(token);
+    await AP.audio.play();
+    apSaveProgress();
+  }catch(e){toast('Audio yuklanmadi');}
+}
+async function openAudioPlayer(id,title){
+  if(!canAct()){toast('Tinglash uchun botni Telegram ichida oching');return;}
+  haptic();
+  $('#audioPlayer').classList.add('show');
+  $('#apTitle').textContent=title||'';
+  $('#apPart').textContent='Yuklanmoqda...';
+  try{
+    const data=await api('/api/books/'+encodeURIComponent(id)+'/audiobook');
+    if(!data.available||!data.parts.length){toast('Bu kitobda audio yo\'q');closeAudioPlayer();return;}
+    AP.bookId=id; AP.audioBookId=data.audio_book_id; AP.parts=data.parts;
+    const startIdx=data.resume_part_index!=null?Math.min(data.resume_part_index,data.parts.length-1):0;
+    apPlayPart(startIdx);
+  }catch(e){toast('Audio yuklanmadi');closeAudioPlayer();}
+}
+function closeAudioPlayer(){
+  AP.audio.pause();
+  if(AP.parts.length)apSaveProgress();
+  $('#audioPlayer').classList.remove('show');
+  AP.parts=[]; AP.bookId=null;
+}
+$('#apClose').onclick=()=>closeAudioPlayer();
+$('#apPlay').onclick=()=>{ if(AP.audio.paused)AP.audio.play();else AP.audio.pause(); };
+$('#apPrevPart').onclick=()=>{if(AP.partIdx>0)apPlayPart(AP.partIdx-1);};
+$('#apNextPart').onclick=()=>{if(AP.partIdx<AP.parts.length-1)apPlayPart(AP.partIdx+1);};
+$('#apBack').onclick=()=>{AP.audio.currentTime=Math.max(0,AP.audio.currentTime-15);};
+$('#apFwd').onclick=()=>{AP.audio.currentTime=Math.min(AP.audio.duration||0,AP.audio.currentTime+30);};
+$('#apSeek').addEventListener('input',()=>{
+  if(AP.audio.duration)AP.audio.currentTime=($('#apSeek').value/1000)*AP.audio.duration;
+});
+$('#apSpeed').onclick=()=>{
+  const cur=AP.audio.playbackRate;
+  const i=AP.speeds.indexOf(cur);
+  const next=AP.speeds[(i+1)%AP.speeds.length];
+  AP.audio.playbackRate=next;
+  $('#apSpeed').textContent=next+'x';
+};
 
 // ---- profile overlay (reading streak/badges) ----
 function openSheet2(html){$('#sheet2c').innerHTML=html;$('#sheet2').classList.add('open');tg?.BackButton?.show();}
@@ -1204,7 +1387,7 @@ $('#btnTheme').onclick=()=>{
 
 function skeletonShelf(){return `<div class="section"><div class="shead"><h2 class="skel" style="width:140px;height:16px;border-radius:6px"></h2></div><div class="shelf">${Array(4).fill('<div class="si"><div class="skel" style="height:170px;border-radius:14px"></div></div>').join('')}</div></div>`;}
 async function boot(){
-  if(tg){tg.ready();tg.expand();tg.disableVerticalSwipes?.();tg.BackButton?.onClick(()=>{if($('#sheet2').classList.contains('open'))closeSheet2();else if($('#sheet').classList.contains('open'))closeSheet();else if($('#globe').classList.contains('open'))closeGlobe();else if($('#libgame').classList.contains('open'))closeLibGame();});applyThemeMode();tg.onEvent?.('themeChanged',()=>{if(themeMode==='system')applyThemeMode();});}
+  if(tg){tg.ready();tg.expand();tg.disableVerticalSwipes?.();tg.BackButton?.onClick(()=>{if($('#pdfSheet').classList.contains('open'))closePdfReader();else if($('#sheet2').classList.contains('open'))closeSheet2();else if($('#sheet').classList.contains('open'))closeSheet();else if($('#globe').classList.contains('open'))closeGlobe();else if($('#libgame').classList.contains('open'))closeLibGame();});applyThemeMode();tg.onEvent?.('themeChanged',()=>{if(themeMode==='system')applyThemeMode();});}
   if('serviceWorker' in navigator)window.addEventListener('load',()=>{
     navigator.serviceWorker.register('./sw.js').catch(()=>{});
     // The shell/data caches are served cache-first-then-refresh, so a stale client can lag a
