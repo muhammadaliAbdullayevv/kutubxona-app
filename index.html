@@ -192,15 +192,24 @@
   /* Sits noticeably higher than #libKnock — a foot player can be near both a parked car and the
      library door at once (they're both roadside landmarks), and the two prompts must never land
      exactly on top of each other in that case. */
-  #libCarEnter{position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom) + 156px); transform:translateX(-50%) scale(.92);
-    padding:12px 20px; border-radius:999px; border:1px solid var(--line); background:var(--accent2); color:#fff;
-    font-size:15px; font-weight:700; font-family:inherit; box-shadow:var(--shadow); z-index:2; cursor:pointer;
+  /* Drive and Sit sit side-by-side (not stacked) so a car with both roles still available shows
+     two buttons at once without one covering the other. */
+  #libCarEnter{position:fixed; left:calc(50% - 80px); bottom:calc(env(safe-area-inset-bottom) + 156px); transform:translateX(-50%) scale(.92);
+    padding:12px 16px; border-radius:999px; border:1px solid var(--line); background:var(--accent2); color:#fff;
+    font-size:14px; font-weight:700; font-family:inherit; box-shadow:var(--shadow); z-index:2; cursor:pointer;
     display:none; opacity:0; transition:opacity .2s, transform .2s;}
   #libCarEnter.show{display:block; opacity:1; transform:translateX(-50%) scale(1); animation:libKnockPulse 1.3s ease-in-out infinite}
+  #libCarSit{position:fixed; left:calc(50% + 80px); bottom:calc(env(safe-area-inset-bottom) + 156px); transform:translateX(-50%) scale(.92);
+    padding:12px 16px; border-radius:999px; border:1px solid var(--line); background:var(--accent); color:#fff;
+    font-size:14px; font-weight:700; font-family:inherit; box-shadow:var(--shadow); z-index:2; cursor:pointer;
+    display:none; opacity:0; transition:opacity .2s, transform .2s;}
+  #libCarSit.show{display:block; opacity:1; transform:translateX(-50%) scale(1); animation:libKnockPulse 1.3s ease-in-out infinite}
   #libCarExit{position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom) + 96px); transform:translateX(-50%);
     padding:12px 20px; border-radius:999px; border:1px solid var(--line); background:var(--chip); color:var(--text);
     font-size:15px; font-weight:700; font-family:inherit; box-shadow:var(--shadow); z-index:2; cursor:pointer; display:none;}
   #libCarExit.show{display:block}
+  /* A passenger has no controls to hold — no throttle/steering, no D-pad at all. */
+  #libgame.riding .libctrls{display:none}
   #libChoice{position:fixed; inset:0; z-index:5; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.55)}
   #libChoice.show{display:flex}
   .libChoiceCard{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:22px; width:min(320px,86vw); text-align:center; box-shadow:var(--shadow)}
@@ -216,6 +225,21 @@
     padding:7px 16px; border-radius:20px; background:rgba(0,0,0,.4); color:#fff; font-size:13px; font-weight:600;
     letter-spacing:.02em; display:none; pointer-events:none; backdrop-filter:blur(3px)}
   #libGenreLabel.show{display:block}
+  /* North-up (not rotating with the player) — a facing wedge at the center shows which way you're
+     looking instead. Sits top-right, below where the speedometer takes over in car mode. */
+  #libMiniMap{position:fixed; top:calc(env(safe-area-inset-top) + 108px); right:14px; z-index:1;
+    width:84px; height:84px; border-radius:50%; border:2px solid var(--line); box-shadow:var(--shadow);
+    pointer-events:none; background:var(--card)}
+  #libEmoteToggle{position:fixed; left:14px; bottom:calc(env(safe-area-inset-bottom) + 76px); z-index:2;
+    width:44px; height:44px; border-radius:50%; border:1px solid var(--line); background:var(--chip);
+    font-size:19px; box-shadow:var(--shadow); cursor:pointer; display:flex; align-items:center; justify-content:center}
+  #libEmotePicker{position:fixed; left:14px; bottom:calc(env(safe-area-inset-bottom) + 128px); z-index:2;
+    display:none; flex-direction:column; gap:6px; background:var(--card); border:1px solid var(--line);
+    border-radius:16px; padding:6px; box-shadow:var(--shadow)}
+  #libEmotePicker.show{display:flex}
+  #libEmotePicker button{width:38px; height:38px; border-radius:50%; border:1px solid var(--line);
+    background:var(--chip); font-size:18px; cursor:pointer; padding:0}
+  #libEmotePicker button:active{transform:scale(.9)}
   /* Explicit matching height + flex-centering (not just a shared "top") is what actually lines
      this up with the 44px round chat toggle next to it — two elements with the same top edge
      but different auto-heights don't share a center, which read as the chat icon sitting low. */
@@ -226,7 +250,10 @@
     max-width:220px; max-height:40vh; overflow-y:auto; background:var(--card); border:1px solid var(--line);
     border-radius:14px; box-shadow:var(--shadow); padding:8px}
   #libOnlineList.show{display:block}
-  #libOnlineList .lo{padding:6px 8px; font-size:13px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  #libOnlineList .lo{padding:6px 8px; font-size:13px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-radius:8px}
+  #libOnlineList .lo.loMe{color:var(--muted)}
+  #libOnlineList .lo:not(.loMe){cursor:pointer}
+  #libOnlineList .lo:not(.loMe):active{background:var(--chip)}
   /* Top row, next to the online-count pill — the bottom of the screen is all movement/driving
      controls now (split steering while driving made that area cramped), so chat lives up top
      where it can never overlap a control you're mid-touch on. */
@@ -235,20 +262,36 @@
     font-size:19px; box-shadow:var(--shadow); cursor:pointer; display:flex; align-items:center; justify-content:center}
   .libChatDot{position:absolute; top:2px; right:2px; width:10px; height:10px; border-radius:50%; background:var(--danger); display:none}
   .libChatDot.show{display:block}
+  /* Shows who a private thread is currently with, right next to the chat icon, so it's obvious
+     at a glance whether you're about to type into the group chat or a DM. */
+  #libChatWithLabel{position:fixed; top:calc(env(safe-area-inset-top) + 14px); left:122px; z-index:2;
+    max-width:110px; padding:0 10px; height:44px; display:none; align-items:center;
+    border-radius:20px; border:1px solid var(--line); background:var(--accent2); color:#fff;
+    font-size:12px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    box-shadow:var(--shadow); pointer-events:none}
+  #libChatWithLabel.show{display:flex}
   #libChat{position:fixed; left:14px; right:14px; top:calc(env(safe-area-inset-top) + 64px); z-index:3;
     max-width:400px; margin:0 auto; display:none; flex-direction:column; background:var(--card);
     border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow); overflow:hidden}
   #libChat.show{display:flex}
+  #libChatModeBar{display:none; align-items:center; justify-content:space-between; gap:8px;
+    padding:8px 12px; border-bottom:1px solid var(--line); background:var(--chip);
+    font-size:12px; font-weight:700; color:var(--text)}
+  #libChatModeBar.show{display:flex}
+  #libChatModeBar button{border:none; background:var(--accent); color:#fff; font-size:11px; font-weight:700;
+    border-radius:12px; padding:5px 10px; cursor:pointer; font-family:inherit; flex-shrink:0}
   /* Telegram Desktop / the web client draw their own title bar over the top of the app, which
      otherwise sits right on top of these — push the whole top row down clear of it. */
-  #libgame.desktopTg #libOnline,#libgame.desktopTg #libChatToggle{top:calc(env(safe-area-inset-top) + 46px)}
+  #libgame.desktopTg #libOnline,#libgame.desktopTg #libChatToggle,#libgame.desktopTg #libChatWithLabel{top:calc(env(safe-area-inset-top) + 46px)}
   #libgame.desktopTg #libOnlineList{top:calc(env(safe-area-inset-top) + 86px)}
   #libgame.desktopTg #libChat{top:calc(env(safe-area-inset-top) + 96px)}
   #libgame.desktopTg #libGenreLabel{top:calc(env(safe-area-inset-top) + 46px)}
-  #libChatMsgs{max-height:34vh; overflow-y:auto; padding:10px 12px; display:flex; flex-direction:column; gap:6px}
-  #libChatMsgs .lm{font-size:13px; color:var(--text); line-height:1.35; transition:opacity .2s}
+  /* Fixed, compact height (not viewport-relative) — sized to roughly the 4-5 most recent plain
+     text messages so the panel never balloons to cover the game, regardless of how long the
+     conversation has gotten. Older messages are still there, just reachable by scrolling up. */
+  #libChatMsgs{height:172px; overflow-y:auto; padding:10px 12px; display:flex; flex-direction:column; gap:6px}
+  #libChatMsgs .lm{font-size:13px; color:var(--text); line-height:1.35}
   #libChatMsgs .lm b{color:var(--accent2)}
-  #libChatMsgs .lm.lmOld{opacity:.35}
   #libChatMsgs .lm img{max-width:160px; max-height:160px; border-radius:10px; display:block; margin-top:3px}
   #libChatMsgs .lm audio{display:block; margin-top:3px; max-width:220px; height:32px}
   .libChatBar{display:flex; gap:8px; padding:8px; border-top:1px solid var(--line)}
@@ -343,6 +386,7 @@
 <div id="libSpeedo">0 km/soat</div>
 <button id="libKnock" type="button">🚪 Eshikni taqillatish</button>
 <button id="libCarEnter" type="button">🚗 Haydash</button>
+<button id="libCarSit" type="button">💺 O'tirish</button>
 <button id="libCarExit" type="button">🚶 Tushish</button>
 <div id="libChoice"><div class="libChoiceCard">
   <div class="libChoiceTitle">Kutubxonaga qanday borasiz?</div>
@@ -351,10 +395,20 @@
 </div></div>
 <button id="libInteriorBack" type="button">🔙 Tashqariga</button>
 <div id="libGenreLabel"></div>
+<canvas id="libMiniMap" width="100" height="100"></canvas>
+<div id="libEmotePicker">
+  <button type="button" data-emoji="👋">👋</button>
+  <button type="button" data-emoji="😂">😂</button>
+  <button type="button" data-emoji="❤️">❤️</button>
+  <button type="button" data-emoji="👍">👍</button>
+</div>
+<button id="libEmoteToggle" type="button">😀</button>
 <button id="libOnline" type="button">🟢 <span id="libOnlineCount">0</span></button>
 <div id="libOnlineList"></div>
 <button id="libChatToggle" type="button">💬<span class="libChatDot" id="libChatDot"></span></button>
+<div id="libChatWithLabel"></div>
 <div id="libChat">
+  <div id="libChatModeBar"><span id="libChatModeName"></span><button id="libChatModeBack" type="button">🌐 Umumiy</button></div>
   <div id="libChatMsgs"></div>
   <div class="libChatBar">
     <button id="libChatImgBtn" type="button" class="ghostBtn">📷</button>
@@ -1559,21 +1613,42 @@ const LG = {
   raf: null, lastTs: 0, built: false, interiorBuilt: false, wired: false,
   renderer: null, camera: null, outdoorScene: null, interiorScene: null, activeScene: null,
   door: null, bookMeshes: [], bookInstanceIds: [], shelfZones: [],
-  cars: [], nearCarIndex: -1, drivingCarIndex: -1, hoodMesh: null,
+  cars: [], nearCarIndex: -1, drivingCarIndex: -1, hoodMesh: null, mySeat: null,
   sunLight: null, sunTarget: null, fountainBooks: null,
 };
 const LG_CAR_ENTER_DIST = 5;
 // Three separate parked cars (not one shared vehicle) — with more than one real player around,
 // everyone needs somewhere to drive without waiting on whoever grabbed the only car first.
 const LG_CAR_SPAWNS = [{ x: 0, z: 45 }, { x: 60, z: 95 }, { x: -70, z: -80 }];
+const LG_CAR_MAX_PASSENGERS = 3;
+// Seat positions in the car MODEL's own authored frame (same frame LG_CAR_FACING_OFFSET rotates
+// into place) — used two ways: as local offsets for passenger avatar clones parented directly to
+// the car mesh (Three.js then handles the rotation for free), and, for whichever seat the LOCAL
+// player is riding in, rotated by hand into world space each frame to drive the camera (see
+// lgCarSeatWorld) since the local player has no mesh of their own to parent to anything.
+const LG_CAR_SEAT_OFFSETS = [
+  { x: 0.55, y: 0.35, z: 0.85 },   // front passenger, beside the driver
+  { x: -0.5, y: 0.3, z: -0.75 },   // rear left
+  { x: 0.5, y: 0.3, z: -0.75 },    // rear right
+];
+function lgCarSeatWorld(car, seatIdx) {
+  const seat = LG_CAR_SEAT_OFFSETS[seatIdx % LG_CAR_SEAT_OFFSETS.length];
+  const yaw = car.yaw + LG_CAR_FACING_OFFSET;
+  const wx = seat.x * Math.cos(yaw) + seat.z * Math.sin(yaw);
+  const wz = -seat.x * Math.sin(yaw) + seat.z * Math.cos(yaw);
+  return { x: car.x + wx, z: car.z + wz };
+}
 // Kenney's sedan.glb is authored front-facing +Z (its wheel nodes are literally named
 // wheel-front-*/wheel-back-* with front at z=+0.66) — opposite of this game's yaw=0 forward
 // (-Z), same mismatch as the character models needed the same fix for.
 const LG_CAR_FACING_OFFSET = Math.PI;
 // Where the cloned hood mesh sits relative to the camera while driving — tuned by direct render
-// inspection (see scratchpad render tests) rather than guessed, since "does the hood actually
-// read as a hood from the driver's eye point" isn't something math alone gets right first try.
-const LG_HOOD_OFFSET = { y: -1.15, z: 0.3 };
+// inspection (see scratchpad render tests) rather than guessed. Deliberately keeps the camera
+// OUTSIDE the car's shell (above the roofline) rather than embedded inside the cabin volume — an
+// earlier, more aggressive placement put the camera inside the mesh, which read as "stuck looking
+// at the inside of the windshield" instead of a forward driving view. This trades some of the
+// "you can tell it's a car" feeling for a much safer, unambiguous view of the road ahead.
+const LG_HOOD_OFFSET = { y: -2.85, z: -2.2 };
 
 // Live multiplayer: presence, movement, chat, all over one WebSocket per player. `others` maps
 // player id -> {name, mesh, tx/tz/tyaw (latest server-reported position, interpolated toward
@@ -1585,7 +1660,14 @@ const LG_WS_URL = 'wss://pdf-audio-kitoblar.site/ws/game';
 // every avatar walked exactly backwards relative to the direction it was actually moving.
 const LG_AVATAR_FACING_OFFSET = Math.PI;
 const LG_MOVE_SEND_MS = 200;
-const LG_MP = { ws: null, myId: window.Telegram?.WebApp?.initDataUnsafe?.user?.id || null, others: new Map(), lastSend: 0, chatOpen: false, unread: 0 };
+const LG_MP = {
+  ws: null, myId: window.Telegram?.WebApp?.initDataUnsafe?.user?.id || null, others: new Map(), lastSend: 0,
+  chatOpen: false, unread: 0,
+  // 'global' or 'dm'; dmPartner is {id,name} while chatMode==='dm'. groupLog/dmLogs hold render
+  // descriptors (not DOM nodes) so switching threads just means clearing #libChatMsgs and
+  // rebuilding from whichever log is now active, rather than juggling multiple live DOM trees.
+  chatMode: 'global', dmPartner: null, groupLog: [], dmLogs: new Map(),
+};
 
 // ---- hand-generated procedural textures (no art assets — canvas patterns tiled via THREE.RepeatWrapping) ----
 function lgNoiseTexture(base, spots, size, repeat) {
@@ -1916,23 +1998,12 @@ function lgSetAvatarAnim(o, name) {
   if (prev) prev.fadeOut(0.25);
   o.animName = name;
 }
-function lgMakeOtherCarMesh() {
-  if (!lgCarModel) return null;
-  const car = lgCarModel.clone(true);
-  const box = new THREE.Box3().setFromObject(car);
-  const size = new THREE.Vector3(); box.getSize(size);
-  car.scale.setScalar(4.2 / (size.z || 1));
-  const box2 = new THREE.Box3().setFromObject(car);
-  car.position.y -= box2.min.y;
-  car.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-  return car;
-}
 function lgUpsertOther(player) {
   if (!player || player.id === LG_MP.myId) return;
   let o = LG_MP.others.get(player.id);
   if (!o) {
     const av = lgAvatarMesh(player.name, player.id);
-    o = { name: player.name, mesh: av.mesh, carMesh: null, lastActive: null, mixer: av.mixer, actions: av.actions, animName: av.animName,
+    o = { name: player.name, mesh: av.mesh, mixer: av.mixer, actions: av.actions, animName: av.animName,
       tx: player.x, tz: player.z, tyaw: player.yaw, scene: player.scene || 'outdoor', driving: !!player.driving };
     o.mesh.position.set(o.tx, 0, o.tz);
     o.mesh.rotation.y = o.tyaw + LG_AVATAR_FACING_OFFSET;
@@ -1954,43 +2025,72 @@ function lgMoveOther(msg) {
 }
 function lgRemoveOther(id) {
   const o = LG_MP.others.get(id);
-  if (o) { o.mesh.parent?.remove(o.mesh); o.carMesh?.parent?.remove(o.carMesh); LG_MP.others.delete(id); }
+  if (o) { o.mesh.parent?.remove(o.mesh); LG_MP.others.delete(id); }
   lgRefreshOnlineCount();
+}
+function lgIsRidingAsPassenger(id) {
+  return LG.cars.some(c => c.passengers.some(p => p.id === id));
 }
 // Smoothly moves every other-player avatar toward its latest reported position, advances its
 // walk/idle animation, and keeps it added to (or removed from) the scene the local player is
 // currently looking at — someone in the library interior shouldn't appear in the outdoor scene.
-// Whoever's driving shows as a real car to everyone else too, not just to themselves — the car
-// model is created lazily the first time we learn a given player is driving.
+// A driving OR riding player isn't rendered as a personal avatar at all — the shared LG.cars[]
+// car object (see lgStepCars/lgSyncPassengerMeshes) is what represents them while they're in a
+// car, same as how the local player's own body disappears the moment they get in one.
 function lgStepOthers(dt) {
   const here = LG.inside ? 'interior' : 'outdoor';
   const sceneObj = LG.inside ? LG.interiorScene : LG.outdoorScene;
-  for (const o of LG_MP.others.values()) {
-    if (o.driving && !o.carMesh) {
-      o.carMesh = lgMakeOtherCarMesh();
-      if (o.carMesh) o.carMesh.position.set(o.tx, o.carMesh.position.y, o.tz);
-    }
-    const active = (o.driving && o.carMesh) ? o.carMesh : o.mesh;
-    const inactive = active === o.mesh ? o.carMesh : o.mesh;
-    if (o.lastActive !== active) {
-      active.position.x = o.tx; active.position.z = o.tz; // snap on switch — no fly-in from a stale spot
-      o.lastActive = active;
-    }
+  for (const [id, o] of LG_MP.others) {
+    if (o.emoteSprite && performance.now() > o.emoteUntil) { o.mesh.remove(o.emoteSprite); o.emoteSprite = null; }
+    if (o.driving || lgIsRidingAsPassenger(id)) { o.mesh.parent?.remove(o.mesh); continue; }
     const visible = o.scene === here;
-    if (visible && active.parent !== sceneObj) { active.parent?.remove(active); sceneObj?.add(active); }
-    else if (!visible && active.parent) { active.parent.remove(active); }
-    if (inactive && inactive.parent) inactive.parent.remove(inactive);
+    if (visible && o.mesh.parent !== sceneObj) { o.mesh.parent?.remove(o.mesh); sceneObj?.add(o.mesh); }
+    else if (!visible && o.mesh.parent) { o.mesh.parent.remove(o.mesh); }
     if (visible) {
-      const offset = active === o.carMesh ? LG_CAR_FACING_OFFSET : LG_AVATAR_FACING_OFFSET;
-      active.position.x += (o.tx - active.position.x) * 0.18;
-      active.position.z += (o.tz - active.position.z) * 0.18;
-      const targetYaw = o.tyaw + offset;
-      let dyaw = targetYaw - active.rotation.y;
+      o.mesh.position.x += (o.tx - o.mesh.position.x) * 0.18;
+      o.mesh.position.z += (o.tz - o.mesh.position.z) * 0.18;
+      const targetYaw = o.tyaw + LG_AVATAR_FACING_OFFSET;
+      let dyaw = targetYaw - o.mesh.rotation.y;
       dyaw = Math.atan2(Math.sin(dyaw), Math.cos(dyaw)); // shortest angular direction, avoids a spin-around
-      active.rotation.y += dyaw * 0.18;
-      if (active === o.mesh) o.mixer?.update(dt);
+      o.mesh.rotation.y += dyaw * 0.18;
+      o.mixer?.update(dt);
     }
   }
+}
+// Authoritative occupancy/parked-position update for one of the 3 shared cars, from the server's
+// car_update broadcast (or the initial roster snapshot on join).
+function lgOnCarUpdate(data) {
+  const car = LG.cars[data.id];
+  if (!car) return;
+  car.driverId = data.driverId; car.driverName = data.driverName;
+  car.passengers = data.passengers || [];
+  car.driving = data.driving;
+  if (!data.driving) { car.x = data.x; car.z = data.z; car.yaw = data.yaw; }
+  lgSyncPassengerMeshes(car);
+  // The server's version of events is authoritative — if it disagrees with what I locally
+  // assumed I was doing (someone else's action beat mine, e.g. the driver left and stranded me),
+  // fall back to standing on foot right where the car ended up rather than getting stuck.
+  if (LG.drivingCarIndex === data.id && car.driverId !== LG_MP.myId) {
+    LG.drivingCarIndex = -1; LG.mode = 'foot';
+    if (LG.hoodMesh) LG.hoodMesh.visible = false;
+    document.getElementById('libgame').classList.remove('car');
+    document.getElementById('libCarExit').classList.remove('show');
+    lgEngineStop();
+    LG.x = car.x; LG.z = car.z;
+  }
+  if (LG.mySeat && LG.mySeat.carId === data.id && !car.passengers.some(p => p.id === LG_MP.myId)) {
+    LG.mySeat = null; LG.mode = 'foot';
+    document.getElementById('libgame').classList.remove('riding');
+    document.getElementById('libCarExit').classList.remove('show');
+    LG.x = car.x; LG.z = car.z;
+  }
+}
+// Frequent position-only update from whoever's actually driving a car — ignored for the car I'm
+// personally driving, since my own local physics already are the source of truth for that one.
+function lgOnCarMove(msg) {
+  const car = LG.cars[msg.id];
+  if (!car || msg.id === LG.drivingCarIndex) return;
+  car.x = msg.x; car.z = msg.z; car.yaw = msg.yaw;
 }
 function lgRefreshOnlineCount() {
   const n = LG_MP.others.size + 1; // +1 for the local player
@@ -1998,29 +2098,10 @@ function lgRefreshOnlineCount() {
   if (el) el.textContent = String(n);
   const list = document.getElementById('libOnlineList');
   if (list) {
-    const names = [...LG_MP.others.values()].map(o => o.name || 'Reader');
-    list.innerHTML = `<div class="lo">🧑 Siz</div>` + names.map(n2 => `<div class="lo">${n2.replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]))}</div>`).join('');
-  }
-}
-// Keeps the chat log from turning into a long scroll — only the 4 most recent messages stay at
-// full opacity, anything older fades out (still readable by scrolling up, just visually
-// de-emphasized so what matters right now stands out).
-function lgRefadeChatMsgs() {
-  const box = document.getElementById('libChatMsgs');
-  if (!box) return;
-  const kids = [...box.children];
-  kids.forEach((el, i) => el.classList.toggle('lmOld', kids.length - i > 4));
-}
-function lgAppendChatEl(el, fromId) {
-  const box = document.getElementById('libChatMsgs');
-  if (box) {
-    box.appendChild(el);
-    lgRefadeChatMsgs();
-    box.scrollTop = box.scrollHeight;
-  }
-  if (!LG_MP.chatOpen && fromId !== LG_MP.myId) {
-    LG_MP.unread++;
-    document.getElementById('libChatDot')?.classList.add('show');
+    const esc = s => String(s).replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+    const rows = [...LG_MP.others.entries()].map(([id, o]) =>
+      `<div class="lo" data-id="${id}">🧑 ${esc(o.name || 'Reader')}</div>`);
+    list.innerHTML = `<div class="lo loMe">🧑 Siz</div>` + rows.join('');
   }
 }
 function lgChatSenderLabel(id, name) {
@@ -2028,30 +2109,156 @@ function lgChatSenderLabel(id, name) {
   b.textContent = (id === LG_MP.myId ? 'Siz' : (name || 'Reader')) + ': ';
   return b;
 }
-function lgReceiveChat(msg) {
+function lgBuildMsgEl(entry) {
   const div = document.createElement('div');
   div.className = 'lm';
-  div.appendChild(lgChatSenderLabel(msg.id, msg.name));
-  div.appendChild(document.createTextNode(msg.text || ''));
-  lgAppendChatEl(div, msg.id);
+  div.appendChild(lgChatSenderLabel(entry.id, entry.name));
+  if (entry.kind === 'text') {
+    div.appendChild(document.createTextNode(entry.text || ''));
+  } else {
+    div.appendChild(document.createElement('br'));
+    if (entry.kind === 'image') {
+      const img = document.createElement('img');
+      img.src = entry.data;
+      img.loading = 'lazy';
+      div.appendChild(img);
+    } else if (entry.kind === 'voice') {
+      const audio = document.createElement('audio');
+      audio.controls = true;
+      audio.src = entry.data;
+      div.appendChild(audio);
+    }
+  }
+  return div;
+}
+// Threads are stored as plain arrays of render descriptors (not DOM), so switching between the
+// group chat and a DM is just "clear the box, rebuild from whichever array is active now" —
+// there's only ever one live DOM tree for #libChatMsgs regardless of how many threads exist.
+function lgThreadKey() { return LG_MP.chatMode === 'dm' && LG_MP.dmPartner ? 'dm:' + LG_MP.dmPartner.id : 'global'; }
+function lgThreadLog(key) {
+  if (key === 'global') return LG_MP.groupLog;
+  const id = Number(key.slice(3));
+  if (!LG_MP.dmLogs.has(id)) LG_MP.dmLogs.set(id, []);
+  return LG_MP.dmLogs.get(id);
+}
+function lgRenderThread(key) {
+  const box = document.getElementById('libChatMsgs');
+  if (!box) return;
+  box.innerHTML = '';
+  for (const entry of lgThreadLog(key)) box.appendChild(lgBuildMsgEl(entry));
+  box.scrollTop = box.scrollHeight;
+}
+function lgLogEntry(key, entry, isMine) {
+  lgThreadLog(key).push(entry);
+  if (key === lgThreadKey()) {
+    const box = document.getElementById('libChatMsgs');
+    if (box) { box.appendChild(lgBuildMsgEl(entry)); box.scrollTop = box.scrollHeight; }
+  }
+  if (isMine) return;
+  if (!LG_MP.chatOpen || key !== lgThreadKey()) {
+    LG_MP.unread++;
+    document.getElementById('libChatDot')?.classList.add('show');
+    // A DM from someone you're not currently looking at still gets their name surfaced next to
+    // the chat icon, so an unread private message is never mistaken for group-chat noise.
+    if (key.startsWith('dm:')) lgSetChatWithLabel(entry.name || 'Reader');
+  }
+}
+function lgSetChatWithLabel(name) {
+  const el = document.getElementById('libChatWithLabel');
+  if (!el) return;
+  if (name) { el.textContent = '💬 ' + name; el.classList.add('show'); }
+  else el.classList.remove('show');
+}
+function lgReceiveChat(msg) {
+  lgLogEntry('global', { kind: 'text', id: msg.id, name: msg.name, text: msg.text }, msg.id === LG_MP.myId);
 }
 function lgReceiveChatMedia(msg) {
-  const div = document.createElement('div');
-  div.className = 'lm';
-  div.appendChild(lgChatSenderLabel(msg.id, msg.name));
-  div.appendChild(document.createElement('br'));
-  if (msg.kind === 'image') {
-    const img = document.createElement('img');
-    img.src = msg.data;
-    img.loading = 'lazy';
-    div.appendChild(img);
-  } else if (msg.kind === 'voice') {
-    const audio = document.createElement('audio');
-    audio.controls = true;
-    audio.src = msg.data;
-    div.appendChild(audio);
+  lgLogEntry('global', { kind: msg.kind, id: msg.id, name: msg.name, data: msg.data }, msg.id === LG_MP.myId);
+}
+function lgReceiveDM(msg) {
+  const mine = msg.from === LG_MP.myId;
+  const partnerId = mine ? msg.to : msg.from;
+  const partnerName = mine ? (LG_MP.others.get(msg.to)?.name || LG_MP.dmPartner?.name || 'Reader') : (msg.name || 'Reader');
+  if (!LG_MP.dmLogs.has(partnerId)) LG_MP.dmLogs.set(partnerId, []);
+  lgLogEntry('dm:' + partnerId, { kind: 'text', id: msg.from, name: msg.name, text: msg.text }, mine);
+}
+function lgToggleEmotePicker() {
+  document.getElementById('libEmotePicker')?.classList.toggle('show');
+}
+function lgSendEmote(emoji) {
+  document.getElementById('libEmotePicker')?.classList.remove('show');
+  window.haptic?.('light');
+  if (LG_MP.ws && LG_MP.ws.readyState === WebSocket.OPEN) {
+    LG_MP.ws.send(JSON.stringify({ t: 'emote', emoji }));
   }
-  lgAppendChatEl(div, msg.id);
+}
+// A floating emoji over the sender's head for a couple seconds — lgStepOthers prunes it once
+// o.emoteUntil passes, same idea as a fading chat bubble but in-world instead of in the chat panel.
+function lgReceiveEmote(msg) {
+  const o = LG_MP.others.get(msg.id);
+  if (!o || !msg.emoji) return;
+  if (o.emoteSprite) { o.mesh.remove(o.emoteSprite); o.emoteSprite = null; }
+  const sprite = lgLabelSprite(msg.emoji, '#ffffff', 160, 160, 120, 0.6);
+  sprite.position.y = 2.3;
+  o.mesh.add(sprite);
+  o.emoteSprite = sprite;
+  o.emoteUntil = performance.now() + 2200;
+}
+const LG_MINIMAP_RANGE = 70; // world units from center to the map's edge
+let lgMiniMapCtx = null;
+function lgDrawMiniMap() {
+  const canvas = document.getElementById('libMiniMap');
+  if (!canvas) return;
+  if (!lgMiniMapCtx) lgMiniMapCtx = canvas.getContext('2d');
+  const ctx = lgMiniMapCtx, W = canvas.width, H = canvas.height, R = W / 2;
+  const toPx = (d) => R + (d / LG_MINIMAP_RANGE) * R;
+  ctx.clearRect(0, 0, W, H);
+  ctx.save();
+  ctx.beginPath(); ctx.arc(R, R, R - 1, 0, Math.PI * 2); ctx.clip();
+  ctx.fillStyle = 'rgba(20,20,24,0.55)';
+  ctx.fillRect(0, 0, W, H);
+  const here = LG.inside ? 'interior' : 'outdoor';
+  if (!LG.inside) {
+    const dx = LG_DOOR.x - LG.x, dz = LG_DOOR.z - LG.z;
+    if (Math.abs(dx) <= LG_MINIMAP_RANGE && Math.abs(dz) <= LG_MINIMAP_RANGE) {
+      ctx.fillStyle = '#e0a030';
+      ctx.beginPath(); ctx.arc(toPx(dx), toPx(dz), 3, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  for (const o of LG_MP.others.values()) {
+    if (o.scene !== here) continue;
+    const dx = o.tx - LG.x, dz = o.tz - LG.z;
+    if (Math.abs(dx) > LG_MINIMAP_RANGE || Math.abs(dz) > LG_MINIMAP_RANGE) continue;
+    ctx.fillStyle = '#4ea1ff';
+    ctx.beginPath(); ctx.arc(toPx(dx), toPx(dz), 3, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.save();
+  ctx.translate(R, R);
+  ctx.rotate(LG.yaw);
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath(); ctx.moveTo(0, -6); ctx.lineTo(4, 5); ctx.lineTo(-4, 5); ctx.closePath(); ctx.fill();
+  ctx.restore();
+  ctx.restore();
+}
+function lgOpenGlobalChat() {
+  LG_MP.chatMode = 'global';
+  LG_MP.dmPartner = null;
+  document.getElementById('libChatModeBar')?.classList.remove('show');
+  lgSetChatWithLabel(null);
+  lgRenderThread('global');
+}
+function lgOpenDM(id, name) {
+  LG_MP.chatMode = 'dm';
+  LG_MP.dmPartner = { id, name };
+  const bar = document.getElementById('libChatModeBar');
+  bar?.classList.add('show');
+  const nameEl = document.getElementById('libChatModeName');
+  if (nameEl) nameEl.textContent = '🔒 ' + name;
+  lgSetChatWithLabel(name);
+  lgRenderThread('dm:' + id);
+  document.getElementById('libOnlineList')?.classList.remove('show');
+  if (!LG_MP.chatOpen) lgToggleChat();
+  else document.getElementById('libChatInput')?.focus();
 }
 function lgToggleChat() {
   LG_MP.chatOpen = !LG_MP.chatOpen;
@@ -2066,7 +2273,11 @@ function lgSendChat() {
   const input = document.getElementById('libChatInput');
   const text = (input?.value || '').trim();
   if (!text || !LG_MP.ws || LG_MP.ws.readyState !== WebSocket.OPEN) return;
-  LG_MP.ws.send(JSON.stringify({ t: 'chat', text }));
+  if (LG_MP.chatMode === 'dm' && LG_MP.dmPartner) {
+    LG_MP.ws.send(JSON.stringify({ t: 'dm', to: LG_MP.dmPartner.id, text }));
+  } else {
+    LG_MP.ws.send(JSON.stringify({ t: 'chat', text }));
+  }
   input.value = '';
 }
 const LG_CHAT_MEDIA_MAX_EDGE = 480;
@@ -2155,12 +2366,16 @@ function lgConnectMultiplayer() {
   ws.onopen = () => { ws.send(JSON.stringify({ t: 'auth', initData })); };
   ws.onmessage = (e) => {
     let msg; try { msg = JSON.parse(e.data); } catch (err) { return; }
-    if (msg.t === 'roster') { (msg.players || []).forEach(lgUpsertOther); lgRefreshOnlineCount(); }
+    if (msg.t === 'roster') { (msg.players || []).forEach(lgUpsertOther); (msg.cars || []).forEach(lgOnCarUpdate); lgRefreshOnlineCount(); }
     else if (msg.t === 'join') lgUpsertOther(msg.player);
     else if (msg.t === 'leave') lgRemoveOther(msg.id);
     else if (msg.t === 'move') lgMoveOther(msg);
     else if (msg.t === 'chat') lgReceiveChat(msg);
     else if (msg.t === 'chat_media') lgReceiveChatMedia(msg);
+    else if (msg.t === 'dm') lgReceiveDM(msg);
+    else if (msg.t === 'car_update') lgOnCarUpdate(msg.car);
+    else if (msg.t === 'car_move') lgOnCarMove(msg);
+    else if (msg.t === 'emote') lgReceiveEmote(msg);
   };
   ws.onclose = () => {
     LG_MP.ws = null;
@@ -2342,9 +2557,10 @@ async function lgBuildOutdoor(pal) {
     scene.add(lamp);
   }
 
-  // Real parked cars sitting in the street — walk up to any of them for a "Drive" prompt, same
-  // pattern as the library door. Three separate cars (not one shared vehicle) so more than one
-  // real player can each be driving at once without waiting on whoever got there first.
+  // Real parked cars sitting in the street — walk up to any of them for Drive/Sit prompts, same
+  // pattern as the library door. Occupancy (who's driving, who's riding along) is authoritative on
+  // the server (see car_update/car_move over /ws/game) so every client renders the same shared
+  // cars rather than each player's own private guess at where they are.
   LG.cars = [];
   if (lgCarModel) {
     for (const spawn of LG_CAR_SPAWNS) {
@@ -2358,7 +2574,10 @@ async function lgBuildOutdoor(pal) {
       car.position.x = spawn.x; car.position.z = spawn.z;
       car.rotation.y = LG_CAR_FACING_OFFSET;
       scene.add(car);
-      LG.cars.push({ mesh: car, pos: { x: spawn.x, z: spawn.z }, yaw: 0, state: 'parked' });
+      LG.cars.push({
+        mesh: car, x: spawn.x, z: spawn.z, yaw: 0, driving: false,
+        driverId: null, driverName: null, passengers: [], passengerMeshes: new Map(),
+      });
     }
   }
 
@@ -2537,7 +2756,62 @@ function lgResize() {
 }
 window.addEventListener('resize', lgResize);
 
+// Keeps every client's copy of the 3 shared world cars visually in sync each frame: the car I'm
+// personally driving mirrors my own local physics (and stays hidden — I see it via the hood-cam
+// instead); everyone else's cars smoothly lerp toward whatever car_move/car_update last reported.
+function lgStepCars() {
+  for (let i = 0; i < LG.cars.length; i++) {
+    const car = LG.cars[i];
+    if (i === LG.drivingCarIndex) {
+      car.x = LG.x; car.z = LG.z; car.yaw = LG.yaw;
+      car.mesh.visible = false;
+    } else {
+      car.mesh.visible = true;
+      if (car.driving) {
+        car.mesh.position.x += (car.x - car.mesh.position.x) * 0.18;
+        car.mesh.position.z += (car.z - car.mesh.position.z) * 0.18;
+        let dyaw = (car.yaw + LG_CAR_FACING_OFFSET) - car.mesh.rotation.y;
+        dyaw = Math.atan2(Math.sin(dyaw), Math.cos(dyaw));
+        car.mesh.rotation.y += dyaw * 0.18;
+      } else {
+        car.mesh.position.set(car.x, car.mesh.position.y, car.z);
+        car.mesh.rotation.y = car.yaw + LG_CAR_FACING_OFFSET;
+      }
+    }
+    // Passenger clones are independent top-level scene objects, NOT children of car.mesh — the
+    // car group carries its own scale (~1.6x, to stretch the raw model to a real 4.2m sedan
+    // length), and parenting would silently compound that into the passenger's own scale/offsets
+    // too. Positioning them by hand each frame via lgCarSeatWorld sidesteps that entirely.
+    if (car.passengerMeshes.size) {
+      car.passengers.forEach((p, idx) => {
+        const mesh = car.passengerMeshes.get(p.id);
+        if (!mesh) return;
+        if (mesh.parent !== LG.outdoorScene) LG.outdoorScene.add(mesh);
+        const seat = LG_CAR_SEAT_OFFSETS[idx % LG_CAR_SEAT_OFFSETS.length];
+        const pos = lgCarSeatWorld(car, idx);
+        mesh.position.set(pos.x, seat.y, pos.z);
+        mesh.rotation.y = car.yaw + LG_CAR_FACING_OFFSET;
+      });
+    }
+  }
+}
 function lgStep(dt) {
+  // Riding along: no throttle/steering of your own, position is fully slaved to whichever car
+  // you're seated in (which itself might be parked-and-waiting, or actively being driven by
+  // someone else) — free look via swipe still works since that's handled independently in
+  // lgCanvasMove, not here.
+  if (LG.mode === 'passenger' && LG.mySeat) {
+    const car = LG.cars[LG.mySeat.carId];
+    if (car) {
+      const seatIdx = Math.max(0, car.passengers.findIndex(p => p.id === LG_MP.myId));
+      const pos = lgCarSeatWorld(car, seatIdx);
+      LG.x = pos.x; LG.z = pos.z;
+    }
+    LG.camera.position.set(LG.x, LG_EYE_HEIGHT, LG.z);
+    LG.camera.rotation.set(LG.pitch, LG.yaw, 0);
+    if (!LG.inside) lgStepCars();
+    return;
+  }
   const cfg = LG_MODE_CFG[LG.mode] || LG_MODE_CFG.foot;
   // Steering while backing up: turning "left" while reversing needs to swing the car the way a
   // real driver expects looking back over their shoulder, which is the opposite screen-rotation
@@ -2575,18 +2849,23 @@ function lgStep(dt) {
     LG.nearDoor = false;
     document.getElementById('libKnock').classList.remove('show');
   }
-  if (!LG.inside && LG.drivingCarIndex < 0 && LG.cars.length) {
+  if (!LG.inside && LG.mode !== 'car' && LG.mode !== 'passenger' && LG.cars.length) {
     let bestIdx = -1, bestD = LG_CAR_ENTER_DIST;
     for (let i = 0; i < LG.cars.length; i++) {
-      if (LG.cars[i].state !== 'parked') continue;
-      const d = Math.hypot(LG.x - LG.cars[i].pos.x, LG.z - LG.cars[i].pos.z);
+      if (LG.cars[i].driving) continue; // a moving car isn't something you can walk up and get into
+      const d = Math.hypot(LG.x - LG.cars[i].x, LG.z - LG.cars[i].z);
       if (d < bestD) { bestD = d; bestIdx = i; }
     }
-    if (bestIdx !== LG.nearCarIndex) {
-      LG.nearCarIndex = bestIdx;
-      document.getElementById('libCarEnter').classList.toggle('show', bestIdx >= 0);
-    }
+    LG.nearCarIndex = bestIdx;
+    const nc = bestIdx >= 0 ? LG.cars[bestIdx] : null;
+    document.getElementById('libCarEnter').classList.toggle('show', !!nc && nc.driverId === null);
+    document.getElementById('libCarSit').classList.toggle('show', !!nc && nc.passengers.length < LG_CAR_MAX_PASSENGERS);
+  } else if (LG.nearCarIndex >= 0) {
+    LG.nearCarIndex = -1;
+    document.getElementById('libCarEnter').classList.remove('show');
+    document.getElementById('libCarSit').classList.remove('show');
   }
+  if (!LG.inside) lgStepCars();
   if (!LG.inside && LG.sunLight) {
     LG.sunLight.position.set(LG.x + 45, 65, LG.z + 25);
     LG.sunLight.target.position.set(LG.x, 0, LG.z);
@@ -2600,7 +2879,8 @@ function lgStep(dt) {
     }
   }
   if (LG.mode === 'car') {
-    document.getElementById('libSpeedo').textContent = Math.round(Math.abs(LG.speed) * 3.6) + ' km/soat';
+    const speedoEl = document.getElementById('libSpeedo');
+    if (speedoEl) speedoEl.textContent = Math.round(Math.abs(LG.speed) * 3.6) + ' km/soat';
     lgEngineUpdate(LG.speed);
   }
   if (LG.inside && LG.shelfZones.length) {
@@ -2610,8 +2890,8 @@ function lgStep(dt) {
       if (d < bestD) { bestD = d; closest = z; }
     }
     const lbl = document.getElementById('libGenreLabel');
-    if (closest && bestD < 14) { lbl.textContent = closest.name; lbl.classList.add('show'); }
-    else lbl.classList.remove('show');
+    if (closest && bestD < 14) { lbl?.classList.add('show'); if (lbl) lbl.textContent = closest.name; }
+    else lbl?.classList.remove('show');
   }
 }
 
@@ -2619,13 +2899,25 @@ function lgTick(ts) {
   if (!LG.lastTs) LG.lastTs = ts;
   const dt = Math.min(0.05, (ts - LG.lastTs) / 1000);
   LG.lastTs = ts;
-  lgStep(dt);
-  lgStepOthers(dt);
-  if (LG_MP.ws && LG_MP.ws.readyState === WebSocket.OPEN && ts - LG_MP.lastSend > LG_MOVE_SEND_MS) {
-    LG_MP.lastSend = ts;
-    LG_MP.ws.send(JSON.stringify({ t: 'move', x: LG.x, z: LG.z, yaw: LG.yaw, scene: LG.inside ? 'interior' : 'outdoor', driving: LG.mode === 'car' }));
+  // A single bad frame must never permanently freeze the game — before this, any uncaught
+  // exception here (a missing DOM element, a null from a multiplayer message, anything) would
+  // silently kill the requestAnimationFrame chain forever with zero visible error, which reads to
+  // a player as "I can't move" for no apparent reason. Log it and keep the loop alive instead.
+  try {
+    lgStep(dt);
+    lgStepOthers(dt);
+    if (LG_MP.ws && LG_MP.ws.readyState === WebSocket.OPEN && ts - LG_MP.lastSend > LG_MOVE_SEND_MS) {
+      LG_MP.lastSend = ts;
+      LG_MP.ws.send(JSON.stringify({ t: 'move', x: LG.x, z: LG.z, yaw: LG.yaw, scene: LG.inside ? 'interior' : 'outdoor', driving: LG.mode === 'car' }));
+      if (LG.drivingCarIndex >= 0) {
+        LG_MP.ws.send(JSON.stringify({ t: 'car_move', carId: LG.drivingCarIndex, x: LG.x, z: LG.z, yaw: LG.yaw }));
+      }
+    }
+    LG.renderer.render(LG.activeScene, LG.camera);
+    lgDrawMiniMap();
+  } catch (e) {
+    console.error('lgTick frame error (recovered):', e);
   }
-  LG.renderer.render(LG.activeScene, LG.camera);
   LG.raf = requestAnimationFrame(lgTick);
 }
 
@@ -2710,11 +3002,23 @@ function lgWireControls() {
   window.addEventListener('blur', () => { Object.keys(LG.keys).forEach(k => LG.keys[k] = false); });
   document.getElementById('libKnock').addEventListener('click', lgKnock);
   document.getElementById('libCarEnter').addEventListener('click', lgEnterCar);
-  document.getElementById('libCarExit').addEventListener('click', lgExitCar);
+  document.getElementById('libCarSit').addEventListener('click', lgSitInCar);
+  document.getElementById('libCarExit').addEventListener('click', lgLeaveCarOrSeat);
+  document.getElementById('libEmoteToggle').addEventListener('click', lgToggleEmotePicker);
+  document.getElementById('libEmotePicker').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-emoji]');
+    if (btn) lgSendEmote(btn.dataset.emoji);
+  });
   document.getElementById('libFoot').addEventListener('click', () => startLibGame('foot'));
   document.getElementById('libCar').addEventListener('click', () => startLibGame('car'));
   document.getElementById('libInteriorBack').addEventListener('click', lgLeaveInterior);
   document.getElementById('libOnline').addEventListener('click', lgToggleOnlineList);
+  document.getElementById('libOnlineList').addEventListener('click', (e) => {
+    const row = e.target.closest('.lo[data-id]');
+    if (!row) return;
+    lgOpenDM(Number(row.dataset.id), row.textContent.replace(/^🧑\s*/, ''));
+  });
+  document.getElementById('libChatModeBack').addEventListener('click', lgOpenGlobalChat);
   document.getElementById('libChatToggle').addEventListener('click', lgToggleChat);
   document.getElementById('libChatSend').addEventListener('click', lgSendChat);
   document.getElementById('libChatInput').addEventListener('keydown', e => { if (e.key === 'Enter') lgSendChat(); });
@@ -2809,40 +3113,105 @@ function lgEngineUpdate(speed) {
   lgEngineGain.gain.setTargetAtTime(0.025 + s * 0.09, now, 0.08);
   lgEngineFilter.frequency.setTargetAtTime(300 + s * 900, now, 0.08);
 }
+// Adds/removes small idle-pose avatar clones for whoever's riding along (excluding the local
+// player, who has no mesh of their own — they ARE the camera). Just creates/destroys the meshes
+// here; lgStepCars positions them into their seat every frame as independent scene objects (see
+// its own comment for why they aren't parented to the car mesh). Seat index is just the
+// passenger's position in the array, matching lgCarSeatWorld's own indexing so a rendered
+// passenger and the local player's own seat (if it's them) never disagree about which seat is whose.
+function lgSyncPassengerMeshes(car) {
+  const wanted = new Set(car.passengers.filter(p => p.id !== LG_MP.myId).map(p => p.id));
+  for (const [id, mesh] of car.passengerMeshes) {
+    if (!wanted.has(id)) { mesh.parent?.remove(mesh); car.passengerMeshes.delete(id); }
+  }
+  car.passengers.forEach((p, idx) => {
+    if (p.id === LG_MP.myId || car.passengerMeshes.has(p.id)) return;
+    const av = lgAvatarMesh(p.name, p.id);
+    av.mesh.scale.setScalar(0.85);
+    car.passengerMeshes.set(p.id, av.mesh);
+  });
+}
 function lgEnterCar() {
   if (LG.drivingCarIndex >= 0 || LG.nearCarIndex < 0) return;
-  const car = LG.cars[LG.nearCarIndex];
-  if (!car || car.state !== 'parked') return;
+  const idx = LG.nearCarIndex;
+  const car = LG.cars[idx];
+  if (!car || car.driverId !== null) return;
   window.haptic?.('medium');
-  car.state = 'driving';
-  LG.drivingCarIndex = LG.nearCarIndex;
+  LG.drivingCarIndex = idx;
   LG.nearCarIndex = -1;
   LG.mode = 'car';
+  car.driverId = LG_MP.myId; car.driverName = 'Siz'; car.driving = true;
   car.mesh.visible = false;
   if (LG.hoodMesh) LG.hoodMesh.visible = true;
   document.getElementById('libgame').classList.add('car');
   document.getElementById('libCarEnter').classList.remove('show');
+  document.getElementById('libCarSit').classList.remove('show');
   document.getElementById('libCarExit').classList.add('show');
   lgEngineStart();
-}
-function lgExitCar() {
-  if (LG.drivingCarIndex < 0) return;
-  window.haptic?.('light');
-  const car = LG.cars[LG.drivingCarIndex];
-  if (car) {
-    car.state = 'parked';
-    car.pos = { x: LG.x, z: LG.z };
-    car.yaw = LG.yaw;
-    car.mesh.position.set(car.pos.x, car.mesh.position.y, car.pos.z);
-    car.mesh.rotation.y = car.yaw + LG_CAR_FACING_OFFSET;
-    car.mesh.visible = true;
+  if (LG_MP.ws && LG_MP.ws.readyState === WebSocket.OPEN) {
+    LG_MP.ws.send(JSON.stringify({ t: 'car_drive', carId: idx }));
   }
-  LG.drivingCarIndex = -1;
-  LG.mode = 'foot';
-  if (LG.hoodMesh) LG.hoodMesh.visible = false;
-  document.getElementById('libgame').classList.remove('car');
-  document.getElementById('libCarExit').classList.remove('show');
-  lgEngineStop();
+}
+function lgSitInCar() {
+  if (LG.mode === 'car' || LG.mode === 'passenger' || LG.nearCarIndex < 0) return;
+  const idx = LG.nearCarIndex;
+  const car = LG.cars[idx];
+  if (!car || car.passengers.length >= LG_CAR_MAX_PASSENGERS) return;
+  window.haptic?.('medium');
+  LG.mySeat = { carId: idx };
+  LG.mode = 'passenger';
+  LG.nearCarIndex = -1;
+  car.passengers.push({ id: LG_MP.myId, name: 'Siz' });
+  document.getElementById('libgame').classList.add('riding');
+  document.getElementById('libCarEnter').classList.remove('show');
+  document.getElementById('libCarSit').classList.remove('show');
+  document.getElementById('libCarExit').classList.add('show');
+  if (LG_MP.ws && LG_MP.ws.readyState === WebSocket.OPEN) {
+    LG_MP.ws.send(JSON.stringify({ t: 'car_sit', carId: idx }));
+  }
+}
+// Handles exiting BOTH roles — driving and riding — since they share the one "Tushish" button.
+// A driver stepping out parks the car (and strands any passengers still aboard, matching the
+// server's own car_leave rule); a passenger stepping out just removes themselves from the seat
+// list and stays standing wherever the car currently is.
+function lgLeaveCarOrSeat() {
+  if (LG.drivingCarIndex >= 0) {
+    window.haptic?.('light');
+    const idx = LG.drivingCarIndex;
+    const car = LG.cars[idx];
+    if (car) {
+      car.driverId = null; car.driverName = null; car.driving = false;
+      car.x = LG.x; car.z = LG.z; car.yaw = LG.yaw; car.passengers = [];
+      lgSyncPassengerMeshes(car);
+      car.mesh.position.set(car.x, car.mesh.position.y, car.z);
+      car.mesh.rotation.y = car.yaw + LG_CAR_FACING_OFFSET;
+      car.mesh.visible = true;
+    }
+    LG.drivingCarIndex = -1;
+    LG.mode = 'foot';
+    if (LG.hoodMesh) LG.hoodMesh.visible = false;
+    document.getElementById('libgame').classList.remove('car');
+    document.getElementById('libCarExit').classList.remove('show');
+    lgEngineStop();
+    if (LG_MP.ws && LG_MP.ws.readyState === WebSocket.OPEN) {
+      LG_MP.ws.send(JSON.stringify({ t: 'car_leave', carId: idx, x: LG.x, z: LG.z, yaw: LG.yaw }));
+    }
+  } else if (LG.mySeat) {
+    window.haptic?.('light');
+    const carId = LG.mySeat.carId;
+    const car = LG.cars[carId];
+    if (car) {
+      car.passengers = car.passengers.filter(p => p.id !== LG_MP.myId);
+      LG.x = car.x; LG.z = car.z;
+    }
+    LG.mySeat = null;
+    LG.mode = 'foot';
+    document.getElementById('libgame').classList.remove('riding');
+    document.getElementById('libCarExit').classList.remove('show');
+    if (LG_MP.ws && LG_MP.ws.readyState === WebSocket.OPEN) {
+      LG_MP.ws.send(JSON.stringify({ t: 'car_leave', carId, x: LG.x, z: LG.z, yaw: LG.yaw }));
+    }
+  }
 }
 
 async function startLibGame(mode) {
@@ -2855,11 +3224,14 @@ async function startLibGame(mode) {
   // prompt would otherwise put you in — keep both paths in sync rather than leaving a second,
   // untouched parked copy sitting ignored at its spawn point.
   if (mode === 'car' && LG.cars[0]) {
-    LG.cars[0].state = 'driving';
+    LG.cars[0].driverId = LG_MP.myId; LG.cars[0].driverName = 'Siz'; LG.cars[0].driving = true;
     LG.cars[0].mesh.visible = false;
     LG.drivingCarIndex = 0;
     if (LG.hoodMesh) LG.hoodMesh.visible = true;
     lgEngineStart();
+    if (LG_MP.ws && LG_MP.ws.readyState === WebSocket.OPEN) {
+      LG_MP.ws.send(JSON.stringify({ t: 'car_drive', carId: 0 }));
+    }
   }
   LG.x = 0; LG.z = LG_WORLD.spawnZ; LG.yaw = 0; LG.pitch = 0; LG.speed = 0; LG.atDoor = false; LG.nearDoor = false; LG.inside = false;
   LG.activeScene = LG.outdoorScene;
@@ -2896,6 +3268,11 @@ function closeLibGame() {
   if (LG.raf) { cancelAnimationFrame(LG.raf); LG.raf = null; }
   Object.keys(LG.keys).forEach(k => LG.keys[k] = false);
   LG.mode = null;
+  // Disconnecting (below) makes the server release any car I was driving/riding automatically —
+  // this just clears the LOCAL UI/state so a reopen doesn't start out thinking it's still driving.
+  LG.drivingCarIndex = -1;
+  LG.mySeat = null;
+  document.getElementById('libgame').classList.remove('car', 'riding');
   lgEngineStop();
   lgReleaseChatMic();
   lgDisconnectMultiplayer();
