@@ -230,10 +230,13 @@
   #libMiniMap{position:fixed; top:calc(env(safe-area-inset-top) + 108px); right:14px; z-index:1;
     width:84px; height:84px; border-radius:50%; border:2px solid var(--line); box-shadow:var(--shadow);
     pointer-events:none; background:var(--card)}
-  #libEmoteToggle{position:fixed; left:14px; bottom:calc(env(safe-area-inset-bottom) + 76px); z-index:2;
+  /* Bottom-left used to collide head-on with the split steering buttons that take over that
+     corner in car mode (#libLeft/#libRight below) — top-right, stacked under the minimap, is
+     clear of the D-pad in every mode (foot, car, and the interior back button). */
+  #libEmoteToggle{position:fixed; top:calc(env(safe-area-inset-top) + 204px); right:14px; z-index:2;
     width:44px; height:44px; border-radius:50%; border:1px solid var(--line); background:var(--chip);
     font-size:19px; box-shadow:var(--shadow); cursor:pointer; display:flex; align-items:center; justify-content:center}
-  #libEmotePicker{position:fixed; left:14px; bottom:calc(env(safe-area-inset-bottom) + 128px); z-index:2;
+  #libEmotePicker{position:fixed; top:calc(env(safe-area-inset-top) + 254px); right:14px; z-index:2;
     display:none; flex-direction:column; gap:6px; background:var(--card); border:1px solid var(--line);
     border-radius:16px; padding:6px; box-shadow:var(--shadow)}
   #libEmotePicker.show{display:flex}
@@ -1600,7 +1603,9 @@ const LG_MODE_CFG = {
   // 0→100 km/h in ~4.3s, full 0→250 in ~10.6s, closer to a fast real car than an arcade jolt.
   // No auto-cruise: the car sits still until the accelerator is actually held, same as any
   // other driving game — it used to creep forward on its own, which read as a bug, not a feature.
-  car: { maxSpeed: 69, accel: 6.5, decel: 26, turnRate: 1.0, bobAmp: 0.015 },
+  // reverseMax is a flat cap (16.7 m/s ≈ 60 km/h), not a fraction of the 250 km/h forward top
+  // speed — reversing at anywhere near forward highway speed makes no sense.
+  car: { maxSpeed: 69, accel: 6.5, decel: 26, turnRate: 1.0, bobAmp: 0.015, reverseMax: 16.7 },
   inside: { maxSpeed: 4, accel: 16, decel: 22, turnRate: 2.0, bobAmp: 0.03 },
 };
 
@@ -1632,12 +1637,22 @@ const LG_CAR_SEAT_OFFSETS = [
   { x: -0.5, y: 0.3, z: -0.75 },   // rear left
   { x: 0.5, y: 0.3, z: -0.75 },    // rear right
 ];
+// Rotates a point given in the car MODEL's own authored frame into world space — the general
+// form lgCarSeatWorld and lgCarExitWorld both build on.
+function lgCarLocalToWorld(car, localX, localZ) {
+  const yaw = car.yaw + LG_CAR_FACING_OFFSET;
+  const wx = localX * Math.cos(yaw) + localZ * Math.sin(yaw);
+  const wz = -localX * Math.sin(yaw) + localZ * Math.cos(yaw);
+  return { x: car.x + wx, z: car.z + wz };
+}
 function lgCarSeatWorld(car, seatIdx) {
   const seat = LG_CAR_SEAT_OFFSETS[seatIdx % LG_CAR_SEAT_OFFSETS.length];
-  const yaw = car.yaw + LG_CAR_FACING_OFFSET;
-  const wx = seat.x * Math.cos(yaw) + seat.z * Math.sin(yaw);
-  const wz = -seat.x * Math.sin(yaw) + seat.z * Math.cos(yaw);
-  return { x: car.x + wx, z: car.z + wz };
+  return lgCarLocalToWorld(car, seat.x, seat.z);
+}
+// Real sedan width is ~2.47 (±1.235 from center) — 2.1 clears the body with a little room to
+// spare, reading as "stepped out and standing beside the car" instead of inside/on top of it.
+function lgCarExitWorld(car) {
+  return lgCarLocalToWorld(car, 2.1, 0.3);
 }
 // Kenney's sedan.glb is authored front-facing +Z (its wheel nodes are literally named
 // wheel-front-*/wheel-back-* with front at z=+0.66) — opposite of this game's yaw=0 forward
@@ -2077,13 +2092,15 @@ function lgOnCarUpdate(data) {
     document.getElementById('libgame').classList.remove('car');
     document.getElementById('libCarExit').classList.remove('show');
     lgEngineStop();
-    LG.x = car.x; LG.z = car.z;
+    const exitPos = lgCarExitWorld(car);
+    LG.x = exitPos.x; LG.z = exitPos.z;
   }
   if (LG.mySeat && LG.mySeat.carId === data.id && !car.passengers.some(p => p.id === LG_MP.myId)) {
     LG.mySeat = null; LG.mode = 'foot';
     document.getElementById('libgame').classList.remove('riding');
     document.getElementById('libCarExit').classList.remove('show');
-    LG.x = car.x; LG.z = car.z;
+    const exitPos = lgCarExitWorld(car);
+    LG.x = exitPos.x; LG.z = exitPos.z;
   }
 }
 // Frequent position-only update from whoever's actually driving a car — ignored for the car I'm
@@ -2831,13 +2848,17 @@ function lgStep(dt) {
   if (LG.keys.right) LG.yaw -= cfg.turnRate * dt * steerFlip;
   let target = 0;
   if (LG.keys.fwd) target = cfg.maxSpeed;
-  else if (LG.keys.back) target = -cfg.maxSpeed * 0.5; // reversing is slower, like backing up
+  else if (LG.keys.back) target = -(cfg.reverseMax ?? cfg.maxSpeed * 0.5); // reversing is slower, like backing up
   if (LG.speed < target) LG.speed = Math.min(target, LG.speed + cfg.accel * dt);
   else if (LG.speed > target) LG.speed = Math.max(target, LG.speed - cfg.decel * dt);
   if (Math.abs(LG.speed) > 0.05) {
     LG.x += -Math.sin(LG.yaw) * LG.speed * dt;
     LG.z += -Math.cos(LG.yaw) * LG.speed * dt;
-    LG.walk += Math.abs(LG.speed) * dt * 3.4;
+    // Caps the bob cycle's rate in car mode at what it was before the 250 km/h top speed —
+    // driving the raw speed straight into this (as foot mode still does) would spin the sine wave
+    // fast enough at redline to read as violent shaking instead of a gentle vibration.
+    const walkSpeed = LG.mode === 'car' ? Math.min(Math.abs(LG.speed), 15) : Math.abs(LG.speed);
+    LG.walk += walkSpeed * dt * 3.4;
   }
   const w = LG.inside ? LG_IN_WORLD : LG_WORLD;
   LG.x = Math.max(-w.halfX, Math.min(w.halfX, LG.x));
@@ -2946,7 +2967,12 @@ function lgCanvasMove(e) {
   if (!lgLookLast) return;
   const dx = e.clientX - lgLookLast.x, dy = e.clientY - lgLookLast.y;
   lgLookLast = { x: e.clientX, y: e.clientY };
-  LG.yaw -= dx * LG_LOOK_SENS;
+  // Turning is button-only on foot and while driving — a horizontal swipe used to also spin the
+  // character/car's actual heading, which felt like losing steering control by accident just from
+  // dragging to look around. A passenger doesn't control the car's heading either way, so they
+  // still get free horizontal look. Vertical swipe (look up/down) never affected movement and
+  // stays on for everyone.
+  if (LG.mode === 'passenger') LG.yaw -= dx * LG_LOOK_SENS;
   LG.pitch = Math.max(-LG_PITCH_MAX, Math.min(LG_PITCH_MAX, LG.pitch - dy * LG_LOOK_SENS));
 }
 function lgCanvasEnd() { lgLookLast = null; }
@@ -3092,38 +3118,51 @@ function lgLeaveInterior() {
   document.getElementById('libGenreLabel').classList.remove('show');
 }
 
-// Synthesized engine hum (Web Audio, no sound file) — sawtooth through a lowpass filter reads as
-// a rough engine rumble rather than a harsh buzz; pitch/volume/brightness all track LG.speed each
-// frame, so it actually revs as you speed up instead of playing a flat loop.
-let lgEngineCtx = null, lgEngineOsc = null, lgEngineGain = null, lgEngineFilter = null;
+// Synthesized engine hum (Web Audio, no sound file) — two voices: a sawtooth "buzz" through a
+// lowpass (the mechanical edge) plus a quieter triangle an octave below for body/warmth. A single
+// bare sawtooth got harsh/thin right at the top of the (much higher, post-250km/h-top-speed)
+// range — the filter/gain ceilings here are deliberately capped well short of "wide open" so the
+// tone stays a rumble instead of turning into a buzzsaw at redline.
+let lgEngineCtx = null, lgEngineOsc = null, lgEngineOsc2 = null, lgEngineGain = null, lgEngineGain2 = null, lgEngineFilter = null;
 function lgEngineStart() {
   if (lgEngineCtx) return;
   try {
     lgEngineCtx = new (window.AudioContext || window.webkitAudioContext)();
     lgEngineOsc = lgEngineCtx.createOscillator();
     lgEngineOsc.type = 'sawtooth';
-    lgEngineOsc.frequency.value = 55;
+    lgEngineOsc.frequency.value = 50;
     lgEngineFilter = lgEngineCtx.createBiquadFilter();
     lgEngineFilter.type = 'lowpass';
-    lgEngineFilter.frequency.value = 300;
+    lgEngineFilter.frequency.value = 260;
+    lgEngineFilter.Q.value = 0.7;
     lgEngineGain = lgEngineCtx.createGain();
     lgEngineGain.gain.value = 0;
     lgEngineOsc.connect(lgEngineFilter).connect(lgEngineGain).connect(lgEngineCtx.destination);
     lgEngineOsc.start();
+    lgEngineOsc2 = lgEngineCtx.createOscillator();
+    lgEngineOsc2.type = 'triangle';
+    lgEngineOsc2.frequency.value = 25;
+    lgEngineGain2 = lgEngineCtx.createGain();
+    lgEngineGain2.gain.value = 0;
+    lgEngineOsc2.connect(lgEngineGain2).connect(lgEngineCtx.destination);
+    lgEngineOsc2.start();
   } catch (e) { lgEngineCtx = null; }
 }
 function lgEngineStop() {
   if (!lgEngineCtx) return;
-  try { lgEngineOsc.stop(); lgEngineCtx.close(); } catch (e) {}
-  lgEngineCtx = null; lgEngineOsc = null; lgEngineGain = null; lgEngineFilter = null;
+  try { lgEngineOsc.stop(); lgEngineOsc2.stop(); lgEngineCtx.close(); } catch (e) {}
+  lgEngineCtx = null; lgEngineOsc = null; lgEngineOsc2 = null; lgEngineGain = null; lgEngineGain2 = null; lgEngineFilter = null;
 }
 function lgEngineUpdate(speed) {
   if (!lgEngineCtx) return;
   const s = Math.min(1, Math.abs(speed) / LG_MODE_CFG.car.maxSpeed);
   const now = lgEngineCtx.currentTime;
-  lgEngineOsc.frequency.setTargetAtTime(55 + s * 140, now, 0.08);
-  lgEngineGain.gain.setTargetAtTime(0.025 + s * 0.09, now, 0.08);
-  lgEngineFilter.frequency.setTargetAtTime(300 + s * 900, now, 0.08);
+  const freq = 50 + s * 95;
+  lgEngineOsc.frequency.setTargetAtTime(freq, now, 0.1);
+  lgEngineGain.gain.setTargetAtTime(0.02 + s * 0.055, now, 0.1);
+  lgEngineFilter.frequency.setTargetAtTime(260 + s * 480, now, 0.1);
+  lgEngineOsc2.frequency.setTargetAtTime(freq / 2, now, 0.1);
+  lgEngineGain2.gain.setTargetAtTime(0.015 + s * 0.04, now, 0.1);
 }
 // Adds/removes small idle-pose avatar clones for whoever's riding along (excluding the local
 // player, who has no mesh of their own — they ARE the camera). Just creates/destroys the meshes
@@ -3210,21 +3249,25 @@ function lgLeaveCarOrSeat() {
     if (LG_MP.ws && LG_MP.ws.readyState === WebSocket.OPEN) {
       LG_MP.ws.send(JSON.stringify({ t: 'car_leave', carId: idx, x: LG.x, z: LG.z, yaw: LG.yaw }));
     }
+    // Step out to the side of the car, not straight down into its own footprint — the car's own
+    // position/yaw are already pinned above, so this can't drift out of sync with where it parked.
+    if (car) { const exitPos = lgCarExitWorld(car); LG.x = exitPos.x; LG.z = exitPos.z; }
   } else if (LG.mySeat) {
     window.haptic?.('light');
     const carId = LG.mySeat.carId;
     const car = LG.cars[carId];
+    if (LG_MP.ws && LG_MP.ws.readyState === WebSocket.OPEN) {
+      LG_MP.ws.send(JSON.stringify({ t: 'car_leave', carId, x: car ? car.x : LG.x, z: car ? car.z : LG.z, yaw: car ? car.yaw : LG.yaw }));
+    }
     if (car) {
       car.passengers = car.passengers.filter(p => p.id !== LG_MP.myId);
-      LG.x = car.x; LG.z = car.z;
+      const exitPos = lgCarExitWorld(car);
+      LG.x = exitPos.x; LG.z = exitPos.z;
     }
     LG.mySeat = null;
     LG.mode = 'foot';
     document.getElementById('libgame').classList.remove('riding');
     document.getElementById('libCarExit').classList.remove('show');
-    if (LG_MP.ws && LG_MP.ws.readyState === WebSocket.OPEN) {
-      LG_MP.ws.send(JSON.stringify({ t: 'car_leave', carId, x: LG.x, z: LG.z, yaw: LG.yaw }));
-    }
   }
 }
 
@@ -3247,7 +3290,16 @@ async function startLibGame(mode) {
       LG_MP.ws.send(JSON.stringify({ t: 'car_drive', carId: 0 }));
     }
   }
-  LG.x = 0; LG.z = LG_WORLD.spawnZ; LG.yaw = 0; LG.pitch = 0; LG.speed = 0; LG.atDoor = false; LG.nearDoor = false; LG.inside = false;
+  // Spawning "in" car 0 but leaving the player's actual position at the foot spawn (25 units
+  // away) meant the car itself would snap to match on the very next frame — the player would see
+  // themselves ride off from empty ground, and stepping out immediately after dropped them right
+  // back at the foot spawn with the car now teleported on top of them. Spawn at the car instead.
+  if (mode === 'car' && LG.cars[0]) {
+    LG.x = LG.cars[0].x; LG.z = LG.cars[0].z; LG.yaw = LG.cars[0].yaw;
+  } else {
+    LG.x = 0; LG.z = LG_WORLD.spawnZ; LG.yaw = 0;
+  }
+  LG.pitch = 0; LG.speed = 0; LG.atDoor = false; LG.nearDoor = false; LG.inside = false;
   LG.activeScene = LG.outdoorScene;
   lgResize();
   LG.lastTs = 0;
