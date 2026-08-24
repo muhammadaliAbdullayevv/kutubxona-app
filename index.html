@@ -13,19 +13,22 @@
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
   /* Night (default) — ink & brass, a library after closing time */
+  /* Night — cool ink, not warm wood. A single confident blue->violet accent runs through every
+     gradient button/highlight in the app; swapping these tokens (not per-component colors) is
+     what took the whole app from "old study" amber/copper to a contemporary reading-app feel. */
   :root{
-    --bg:#14100b; --card:#1f1710; --card2:#291f14; --text:#f4ecdc; --muted:#a89172;
-    --accent:#d9a441; --accent2:#b5672e; --line:#34281a; --chip:#241b12; --danger:#e2685a;
-    --radius:16px; --shadow:0 6px 24px rgba(0,0,0,.5);
+    --bg:#0b0e15; --card:#131826; --card2:#1a2133; --text:#eef1f8; --muted:#8b93aa;
+    --accent:#5b8cff; --accent2:#8a5cf6; --line:#232a3d; --chip:#161d2d; --danger:#ef5b6b;
+    --radius:16px; --shadow:0 6px 24px rgba(0,0,0,.45);
     /* Set from JS (measured, not guessed) whenever the audio mini-player shows/hides — lets
        .actions below make room for it instead of being covered by it. */
     --audio-player-h:0px;
   }
-  /* Day — parchment & ink */
+  /* Day — daylight reading room: cool near-white, not parchment. */
   :root[data-theme="day"]{
-    --bg:#f7f5f0; --card:#ffffff; --card2:#eeebe2; --text:#1e1b16; --muted:#726c5f;
-    --accent:#2f6b4f; --accent2:#1f4d38; --line:#e3ded1; --chip:#eeebe2; --danger:#c0392b;
-    --shadow:0 6px 20px rgba(30,25,15,.10);
+    --bg:#f5f6fa; --card:#ffffff; --card2:#eef0f7; --text:#161a26; --muted:#6b7288;
+    --accent:#3b63e0; --accent2:#7c4de0; --line:#e2e5f0; --chip:#eef0f7; --danger:#d94357;
+    --shadow:0 6px 20px rgba(20,24,40,.08);
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
   html,body{margin:0; padding:0}
@@ -131,6 +134,7 @@
   .btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff}
   .btn.ghost{flex:0 0 auto; width:52px; background:var(--card); border:1px solid var(--line); color:var(--text)}
   .btn.ghost.on{color:var(--danger)}
+  .btn.ghost.wanton{color:var(--accent)}
   .toast{position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(20px); background:var(--card2); border:1px solid var(--line); color:var(--text); padding:11px 18px; border-radius:12px; font-weight:600; font-size:14px; opacity:0; transition:.25s; z-index:99; box-shadow:var(--shadow)}
   .toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
   .hint{color:var(--muted); font-size:13px; margin:6px 0}
@@ -153,12 +157,15 @@
   .gzoom button{width:42px; height:42px; border-radius:50%; background:var(--chip); border:1px solid var(--line); color:var(--text); font-size:21px; font-weight:700; font-family:inherit; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:var(--shadow); padding:0; line-height:1; transition:transform .15s}
   .gzoom button:active{transform:scale(.9)}
   #pdfToolbar{position:fixed; top:0; left:0; right:0; z-index:2; display:flex; align-items:center; justify-content:center; gap:16px;
-    padding:calc(env(safe-area-inset-top) + 14px) 60px 12px; background:linear-gradient(180deg,var(--bg) 60%,transparent)}
-  #pdfToolbar button{width:38px; height:38px; border-radius:50%; border:1px solid var(--line); background:var(--chip); color:var(--text);
-    font-size:16px; cursor:pointer; box-shadow:var(--shadow)}
-  #pdfToolbar button:disabled{opacity:.4; cursor:default}
-  #pdfPageInfo{font-size:14px; font-weight:600; color:var(--text); min-width:70px; text-align:center}
-  #pdfCanvasWrap{position:absolute; inset:0; overflow:auto; display:flex; align-items:flex-start; justify-content:center; padding:70px 0 20px}
+    padding:calc(env(safe-area-inset-top) + 14px) 60px 14px; background:linear-gradient(180deg,var(--bg) 55%,transparent)}
+  #pdfToolbar button{width:40px; height:40px; border-radius:50%; border:1px solid var(--line); background:var(--card); color:var(--text);
+    font-size:15px; cursor:pointer; box-shadow:var(--shadow); transition:transform .12s, background .15s}
+  #pdfToolbar button:active{transform:scale(.9); background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border-color:transparent}
+  #pdfToolbar button:disabled{opacity:.35; cursor:default; transform:none; background:var(--card); color:var(--text)}
+  #pdfPageInfo{font-size:13px; font-weight:700; color:var(--muted); min-width:70px; text-align:center; font-variant-numeric:tabular-nums}
+  #pdfProgressTrack{position:fixed; top:calc(env(safe-area-inset-top) + 62px); left:0; right:0; z-index:2; height:3px; background:var(--line)}
+  #pdfProgressFill{height:100%; width:0%; background:linear-gradient(90deg,var(--accent),var(--accent2)); transition:width .25s ease}
+  #pdfCanvasWrap{position:absolute; inset:0; overflow:auto; display:flex; align-items:flex-start; justify-content:center; padding:78px 0 20px}
   #pdfCanvas{max-width:100%; box-shadow:var(--shadow); background:#fff}
   #pdfLoading{position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); color:var(--muted); font-size:14px; display:none}
   #pdfLoading.show{display:block}
@@ -463,6 +470,7 @@
     <span id="pdfPageInfo">— / —</span>
     <button id="pdfNext" type="button">▶</button>
   </div>
+  <div id="pdfProgressTrack"><div id="pdfProgressFill"></div></div>
   <div id="pdfCanvasWrap"><canvas id="pdfCanvas"></canvas><div id="pdfLoading">Yuklanmoqda...</div></div>
 </div>
 <div id="audioPlayer">
@@ -1154,7 +1162,7 @@ function openDetail(id){
     <div class="dbody">
       <h2 class="dtitle">${esc(b.t)}</h2>
       <div class="dauthor">${esc(b.a||'Noma\'lum muallif')}</div>
-      <div class="pills">${pill('📂',b.g)}${pill('🎯',audLabel)}${pill('🗓',b.y)}${pill('🌐',b.l)}<span class="pill">${b.ha?'🎧':'📄'} <b>${esc(typeTxt)}</b></span>${b.mb?`<span class="pill">💾 <b>${b.mb} MB</b></span>`:''}${b.dl?`<span class="pill">⬇️ <b>${fmtNum(b.dl)}</b></span>`:''}</div>
+      <div class="pills">${pill('📂',b.g)}${pill('🎯',audLabel)}${pill('🗓',b.y)}${pill('🌐',b.l)}<span class="pill">${b.ha?'🎧':'📄'} <b>${esc(typeTxt)}</b></span>${b.mb?`<span class="pill">💾 <b>${b.mb} MB</b></span>`:''}${b.dl?`<span class="pill">⬇️ <b>${fmtNum(b.dl)}</b></span>`:''}<span class="pill" id="pillReading" style="display:none">👀 <b><span id="pillReadingN">0</span> o'qimoqda</b></span><span class="pill" id="pillWant" style="display:none">🔖 <b><span id="pillWantN">0</span> o'qimoqchi</b></span></div>
       ${b.sm?`<div class="sec"><h3>Qisqacha</h3><p>${esc(b.sm)}</p></div>`:''}
       ${b.d?`<div class="sec"><h3>Tavsif</h3><p>${esc(b.d)}</p></div>`:''}
       ${(b.s&&b.s.length)?`<div class="sec"><h3>Mavzular</h3><div class="subs">${b.s.map(s=>`<span class="sub" data-sub="${esc(s)}">${esc(s)}</span>`).join('')}</div></div>`:''}
@@ -1166,6 +1174,7 @@ function openDetail(id){
       <button class="btn ghost" id="dRead">📄 O'qish</button>
       ${b.ha?`<button class="btn ghost" id="dListen">🎧 Tinglash</button>`:''}
       <button class="btn ghost ${fav?'on':''}" id="dFav">${fav?'❤️':'🤍'}</button>
+      <button class="btn ghost" id="dWant">📑</button>
       <button class="btn ghost" id="dShare">↗️</button>
       ${openedFromGlobe?'<button class="btn ghost" id="dBackGlobe">🌐</button>':''}
     </div>`;
@@ -1189,13 +1198,43 @@ function openDetail(id){
   const dListen=$('#dListen');
   if(dListen)dListen.onclick=()=>openAudioPlayer(b.i,b.t);
   $('#dFav').onclick=()=>toggleFav(b.i);
+  $('#dWant').onclick=()=>toggleWantToRead(b.i);
   $('#dShare').onclick=()=>{const txt=`📚 ${b.t}${b.a?' — '+b.a:''}`;const s=`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(txt)}`;tg?.openTelegramLink?tg.openTelegramLink(s):navigator.share?.({title:b.t,url});};
   const dBackGlobe=$('#dBackGlobe');
   if(dBackGlobe)dBackGlobe.onclick=()=>closeSheet();
   c.querySelectorAll('[data-sub]').forEach(el=>el.onclick=()=>{closeSheet();$('#q').value=el.dataset.sub;state.q=el.dataset.sub;$('#clr').style.display='block';if(state.view!=='browse'){state.view='browse';setTabs();}run();window.scrollTo(0,0);});
   c.querySelectorAll('.si').forEach(el=>el.onclick=()=>openDetail(el.dataset.id));
   loadRating(b.i);
+  loadBookExtras(b.i);
   c.scrollTop=0;
+}
+
+// ---- reading stats (currently-reading / want-to-read counts) + want-to-read toggle ----
+function loadBookExtras(id){
+  api('/api/books/'+encodeURIComponent(id)+'/stats').then(r=>{
+    if(!$('#sheet').classList.contains('open')||!$('#pillReading'))return;
+    const rc=r.reading_count||0,wc=r.want_to_read_count||0;
+    const pr=$('#pillReading'),pw=$('#pillWant');
+    if(pr){$('#pillReadingN').textContent=fmtNum(rc);pr.style.display=rc>0?'':'none';}
+    if(pw){$('#pillWantN').textContent=fmtNum(wc);pw.style.display=wc>0?'':'none';}
+  }).catch(()=>{});
+  if(!canAct())return;
+  api('/api/books/'+encodeURIComponent(id)+'/progress').then(r=>{
+    const el=$('#dWant');
+    if(!el||!$('#sheet').classList.contains('open'))return;
+    el.classList.toggle('wanton',!!r.want_to_read);
+    el.textContent=r.want_to_read?'🔖':'📑';
+  }).catch(()=>{});
+}
+function toggleWantToRead(id){
+  if(!canAct()){toast("Botni Telegram ichida oching");return;}
+  haptic('medium');
+  api('/api/books/'+encodeURIComponent(id)+'/want-to-read',{method:'POST'}).then(r=>{
+    const el=$('#dWant');
+    if(el){el.classList.toggle('wanton',r.want_to_read);el.textContent=r.want_to_read?'🔖':'📑';}
+    toast(r.want_to_read?"🔖 O'qimoqchilar ro'yxatiga qo'shildi":"Ro'yxatdan olib tashlandi");
+    loadBookExtras(id);
+  }).catch(()=>toast('Xatolik yuz berdi'));
 }
 function closeSheet(){
   $('#sheet').classList.remove('open');
@@ -1218,8 +1257,60 @@ function getStreamToken(scope){
 }
 
 // ---- PDF reader ----
-let pdfDoc=null,pdfPageNum=1,pdfPageCount=0,pdfRendering=false,pdfLib=null;
+let pdfDoc=null,pdfPageNum=1,pdfPageCount=0,pdfRendering=false,pdfLib=null,pdfBookId=null;
 function pdfSetLoading(on){$('#pdfLoading').classList.toggle('show',on);}
+function pdfUpdateProgressBar(){
+  const bar=$('#pdfProgressFill');
+  if(bar)bar.style.width=(pdfPageCount?Math.min(100,pdfPageNum/pdfPageCount*100):0)+'%';
+}
+
+// ---- active-reading-time tracking ----
+// "Active" means the reader sheet is open AND the tab/app is actually visible/foregrounded —
+// a book left open in a backgrounded tab must not silently rack up hours of "reading time".
+// Ticks accumulate locally and flush to the server periodically (not every second — that would
+// be a lot of chatter for little benefit) plus once for real on close, so a short visit still
+// gets recorded even if it never reaches a periodic flush.
+let pdfActiveTimer=null,pdfActiveAccum=0,pdfFlushedUpTo=0,pdfCompletedShown=false;
+const PDF_FLUSH_EVERY_SEC=20;
+function pdfStartActiveTracking(){
+  pdfActiveAccum=0;pdfFlushedUpTo=0;pdfCompletedShown=false;
+  if(pdfActiveTimer)clearInterval(pdfActiveTimer);
+  pdfActiveTimer=setInterval(()=>{
+    if(document.visibilityState==='visible'&&$('#pdfSheet').classList.contains('open')){
+      pdfActiveAccum++;
+      if(pdfActiveAccum-pdfFlushedUpTo>=PDF_FLUSH_EVERY_SEC)pdfFlushProgress();
+    }
+  },1000);
+}
+function pdfStopActiveTracking(){
+  if(pdfActiveTimer){clearInterval(pdfActiveTimer);pdfActiveTimer=null;}
+  pdfFlushProgress();
+}
+function fmtDuration(totalSec){
+  totalSec=Math.max(0,Math.round(totalSec));
+  const h=Math.floor(totalSec/3600),m=Math.floor((totalSec%3600)/60),s=totalSec%60;
+  if(h>0)return `${h} soat ${m} daqiqa`;
+  if(m>0)return `${m} daqiqa ${s} soniya`;
+  return `${s} soniya`;
+}
+function pdfFlushProgress(){
+  const delta=pdfActiveAccum-pdfFlushedUpTo;
+  if(delta<=0||!pdfBookId)return;
+  pdfFlushedUpTo=pdfActiveAccum;
+  api('/api/books/'+encodeURIComponent(pdfBookId)+'/progress',{method:'POST',body:JSON.stringify({current_page:pdfPageNum,total_pages:pdfPageCount||null,active_seconds:delta})}).then(r=>{
+    if(r.completed&&!pdfCompletedShown){
+      pdfCompletedShown=true;
+      haptic('medium');
+      let spanTxt='';
+      if(r.started_at&&r.completed_at){
+        const days=Math.round((new Date(r.completed_at)-new Date(r.started_at))/86400000);
+        if(days>=1)spanTxt=` — ${days} kun ichida`;
+      }
+      toast(`🎉 Kitob tugadi! Faol o'qish: ${fmtDuration(r.active_seconds||0)}${spanTxt}`);
+    }
+  }).catch(()=>{});
+}
+
 async function openPdfReader(id,title){
   if(!canAct()){toast("Ilovada o'qish uchun botni Telegram ichida oching");return;}
   haptic();
@@ -1227,6 +1318,7 @@ async function openPdfReader(id,title){
   tg?.BackButton?.show();
   pdfSetLoading(true);
   $('#pdfPageInfo').textContent='— / —';
+  pdfBookId=id;
   try{
     if(!pdfLib){
       pdfLib=await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.7.76/build/pdf.min.mjs');
@@ -1236,8 +1328,14 @@ async function openPdfReader(id,title){
     const url=COMMUNITY_API_BASE+'/api/books/'+encodeURIComponent(id)+'/read?token='+encodeURIComponent(token);
     pdfDoc=await pdfLib.getDocument(url).promise;
     pdfPageCount=pdfDoc.numPages;
-    pdfPageNum=1;
-    await pdfRenderPage(1);
+    let resumePage=1;
+    try{
+      const prog=await api('/api/books/'+encodeURIComponent(id)+'/progress');
+      if(prog&&prog.current_page>1&&prog.current_page<=pdfPageCount&&!prog.completed)resumePage=prog.current_page;
+    }catch(e){/* no saved progress yet — start from page 1 */}
+    await pdfRenderPage(resumePage);
+    if(resumePage>1)toast(`📖 ${resumePage}-betdan davom etilmoqda`);
+    pdfStartActiveTracking();
   }catch(e){
     pdfSetLoading(false);
     toast("Bu kitobni ilovada o'qib bo'lmadi");
@@ -1265,6 +1363,7 @@ async function pdfRenderPage(n){
     $('#pdfPageInfo').textContent=n+' / '+pdfPageCount;
     $('#pdfPrev').disabled=n<=1; $('#pdfNext').disabled=n>=pdfPageCount;
     $('#pdfCanvasWrap').scrollTop=0;
+    pdfUpdateProgressBar();
   }catch(e){/* a single bad page shouldn't kill the whole reader */}
   pdfRendering=false;
   pdfSetLoading(false);
@@ -1272,7 +1371,8 @@ async function pdfRenderPage(n){
 function closePdfReader(){
   $('#pdfSheet').classList.remove('open');
   tg?.BackButton?.hide();
-  pdfDoc=null;
+  pdfStopActiveTracking();
+  pdfDoc=null;pdfBookId=null;
 }
 $('#pdfClose').onclick=()=>closePdfReader();
 $('#pdfPrev').onclick=()=>{if(pdfPageNum>1)pdfRenderPage(pdfPageNum-1);};
