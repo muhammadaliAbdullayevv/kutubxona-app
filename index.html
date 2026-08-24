@@ -1473,8 +1473,19 @@ const PLANET = {
   pitch: -0.15,
 };
 const PLANET_RESUME_DELAY = 2000;
+// Reused every frame for the label-visibility distance/facing check — avoids allocating 3 new
+// Vector3s x ~200 anchors x 60fps.
+const planetWorldTmp = new THREE.Vector3();
+const planetOutwardTmp = new THREE.Vector3();
+const planetToCamTmp = new THREE.Vector3();
 
 function planetPopScore(b) { return (b.dl || 0) * 3 + (b.rc ? b.rt * b.rc : 0) + (b.hc ? 2 : 0); }
+
+// A fixed radians-per-pixel drag rate felt right at the default zoom but WAY too fast once
+// zoomed in — the same finger movement sweeps a much bigger apparent angle when the camera is
+// close, since perspective makes nearby geometry cross more of the screen for the same rotation.
+// Scaling by how far out the camera currently is keeps the felt speed roughly constant.
+function planetRotSens() { return 0.0072 * (PLANET.cameraDist / 118); }
 
 // Evenly spread N points on a unit sphere (standard Fibonacci-sphere construction) — used both
 // for the per-genre "continent" seed points and, indirectly, informs the anchor jitter radius.
@@ -1803,7 +1814,7 @@ function planetTick(ts) {
     // Flick momentum: keep spinning at the release velocity, decaying by a friction factor each
     // frame, until it's too slow to see — then hand off to the normal pause-then-auto-rotate.
     PLANET.group.rotation.y += PLANET.spin.vy * dt * 1000;
-    PLANET.group.rotation.x = Math.max(-1.15, Math.min(1.15, PLANET.group.rotation.x + PLANET.spin.vx * dt * 1000));
+    PLANET.group.rotation.x += PLANET.spin.vx * dt * 1000;
     const friction = Math.pow(0.06, dt);
     PLANET.spin.vy *= friction; PLANET.spin.vx *= friction;
     if (Math.abs(PLANET.spin.vy) < 0.000025 && Math.abs(PLANET.spin.vx) < 0.000025) {
@@ -1815,23 +1826,30 @@ function planetTick(ts) {
     // distinguishable from "not rotating at all" over the few seconds someone actually watches it.
     PLANET.group.rotation.y += 0.16 * dt;
   }
-  // Reveal anchor titles for the most popular books once zoomed in close enough — mirrors the
-  // old map's "labels grow as you zoom" progressive reveal instead of dumping 200 at once. A
-  // linear curve measured out to ~125 of ~220 titles visible at the DEFAULT zoom alone — a wall
-  // of overlapping text before the user even touches anything. Cubic-eased and pushed later
-  // (nothing ramps up until zoomT>0.6, i.e. real zooming-in, not just the default distance) so
-  // the overview starts with only a small, readable handful and titles earn their appearance.
-  const zoomT = 1 - (PLANET.cameraDist - PLANET.minDist) / (PLANET.maxDist - PLANET.minDist); // 0 far .. 1 close
-  const labelT = Math.max(0, Math.min(1, (zoomT - 0.6) / 0.4));
-  const labelCap = Math.round(labelT * labelT * labelT * 200);
-  if (labelCap !== PLANET._lastLabelCap) {
-    PLANET._lastLabelCap = labelCap;
-    const byPop = PLANET.anchors.map((a, i) => [a.pop, i]).sort((x, y) => y[0] - x[0]);
-    for (let k = 0; k < byPop.length; k++) {
-      const idx = byPop[k][1];
-      PLANET.anchorLabels[idx].visible = k < labelCap;
-    }
+  // Reveal titles for whichever books are actually near the camera right now — NOT a fixed
+  // global-popularity ranking. That first version picked the catalog's ~200 most-downloaded
+  // books regardless of where they sat on the sphere, so zooming all the way into a lower-
+  // download genre (language learning, poetry...) could show zero titles even at max zoom,
+  // because none of ITS books ever made the global top-K cut — exactly "only genre labels, no
+  // real books" once you zoom into anything but the biggest genres. Recomputed every frame
+  // (cheap: a couple hundred anchors) from each one's ACTUAL current world position — rotation-
+  // aware, so it stays correct as the planet spins — and its distance/facing relative to the
+  // camera, so whatever is actually under the camera right now is what gets labeled.
+  PLANET.group.updateMatrixWorld();
+  const nearThreshold = (PLANET.cameraDist - PLANET_RADIUS) + 26; // scales with zoom automatically
+  const labelCandidates = [];
+  for (let i = 0; i < PLANET.anchors.length; i++) {
+    planetWorldTmp.set(PLANET.anchors[i].pos.x, PLANET.anchors[i].pos.y, PLANET.anchors[i].pos.z).applyMatrix4(PLANET.group.matrixWorld);
+    const distToCam = planetWorldTmp.distanceTo(PLANET.camera.position);
+    if (distToCam > nearThreshold) continue;
+    planetOutwardTmp.copy(planetWorldTmp).normalize();
+    planetToCamTmp.subVectors(PLANET.camera.position, planetWorldTmp).normalize();
+    if (planetOutwardTmp.dot(planetToCamTmp) < 0.12) continue; // facing away — hidden behind the sphere body anyway
+    labelCandidates.push({ idx: i, distToCam });
   }
+  labelCandidates.sort((a, b) => a.distToCam - b.distToCam);
+  const shownIdx = new Set(labelCandidates.slice(0, 26).map(c => c.idx));
+  for (let i = 0; i < PLANET.anchorLabels.length; i++) PLANET.anchorLabels[i].visible = shownIdx.has(i);
   PLANET.camera.position.set(0, 0, PLANET.cameraDist);
   PLANET.renderer.render(PLANET.scene, PLANET.camera);
   PLANET.raf = requestAnimationFrame(planetTick);
@@ -1910,14 +1928,19 @@ function wirePlanetInteraction() {
     if (!PLANET.drag) return;
     const dx = e.clientX - PLANET.drag.x0, dy = e.clientY - PLANET.drag.y0;
     if (!PLANET.drag.moved && Math.hypot(dx, dy) > 6) PLANET.drag.moved = true;
-    PLANET.group.rotation.y = PLANET.drag.ry0 + dx * 0.0072;
-    PLANET.group.rotation.x = Math.max(-1.15, Math.min(1.15, PLANET.drag.rx0 + dy * 0.0072));
+    // No pitch clamp — an earlier version capped rotation.x to ±1.15 rad (~66°) to avoid Euler
+    // pole quirks, but that meant the poles were simply never reachable: dragging vertically
+    // would visibly stop partway and refuse to go further, exactly like a wall placed just past
+    // the poles. Free rotation on both axes lets every side of the planet actually be reached.
+    const sens = planetRotSens();
+    PLANET.group.rotation.y = PLANET.drag.ry0 + dx * sens;
+    PLANET.group.rotation.x = PLANET.drag.rx0 + dy * sens;
     // Instantaneous velocity (rad/ms), smoothed against the previous sample — a single raw
     // pointermove delta is noisy (touch sampling isn't perfectly even), so this is fed into the
     // release-time "flick" momentum below rather than used as-is.
     const now = performance.now(), dtMs = Math.max(1, now - PLANET.drag.lastT);
-    const instVy = (e.clientX - PLANET.drag.lastX) * 0.0072 / dtMs;
-    const instVx = (e.clientY - PLANET.drag.lastY) * 0.0072 / dtMs;
+    const instVy = (e.clientX - PLANET.drag.lastX) * sens / dtMs;
+    const instVx = (e.clientY - PLANET.drag.lastY) * sens / dtMs;
     PLANET.drag.vy = PLANET.drag.vy * 0.7 + instVy * 0.3;
     PLANET.drag.vx = PLANET.drag.vx * 0.7 + instVx * 0.3;
     PLANET.drag.lastX = e.clientX; PLANET.drag.lastY = e.clientY; PLANET.drag.lastT = now;
