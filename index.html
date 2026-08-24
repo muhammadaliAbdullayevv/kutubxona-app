@@ -1804,17 +1804,29 @@ function skeletonShelf(){return `<div class="section"><div class="shead"><h2 cla
 async function boot(){
   if(tg){tg.ready();tg.expand();tg.disableVerticalSwipes?.();tg.BackButton?.onClick(()=>{if($('#pdfSheet').classList.contains('open'))closePdfReader();else if($('#sheet2').classList.contains('open'))closeSheet2();else if($('#sheet').classList.contains('open'))closeSheet();else if($('#globe').classList.contains('open'))closeGlobe();else if($('#libgame').classList.contains('open'))closeLibGame();});applyThemeMode();tg.onEvent?.('themeChanged',()=>{if(themeMode==='system')applyThemeMode();});}
   if('serviceWorker' in navigator)window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('./sw.js').catch(()=>{});
+    navigator.serviceWorker.register('./sw.js').then(reg=>{
+      // A long-lived, never-navigated Mini App session (Telegram keeps the WebView warm across
+      // what the user sees as close/reopen) may never fire another 'load' event to trigger the
+      // browser's own update check — poll for a new SW every few minutes while visible so a
+      // long session still picks up a deploy instead of only checking once at the very start.
+      setInterval(()=>{if(document.visibilityState==='visible')reg.update().catch(()=>{});},180000);
+    }).catch(()=>{});
     // The shell/data caches are served cache-first-then-refresh, so a stale client can lag a
     // load behind a new deploy. Once a new SW actually takes control, force exactly one reload
-    // so the fresh shell/JS is what actually runs. Guarded with sessionStorage (not a plain JS
-    // variable, which resets on every reload and can't prevent a reload loop) so this fires at
-    // most once per tab even if controllerchange happens to fire again after reloading.
+    // so the fresh shell/JS is what actually runs.
+    // A short per-load DEBOUNCE, not a permanent "already reloaded once, ever" flag — an earlier
+    // version used the latter, which backfired: Telegram's Mini App WebView often stays warm
+    // across what looks like a close/reopen to the user (it isn't a real new page load), so
+    // sessionStorage survives too. Once that flag got set for the FIRST auto-update this tab
+    // ever saw, every later real deploy silently stopped reloading it — the user could be stuck
+    // on week-old JS no matter how many times a bug got fixed since. A time-boxed debounce still
+    // blocks a genuine rapid-fire loop (repeated controllerchange within the same load) while
+    // letting every later deploy (minutes/hours apart in practice) actually take effect.
     navigator.serviceWorker.addEventListener('controllerchange',()=>{
-      let already=false;
-      try{already=sessionStorage.getItem('swReloaded')==='1';}catch(e){}
-      if(already)return;
-      try{sessionStorage.setItem('swReloaded','1');}catch(e){}
+      let last=0;
+      try{last=parseInt(sessionStorage.getItem('swReloadedAt')||'0',10);}catch(e){}
+      if(Date.now()-last<10000)return;
+      try{sessionStorage.setItem('swReloadedAt',String(Date.now()));}catch(e){}
       window.location.reload();
     });
   });
