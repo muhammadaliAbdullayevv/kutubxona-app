@@ -190,29 +190,39 @@
      activity feed layered on top when the viewer is the bot owner (server-enforced, not just a
      hidden div: /api/admin/live-feed 403s for anyone else, so this section simply never
      receives data to show for a normal user). */
-  .liveDot{display:inline-block; width:8px; height:8px; border-radius:50%; background:#3ecf6a; box-shadow:0 0 0 rgba(62,207,106,.6); animation:liveDotPulse 1.8s ease-out infinite; vertical-align:middle; margin-right:2px}
-  @keyframes liveDotPulse{0%{box-shadow:0 0 0 0 rgba(62,207,106,.55)}70%{box-shadow:0 0 0 7px rgba(62,207,106,0)}100%{box-shadow:0 0 0 0 rgba(62,207,106,0)}}
-  /* Its own row under the title, not squeezed into the already-full pill row (Qur'on/profile/
-     theme) — that row has no spare width left on a typical 375-420px phone. */
-  .liveHeaderRow{display:flex; justify-content:flex-end; margin:8px 0 2px}
-  .liveBadge{display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:var(--muted);
-    background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:5px 12px 5px 10px;
-    cursor:pointer; text-decoration:none; white-space:nowrap}
-  .liveBadge #btnLiveN{color:var(--text)}
-  #liveSheetc{padding:20px 18px calc(20px + env(safe-area-inset-bottom))}
-  .liveHead{text-align:center; padding:14px 0 20px}
-  .liveClock{font-size:38px; font-weight:800; letter-spacing:.5px; font-variant-numeric:tabular-nums; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  .liveDot{display:inline-block; width:8px; height:8px; border-radius:50%; --dot-rgb:62,207,106; background:rgb(var(--dot-rgb)); animation:liveDotPulse 1.8s ease-out infinite; vertical-align:middle; margin-right:2px}
+  @keyframes liveDotPulse{0%{box-shadow:0 0 0 0 rgba(var(--dot-rgb),.55)}70%{box-shadow:0 0 0 7px rgba(var(--dot-rgb),0)}100%{box-shadow:0 0 0 0 rgba(var(--dot-rgb),0)}}
+  /* A real, bold call-to-action under the title — not squeezed into the already-full pill row
+     (Qur'on/profile/theme has no spare width left on a typical 375-420px phone), and not a tiny
+     dot easy to miss either. */
+  .liveHeaderRow{margin:10px 0 4px}
+  .liveBadge{display:flex; align-items:center; justify-content:space-between; width:100%; font-size:14.5px; font-weight:800; color:#fff;
+    background:linear-gradient(135deg,var(--accent),var(--accent2)); border:none; border-radius:14px; padding:13px 16px;
+    cursor:pointer; text-decoration:none; box-shadow:var(--shadow)}
+  .liveBadge .liveDot{--dot-rgb:255,255,255}
+  .liveBadgeRight{display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700; opacity:.92}
+  /* The panel is a full page (like the PDF reader), not a bottom drawer — a "footer" card reads
+     as a minor add-on; a whole page reads as what it actually is, the app's stats dashboard. */
+  #liveSheet{flex-direction:column}
+  #liveTopbar{flex-shrink:0; display:flex; align-items:center; justify-content:space-between; gap:12px;
+    padding:calc(env(safe-area-inset-top) + 14px) 18px 14px; border-bottom:1px solid var(--line)}
+  #liveTopbarTitle{font-size:18px; font-weight:800; color:var(--text)}
+  #liveTopbar .gclose{position:static; box-shadow:none; flex-shrink:0}
+  #liveSheetc{flex:1; overflow-y:auto; padding:20px 18px calc(20px + env(safe-area-inset-bottom)); max-width:760px; width:100%; margin:0 auto}
+  .liveHead{text-align:center; padding:6px 0 24px}
+  .liveClock{font-size:40px; font-weight:800; letter-spacing:.5px; font-variant-numeric:tabular-nums; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
     background:linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; background-clip:text; color:transparent}
-  .liveOnlineRow{margin-top:6px; font-size:13px; font-weight:700; color:var(--muted)}
+  .liveOnlineRow{margin-top:8px; font-size:13px; font-weight:700; color:var(--muted)}
   .liveOnlineRow #liveOnline{color:var(--text)}
-  .liveGrid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:8px}
-  .liveTile{background:var(--card2); border:1px solid var(--line); border-radius:14px; padding:14px 8px; text-align:center}
-  .liveTileN{font-size:21px; font-weight:800; color:var(--text); font-variant-numeric:tabular-nums}
-  .liveTileL{font-size:11px; color:var(--muted); font-weight:600; margin-top:3px; line-height:1.3}
-  #liveAdminSec{margin-top:20px}
-  #liveAdminSec h3{font-size:13px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); margin:0 0 8px; display:flex; align-items:center; gap:8px}
+  .liveSecTitle{font-size:13px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); margin:22px 0 8px; display:flex; align-items:center; gap:8px}
+  .liveSecTitle:first-of-type{margin-top:0}
+  .liveGrid{display:grid; grid-template-columns:repeat(2,1fr); gap:8px}
+  .liveTile{background:var(--card2); border:1px solid var(--line); border-radius:14px; padding:16px 10px; text-align:center}
+  .liveTileN{font-size:24px; font-weight:800; color:var(--text); font-variant-numeric:tabular-nums}
+  .liveTileL{font-size:12px; color:var(--muted); font-weight:600; margin-top:4px; line-height:1.3}
+  #liveAdminSec{margin-top:6px}
   .liveAdminTag{text-transform:none; letter-spacing:0; font-size:11px; font-weight:600; color:var(--accent); background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:3px 9px}
-  #liveFeed{display:flex; flex-direction:column; gap:6px; max-height:340px; overflow-y:auto}
+  #liveFeed{display:flex; flex-direction:column; gap:6px}
   .lfRow{display:flex; align-items:center; gap:10px; background:var(--card2); border:1px solid var(--line); border-radius:12px; padding:9px 12px}
   .lfIcon{font-size:18px; flex-shrink:0}
   .lfText{flex:1; min-width:0; font-size:13px; color:var(--text)}
@@ -417,7 +427,7 @@
 <div class="wrap">
   <header>
     <h1>📚 Kutubxona <a href="quran.html" style="float:right; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle">📖 Qur'on</a><a id="btnProfile" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer">👤</a><a id="btnTheme" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer">☀️</a></h1>
-    <div class="liveHeaderRow"><a id="btnLive" class="liveBadge"><span class="liveDot"></span><span id="btnLiveN">–</span> onlayn o'quvchi</a></div>
+    <div class="liveHeaderRow"><a id="btnLive" class="liveBadge">📊 Statistika<span class="liveBadgeRight"><span class="liveDot"></span><span id="btnLiveN">–</span> onlayn</span></a></div>
     <div class="searchbar">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
       <input id="q" type="search" placeholder="Kitob, muallif, mavzu…" autocomplete="off" enterkeyhint="search">
@@ -507,20 +517,34 @@
   <div id="pdfProgressTrack"><div id="pdfProgressFill"></div></div>
   <div id="pdfCanvasWrap"><canvas id="pdfCanvas"></canvas><div id="pdfLoading">Yuklanmoqda...</div></div>
 </div>
-<div class="sheet" id="liveSheet" style="z-index:47">
-  <div class="sheetc" id="liveSheetc">
-    <div class="gclose" id="liveClose">✕</div>
+<div class="sheet" id="liveSheet" style="z-index:47; align-items:stretch; background:var(--bg)">
+  <div id="liveTopbar"><div id="liveTopbarTitle">📊 Statistika</div><div class="gclose" id="liveClose">✕</div></div>
+  <div id="liveSheetc">
     <div class="liveHead">
       <div class="liveClock" id="liveClock">00:00:00.000</div>
       <div class="liveOnlineRow"><span class="liveDot"></span><span id="liveOnline">0</span> onlayn o'quvchi</div>
     </div>
+
+    <h3 class="liveSecTitle">Bugun</h3>
     <div class="liveGrid">
-      <div class="liveTile"><div class="liveTileN" id="liveTotalSearches">–</div><div class="liveTileL">Jami qidiruvlar</div></div>
-      <div class="liveTile"><div class="liveTileN" id="liveTodaySearches">–</div><div class="liveTileL">Bugun qidirildi</div></div>
-      <div class="liveTile"><div class="liveTileN" id="liveTodayDownloads">–</div><div class="liveTileL">Bugun yuklandi</div></div>
+      <div class="liveTile"><div class="liveTileN" id="liveTodaySearches">–</div><div class="liveTileL">Qidiruvlar</div></div>
+      <div class="liveTile"><div class="liveTileN" id="liveTodayDownloads">–</div><div class="liveTileL">Yuklab olishlar</div></div>
     </div>
+
+    <h3 class="liveSecTitle">Butun katalog</h3>
+    <div class="liveGrid">
+      <div class="liveTile"><div class="liveTileN" id="liveTotalBooks">–</div><div class="liveTileL">📚 Kitoblar</div></div>
+      <div class="liveTile"><div class="liveTileN" id="liveTotalAudiobooks">–</div><div class="liveTileL">🎧 Audiokitoblar</div></div>
+      <div class="liveTile"><div class="liveTileN" id="liveTotalUsers">–</div><div class="liveTileL">👤 Foydalanuvchilar</div></div>
+      <div class="liveTile"><div class="liveTileN" id="liveTotalDownloads">–</div><div class="liveTileL">⬇️ Jami yuklab olishlar</div></div>
+      <div class="liveTile"><div class="liveTileN" id="liveTotalSearches">–</div><div class="liveTileL">🔍 Jami qidiruvlar</div></div>
+      <div class="liveTile"><div class="liveTileN" id="liveTotalFavorites">–</div><div class="liveTileL">❤️ Sevimlilar</div></div>
+      <div class="liveTile"><div class="liveTileN" id="liveTotalRatings">–</div><div class="liveTileL">⭐ Baholar</div></div>
+      <div class="liveTile"><div class="liveTileN" id="liveTotalComments">–</div><div class="liveTileL">💬 Izohlar</div></div>
+    </div>
+
     <div id="liveAdminSec" style="display:none">
-      <h3>🕵️ Faollik <span class="liveAdminTag">faqat sizga ko'rinadi</span></h3>
+      <h3 class="liveSecTitle">🕵️ Faollik <span class="liveAdminTag">faqat sizga ko'rinadi</span></h3>
       <div id="liveFeed"></div>
     </div>
   </div>
@@ -582,14 +606,21 @@ function livePresenceTick(){
   if(!canAct()||document.visibilityState!=='visible')return;
   api('/api/presence/ping',{method:'POST'}).catch(()=>{});
 }
+const LIVE_STAT_FIELDS={
+  total_searches:'liveTotalSearches', today_searches:'liveTodaySearches', today_downloads:'liveTodayDownloads',
+  total_books:'liveTotalBooks', total_audiobooks:'liveTotalAudiobooks', total_users:'liveTotalUsers',
+  total_downloads:'liveTotalDownloads', total_favorites:'liveTotalFavorites', total_ratings:'liveTotalRatings',
+  total_comments:'liveTotalComments',
+};
 function liveRefreshPublicStats(){
   api('/api/stats/live').then(r=>{
     const n=fmtNum(r.online_count||0);
     const bn=$('#btnLiveN');if(bn)bn.textContent=n;
     const lo=$('#liveOnline');if(lo)lo.textContent=n;
-    const ts=$('#liveTotalSearches');if(ts)ts.textContent=fmtNum(r.total_searches||0);
-    const tds=$('#liveTodaySearches');if(tds)tds.textContent=fmtNum(r.today_searches||0);
-    const tdd=$('#liveTodayDownloads');if(tdd)tdd.textContent=fmtNum(r.today_downloads||0);
+    for(const key in LIVE_STAT_FIELDS){
+      const el=document.getElementById(LIVE_STAT_FIELDS[key]);
+      if(el)el.textContent=fmtNum(r[key]||0);
+    }
   }).catch(()=>{});
 }
 let liveClockTimer=null,liveFeedTimer=null;
