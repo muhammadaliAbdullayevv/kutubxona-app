@@ -866,431 +866,14 @@ function hash31(s){let h=0;s=String(s||'');for(let i=0;i<s.length;i++)h=(h*31+s.
 // "Unknown"/"Noma'lum" isn't a real author identity — 1023+ books share it, so treating it as
 // one would falsely cluster a fifth of the catalog onto a single node.
 function isKnownAuthor(a){return !!a && !/unknown|noma.?lum/i.test(a);}
-const CLUSTER_COLORS=['#4f8fd9','#e0824a','#4caf7d','#a066c9','#2fa6a6','#d9527a','#c9a227','#7d6ad9','#5ba64f','#4aa8c9','#c96f3f','#8f9bb3','#b3853f','#5f9bd9','#6fae8f'];
-const GLOBE={built:false,nodes:[],edges:[],hubs:[],projected:[],genreColor:{},highlightGenre:null,panX:0,panY:0,zoom:1,raf:null};
-function buildGlobe(){
-  const byGenre={};
-  for(const b of DB.books){(byGenre[b.g||'?']=byGenre[b.g||'?']||[]).push(b);}
-  const total=DB.books.length||1;
-  let anchors=[];
-  for(const g in byGenre){
-    const bucket=byGenre[g];
-    const k=Math.max(6,Math.round(200*bucket.length/total));
-    const sorted=bucket.slice().sort((x,y)=>{
-      const d=popScore(y)-popScore(x);
-      return d!==0?d:hash31(x.i)-hash31(y.i);
-    });
-    anchors=anchors.concat(sorted.slice(0,k));
-  }
-  const genreColor={};
-  let colorIdx=0;
-  for(const b of anchors){
-    const g=b.g||'?';
-    if(!(g in genreColor)){genreColor[g]=CLUSTER_COLORS[colorIdx%CLUSTER_COLORS.length];colorIdx++;}
-  }
-  const idIndex={};
-  const nodes=anchors.map((b,i)=>{
-    idIndex[b.i]=i;
-    const ang=(hash31(b.i)%6283)/1000, rad=20+(hash31(b.i+'#r')%120);
-    return {id:b.i,t:b.t,g:b.g||'?',pop:popScore(b),
-      x:Math.cos(ang)*rad,y:Math.sin(ang)*rad,vx:0,vy:0,color:genreColor[b.g||'?']};
-  });
-  // Edges: within each genre bucket (sorted by popularity), connect each anchor to its 2
-  // nearest neighbors in that ordering — gives every node a couple of same-genre "cousins"
-  // without an O(bucket²) all-to-all hairball. Plus same-author pairs across genres, if any.
-  const edges=[], seen=new Set();
-  function addEdge(i,j){
-    if(i===j||i==null||j==null)return;
-    const key=i<j?i+'_'+j:j+'_'+i;
-    if(seen.has(key))return;
-    seen.add(key);edges.push([i,j]);
-  }
-  for(const g in byGenre){
-    const bucket=byGenre[g].filter(b=>idIndex[b.i]!==undefined).sort((x,y)=>popScore(y)-popScore(x));
-    for(let i=0;i<bucket.length;i++){
-      const a=idIndex[bucket[i].i];
-      if(i+1<bucket.length)addEdge(a,idIndex[bucket[i+1].i]);
-      if(i+2<bucket.length)addEdge(a,idIndex[bucket[i+2].i]);
-    }
-  }
-  const byAuthorAnchor={};
-  for(const b of anchors){if(isKnownAuthor(b.a))(byAuthorAnchor[b.a]=byAuthorAnchor[b.a]||[]).push(b);}
-  for(const a in byAuthorAnchor){
-    const arr=byAuthorAnchor[a];
-    for(let i=1;i<arr.length;i++)addEdge(idIndex[arr[0].i],idIndex[arr[i].i]);
-  }
-  // Satellites: every other book in the catalog (~5100+), NOT individually simulated (that
-  // would blow the O(n²) repulsion budget) — each just rides along at its parent anchor's
-  // live (already-simulated) position plus a small fixed jitter, so the full catalog has
-  // visual presence without extra physics cost. Revealed once zoomed in a bit (see
-  // globeDraw), matching "popular books by default, more as you zoom into a cluster."
-  const anchorIdSet=new Set(anchors.map(a=>a.i));
-  const primaryAnchorByAuthor={};
-  for(const b of anchors){if(isKnownAuthor(b.a) && !(b.a in primaryAnchorByAuthor))primaryAnchorByAuthor[b.a]=b.i;}
-  // Genre fallback: a book whose author has no anchor gets hash-distributed across ALL of its
-  // genre's anchors (not dumped onto a single "top" one) — otherwise nearly every satellite in
-  // a genre piles onto one node, since most authors only have 1-2 books and rarely have an
-  // anchor of their own.
-  const anchorsByGenre={};
-  for(const g in byGenre){
-    anchorsByGenre[g]=anchors.filter(a=>(a.g||'?')===g); // already popScore-sorted from above
-  }
-  const satellites=[];
-  for(const b of DB.books){
-    if(anchorIdSet.has(b.i))continue;
-    let parentId=isKnownAuthor(b.a) && primaryAnchorByAuthor[b.a];
-    if(!parentId){
-      const bucket=anchorsByGenre[b.g||'?'];
-      if(bucket && bucket.length)parentId=bucket[hash31(b.i+'#gp')%bucket.length].i;
-    }
-    if(!parentId)continue;
-    const parentIdx=idIndex[parentId];
-    const jAng=(hash31(b.i+'#sat')%6283)/1000, jRad=4+(hash31(b.i+'#satr')%10);
-    satellites.push({id:b.i,t:b.t,parentIdx,jx:Math.cos(jAng)*jRad,jy:Math.sin(jAng)*jRad,color:nodes[parentIdx].color});
-  }
-  GLOBE.nodes=nodes;
-  GLOBE.satellites=satellites;
-  GLOBE.edges=edges;
-  GLOBE.genreColor=genreColor;
-  GLOBE.built=true;
-  renderGlobeLegend(byGenre);
-}
-function renderGlobeLegend(byGenre){
-  const el=$('#globeLegend');
-  if(!el)return;
-  const rows=Object.keys(GLOBE.genreColor)
-    .sort((a,b)=>(byGenre[b]?.length||0)-(byGenre[a]?.length||0))
-    .map(g=>`<div class="lg-row"><span class="lg-dot" style="background:${GLOBE.genreColor[g]}"></span>${esc(g)} <b>${byGenre[g]?byGenre[g].length:0}</b></div>`)
-    .join('');
-  el.innerHTML=rows;
-}
-function globeSimStep(){
-  const nodes=GLOBE.nodes, n=nodes.length;
-  for(let i=0;i<n;i++){
-    const A=nodes[i];
-    for(let j=i+1;j<n;j++){
-      const B=nodes[j];
-      let dx=A.x-B.x, dy=A.y-B.y, distSq=dx*dx+dy*dy;
-      // Softened minimum distance (not just clamped to 1): without this, two nodes that ever
-      // land close together spike the force toward its ceiling and fling both away violently
-      // (exactly what "moving so fast, can't see anything" was — dividing by a near-zero
-      // distSq). Flooring at 100 (~10px) caps the worst-case force instead of letting it blow up.
-      if(distSq<100)distSq=100;
-      const dist=Math.sqrt(distSq), force=95/distSq;
-      const fx=(dx/dist)*force, fy=(dy/dist)*force;
-      A.vx+=fx;A.vy+=fy;B.vx-=fx;B.vy-=fy;
-    }
-  }
-  for(const [i,j] of GLOBE.edges){
-    const A=nodes[i],B=nodes[j];
-    const dx=B.x-A.x,dy=B.y-A.y,dist=Math.sqrt(dx*dx+dy*dy)||0.01;
-    const force=(dist-24)*0.018;
-    const fx=(dx/dist)*force,fy=(dy/dist)*force;
-    A.vx+=fx;A.vy+=fy;B.vx-=fx;B.vy-=fy;
-  }
-  // Centering needs to scale with node count — with ~220 anchors each pushed by ~220 others,
-  // a fixed weak pull loses that tug-of-war and the whole graph drifts apart into empty space —
-  // but too strong (an earlier attempt) overshoots and oscillates instead of settling.
-  for(const A of nodes){A.vx-=A.x*0.011;A.vy-=A.y*0.011;}
-  // Hard velocity cap: a safety net independent of the exact force constants above — whatever
-  // the net force on a node comes out to, it can never move faster than this per frame, so a
-  // parameter combination that's slightly too strong degrades to "settles a bit slower"
-  // instead of "flies off screen."
-  const MAX_SPEED=5;
-  for(const A of nodes){
-    A.vx*=0.78;A.vy*=0.78;
-    const sp=Math.hypot(A.vx,A.vy);
-    if(sp>MAX_SPEED){A.vx=A.vx/sp*MAX_SPEED;A.vy=A.vy/sp*MAX_SPEED;}
-    A.x+=A.vx;A.y+=A.vy;
-  }
-}
-function globeDraw(){
-  const canvas=$('#globeCanvas');
-  if(!canvas)return;
-  const dpr=Math.min(window.devicePixelRatio||1,2);
-  const w=canvas.clientWidth,h=canvas.clientHeight;
-  if(canvas.width!==Math.round(w*dpr)||canvas.height!==Math.round(h*dpr)){
-    canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);
-  }
-  const ctx=canvas.getContext('2d');
-  ctx.setTransform(dpr,0,0,dpr,0,0);
-  ctx.clearRect(0,0,w,h);
-  const cx=w/2+GLOBE.panX, cy=h/2+GLOBE.panY, s=GLOBE.zoom;
-  const style=getComputedStyle(document.documentElement);
-  const lineColor=style.getPropertyValue('--line').trim()||'#34281a';
-  const textColor=style.getPropertyValue('--text').trim()||'#f4ecdc';
-  const proj={};
-  for(const A of GLOBE.nodes)proj[A.id]={sx:cx+A.x*s,sy:cy+A.y*s};
-  const dim=g=>GLOBE.highlightGenre && g!==GLOBE.highlightGenre;
+var CLUSTER_COLORS=['#4f8fd9','#e0824a','#4caf7d','#a066c9','#2fa6a6','#d9527a','#c9a227','#7d6ad9','#5ba64f','#4aa8c9','#c96f3f','#8f9bb3','#b3853f','#5f9bd9','#6fae8f'];
+// Books "Planet" — full 3D rotatable sphere, built + rendered in the module script below
+// (needs Three.js). buildPlanet/openGlobe/closeGlobe/globeResumeAfterDetail are all defined
+// there and exposed on window, mirroring the exact same cross-script pattern already used for
+// the library-game (openLibGame/closeLibGame/lgResumeAfterDetail).
+$('#btnGlobe').onclick=()=>{haptic();window.openGlobe?.();};
+$('#globeClose').onclick=()=>window.closeGlobe?.();
 
-  // Layer 1: one hub per genre/type ("the main header"), positioned at the live centroid of
-  // that genre's anchors (Layer 2) — recomputed fresh each frame (cheap: ~18 genres), so it
-  // naturally stays in the middle of its cluster without its own physics. Tapping a hub
-  // toggles a highlight (see onHubTap) that traces its lines/books, dimming everything else.
-  const byGenreNodes={};
-  for(const A of GLOBE.nodes)(byGenreNodes[A.g]=byGenreNodes[A.g]||[]).push(A);
-  const hubs=[];
-  for(const g in byGenreNodes){
-    const arr=byGenreNodes[g];
-    let hx=0,hy=0;
-    for(const A of arr){hx+=A.x;hy+=A.y;}
-    hubs.push({g,x:hx/arr.length,y:hy/arr.length,color:GLOBE.genreColor[g],anchors:arr});
-  }
-  GLOBE.hubs=hubs;
-
-  // hub -> Layer-2 (anchor) spokes
-  ctx.lineWidth=1;
-  for(const H of hubs){
-    const hx=cx+H.x*s, hy=cy+H.y*s, on=GLOBE.highlightGenre===H.g;
-    ctx.globalAlpha=dim(H.g)?0.05:(on?0.55:0.22);
-    ctx.strokeStyle=H.color;
-    for(const A of H.anchors){
-      const p=proj[A.id];
-      ctx.beginPath();ctx.moveTo(hx,hy);ctx.lineTo(p.sx,p.sy);ctx.stroke();
-    }
-  }
-  // Layer-2 <-> Layer-2 edges (same-genre neighbors / same-author pairs)
-  ctx.strokeStyle=lineColor;
-  const edgeBase=Math.min(0.4,0.18+(s-1)*0.08); // fainter overview, fuller once zoomed in
-  for(const [i,j] of GLOBE.edges){
-    const A=GLOBE.nodes[i],B=GLOBE.nodes[j];
-    ctx.globalAlpha=dim(A.g)?0.05:(GLOBE.highlightGenre===A.g?0.6:edgeBase);
-    const pa=proj[A.id],pb=proj[B.id];
-    ctx.beginPath();ctx.moveTo(pa.sx,pa.sy);ctx.lineTo(pb.sx,pb.sy);ctx.stroke();
-  }
-  ctx.globalAlpha=1;
-
-  // Layer 2: anchor books
-  GLOBE.projected=[];
-  for(const A of GLOBE.nodes){
-    const p=proj[A.id];
-    const r=(2.6+Math.min(3,Math.sqrt(A.pop+1)*0.6))*Math.min(1.5,Math.max(0.55,s));
-    ctx.globalAlpha=dim(A.g)?0.15:1;
-    ctx.fillStyle=A.color;
-    ctx.beginPath();ctx.arc(p.sx,p.sy,r,0,Math.PI*2);ctx.fill();
-    GLOBE.projected.push({id:A.id,sx:p.sx,sy:p.sy,r});
-  }
-  ctx.globalAlpha=1;
-
-  // Layer 3: the rest of the catalog, riding along at their live parent's position. Every book
-  // is always technically present (so it's reachable/tappable), but faded low at the overview
-  // zoom and fading in as you zoom toward a cluster — full dot-clutter right from the default
-  // view was what made it feel messy; a gradual reveal keeps "all books are there" true while
-  // the overview itself stays calm.
-  const satAlpha=Math.min(0.65,0.1+(s-1)*0.12);
-  for(const S of GLOBE.satellites){
-    const P=GLOBE.nodes[S.parentIdx];
-    const sx=cx+(P.x+S.jx)*s, sy=cy+(P.y+S.jy)*s;
-    if(sx<-30||sx>w+30||sy<-30||sy>h+30)continue; // cheap off-screen cull
-    const r=1.6*Math.min(1.5,Math.max(0.6,s));
-    ctx.globalAlpha=dim(P.g)?0.08:satAlpha;
-    ctx.fillStyle=S.color;
-    ctx.beginPath();ctx.arc(sx,sy,r,0,Math.PI*2);ctx.fill();
-    GLOBE.projected.push({id:S.id,sx,sy,r:Math.max(r,8)}); // generous tap radius despite tiny draw size
-  }
-  ctx.globalAlpha=1;
-
-  // hub circles + names, drawn last so they always sit on top as the permanent "headers"
-  ctx.textAlign='center';
-  for(const H of hubs){
-    const hx=cx+H.x*s, hy=cy+H.y*s;
-    if(hx<-40||hx>w+40||hy<-40||hy>h+40)continue;
-    const on=GLOBE.highlightGenre===H.g, r=on?9:7;
-    ctx.globalAlpha=1;
-    ctx.fillStyle=H.color;
-    ctx.beginPath();ctx.arc(hx,hy,r,0,Math.PI*2);ctx.fill();
-    ctx.strokeStyle=textColor;ctx.lineWidth=1.5;
-    ctx.beginPath();ctx.arc(hx,hy,r,0,Math.PI*2);ctx.stroke();
-    ctx.font='bold 12px -apple-system,BlinkMacSystemFont,sans-serif';
-    ctx.fillStyle=textColor;
-    ctx.fillText(H.g,hx,hy-r-6);
-    GLOBE.projected.unshift({id:'hub:'+H.g,sx:hx,sy:hy,r:16}); // unshift: hubs win hit-test ties
-  }
-
-  // book titles: a small, readable set at the overview zoom, growing gradually as you zoom
-  // in — jumping straight from "top 15" to "all 221" at a small zoom was the main source of
-  // clutter, since 221 labels can't all be readable at once regardless of how sparse the dots
-  // are. Layer-3 satellite titles only start appearing once zoomed in well past that.
-  ctx.font='11px -apple-system,BlinkMacSystemFont,sans-serif';ctx.fillStyle=textColor;
-  const anchorLabelCount=Math.round(Math.min(221,12+Math.max(0,s-1)*55));
-  const anchorPool=GLOBE.nodes.slice().sort((a,b)=>b.pop-a.pop).slice(0,anchorLabelCount);
-  for(const A of anchorPool){
-    if(dim(A.g))continue;
-    const p=proj[A.id];
-    if(p.sx<-20||p.sx>w+20||p.sy<-20||p.sy>h+20)continue;
-    let title=A.t||'';if(title.length>16)title=title.slice(0,15)+'…';
-    ctx.fillText(title,p.sx,p.sy+13);
-  }
-  if(s>2.4){
-    const satLabelCap=Math.round(Math.min(60,(s-2.4)*22));
-    let labeled=0;
-    for(const S of GLOBE.satellites){
-      if(labeled>=satLabelCap)break;
-      const P=GLOBE.nodes[S.parentIdx];
-      if(dim(P.g))continue;
-      const sx=cx+(P.x+S.jx)*s, sy=cy+(P.y+S.jy)*s;
-      if(sx<-10||sx>w+10||sy<-10||sy>h+10)continue;
-      let title=S.t||'';if(title.length>14)title=title.slice(0,13)+'…';
-      ctx.fillText(title,sx,sy+9);
-      labeled++;
-    }
-  }
-}
-function globeTick(){
-  // Physics stays paused for a few seconds of stillness after any touch, not just during the
-  // touch itself — resuming the instant a finger lifts made it hard to actually tap a book
-  // right after zooming/panning to it, since the nodes would already be sliding away again.
-  if(!globeSimPaused)globeSimStep();
-  globeDraw();
-  GLOBE.raf=requestAnimationFrame(globeTick);
-}
-function hitTestGlobe(clientX,clientY){
-  const canvas=$('#globeCanvas');
-  const rect=canvas.getBoundingClientRect();
-  const x=clientX-rect.left, y=clientY-rect.top;
-  let best=null,bestD=18*18; // 18px tap-target radius, squared (compared against squared dist)
-  for(const p of GLOBE.projected){
-    const dx=p.sx-x, dy=p.sy-y, d=dx*dx+dy*dy;
-    if(d<bestD){bestD=d;best=p;}
-  }
-  return best;
-}
-let openedFromGlobe=false;
-// var (not let) so it's also reachable as window.openedFromLibGame — the library-game module
-// script runs in its own module scope and can only hand state back through window properties.
-var openedFromLibGame=false;
-function onGlobeNodeTap(id){
-  haptic();
-  if(GLOBE.raf){cancelAnimationFrame(GLOBE.raf);GLOBE.raf=null;} // pause while the sheet covers it
-  openedFromGlobe=true;
-  openDetail(id);
-}
-function onHubTap(genre){
-  haptic();
-  GLOBE.highlightGenre = GLOBE.highlightGenre===genre ? null : genre;
-}
-function onGlobeTap(id){
-  if(id.startsWith('hub:'))onHubTap(id.slice(4));
-  else onGlobeNodeTap(id);
-}
-const globePointers=new Map();
-let globeDrag=null, globePinch=null, globeSimPaused=false, globeResumeTimer=null;
-const GLOBE_RESUME_DELAY=3000; // how long the map holds still after you let go, so there's a
-                                 // real window to actually tap a book before it drifts again
-// Zooms toward a specific screen point (pinch midpoint, cursor position, or canvas center for
-// the +/- buttons) instead of always toward the canvas center — keeps whatever you're actually
-// looking at under your fingers/cursor as it grows, like any normal map.
-function zoomToward(px,py,newZoom){
-  const canvas=$('#globeCanvas');
-  if(!canvas)return;
-  const w=canvas.clientWidth,h=canvas.clientHeight;
-  newZoom=Math.max(0.4,Math.min(26,newZoom));
-  const wx=(px-(w/2+GLOBE.panX))/GLOBE.zoom, wy=(py-(h/2+GLOBE.panY))/GLOBE.zoom;
-  GLOBE.zoom=newZoom;
-  GLOBE.panX=px-w/2-wx*newZoom;
-  GLOBE.panY=py-h/2-wy*newZoom;
-}
-function globePauseThenResume(){
-  globeSimPaused=true;
-  clearTimeout(globeResumeTimer);
-  globeResumeTimer=setTimeout(()=>{globeSimPaused=false;},GLOBE_RESUME_DELAY);
-}
-function wireGlobeInteraction(){
-  const canvas=$('#globeCanvas');
-  function pinchDist(){const pts=[...globePointers.values()];return pts.length<2?0:Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);}
-  function pinchMid(){
-    const pts=[...globePointers.values()];
-    const rect=canvas.getBoundingClientRect();
-    return {x:(pts[0].x+pts[1].x)/2-rect.left, y:(pts[0].y+pts[1].y)/2-rect.top};
-  }
-  canvas.addEventListener('pointerdown',e=>{
-    canvas.setPointerCapture(e.pointerId);
-    globeSimPaused=true;
-    clearTimeout(globeResumeTimer);
-    globePointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
-    if(globePointers.size===1){
-      globeDrag={x0:e.clientX,y0:e.clientY,panX0:GLOBE.panX,panY0:GLOBE.panY,moved:false};
-    } else if(globePointers.size===2){
-      globeDrag=null;
-      globePinch={d0:pinchDist(),zoom0:GLOBE.zoom};
-    }
-  });
-  canvas.addEventListener('pointermove',e=>{
-    if(!globePointers.has(e.pointerId))return;
-    globePointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
-    if(globePinch && globePointers.size>=2){
-      const d=pinchDist();
-      if(d>0&&globePinch.d0>0){
-        const mid=pinchMid();
-        zoomToward(mid.x,mid.y,globePinch.zoom0*(d/globePinch.d0));
-      }
-      return;
-    }
-    if(!globeDrag)return;
-    const dx=e.clientX-globeDrag.x0, dy=e.clientY-globeDrag.y0;
-    if(!globeDrag.moved && Math.hypot(dx,dy)>6)globeDrag.moved=true;
-    GLOBE.panX=globeDrag.panX0+dx;
-    GLOBE.panY=globeDrag.panY0+dy;
-  });
-  function release(e){
-    if(globePointers.has(e.pointerId)){
-      if(globePointers.size===1 && globeDrag && !globeDrag.moved){
-        const hit=hitTestGlobe(e.clientX,e.clientY);
-        if(hit)onGlobeTap(hit.id);
-      }
-      globePointers.delete(e.pointerId);
-    }
-    // Lifting one finger out of a 2-finger pinch used to leave BOTH globeDrag and globePinch
-    // null while the other finger was still down — physics would resume mid-touch and the
-    // remaining finger stopped panning, which read as the map "breaking"/jumping right as you
-    // let go. Hand off to a fresh drag anchored at the remaining finger instead.
-    if(globePointers.size>=2){
-      globePinch={d0:pinchDist(),zoom0:GLOBE.zoom};
-      globeDrag=null;
-    } else if(globePointers.size===1){
-      globePinch=null;
-      const remaining=[...globePointers.values()][0];
-      globeDrag={x0:remaining.x,y0:remaining.y,panX0:GLOBE.panX,panY0:GLOBE.panY,moved:true};
-    } else {
-      globePinch=null;
-      globeDrag=null;
-      globePauseThenResume(); // fully released — hold still before the sim drifts again
-    }
-  }
-  canvas.addEventListener('pointerup',release);
-  canvas.addEventListener('pointercancel',release);
-  canvas.addEventListener('wheel',e=>{
-    const rect=canvas.getBoundingClientRect();
-    zoomToward(e.clientX-rect.left,e.clientY-rect.top,GLOBE.zoom-e.deltaY*0.0015);
-    e.preventDefault();
-    globePauseThenResume();
-  },{passive:false});
-  $('#globeZoomIn').onclick=()=>{
-    const canvas=$('#globeCanvas');
-    zoomToward(canvas.clientWidth/2,canvas.clientHeight/2,GLOBE.zoom*1.35);
-    haptic();globePauseThenResume();
-  };
-  $('#globeZoomOut').onclick=()=>{
-    const canvas=$('#globeCanvas');
-    zoomToward(canvas.clientWidth/2,canvas.clientHeight/2,GLOBE.zoom/1.35);
-    haptic();globePauseThenResume();
-  };
-}
-function openGlobe(){
-  if(!DB.books.length){toast('Kutubxona hali yuklanmoqda...');return;}
-  if(!GLOBE.built){buildGlobe();wireGlobeInteraction();}
-  $('#globe').classList.add('open');
-  tg?.BackButton?.show();
-  if(!GLOBE.raf)GLOBE.raf=requestAnimationFrame(globeTick);
-  trackEvent('books_map_open');
-}
-function closeGlobe(){
-  $('#globe').classList.remove('open');
-  tg?.BackButton?.hide();
-  if(GLOBE.raf){cancelAnimationFrame(GLOBE.raf);GLOBE.raf=null;}
-}
-$('#btnGlobe').onclick=()=>{haptic();openGlobe();};
-$('#globeClose').onclick=()=>closeGlobe();
 
 // Library adventure mini-game (Stage 0): first-person 3D scene, implemented in the
 // type="module" script below (needs ES-module Three.js) — openLibGame/closeLibGame
@@ -1412,8 +995,7 @@ function closeSheet(){
   // closing via the native/Telegram back button, the backdrop tap, or a swipe all bypass that
   // button entirely, and previously left the map's render loop frozen (paused, never resumed)
   // whenever the sheet was opened from it and closed any other way.
-  if(openedFromGlobe && !GLOBE.raf)GLOBE.raf=requestAnimationFrame(globeTick);
-  openedFromGlobe=false;
+  if(openedFromGlobe){window.globeResumeAfterDetail?.();openedFromGlobe=false;}
   if(openedFromLibGame){window.lgResumeAfterDetail?.();openedFromLibGame=false;}
 }
 
@@ -1867,6 +1449,493 @@ boot();
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
 import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js";
 import * as SkeletonUtils from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/utils/SkeletonUtils.js";
+
+
+// ============================================================================================
+// Books "Planet" — a real rotatable 3D sphere replacing the old flat force-directed map. Every
+// book still lives somewhere (nothing was dropped): each genre claims a region of the sphere
+// (a Fibonacci-sphere seed point, evenly spread so genres don't crowd each other), its most
+// popular books ("anchors", same selection rule as the old map: top ~200*share by popScore)
+// scatter near that seed as small glowing markers, and the rest of the catalog ("satellites",
+// thousands of books) rides along near its own anchor as one cheap GPU point cloud — same
+// anchor/satellite split as before, just placed on a sphere instead of settled by 2D physics.
+// Drag rotates the planet (not the camera — simpler, and avoids gimbal issues), pinch/wheel/
+// buttons dolly the camera in and out, and it auto-rotates gently when nobody's touching it.
+const PLANET_RADIUS = 40;
+const PLANET = {
+  built: false, scene: null, camera: null, renderer: null, group: null, raf: null,
+  hubs: [], anchors: [], anchorSprites: [], anchorLabels: [], hubSprites: [], hubLabels: [],
+  satPositions: null, satIds: [], satPoints: null,
+  highlightGenre: null, raycaster: null,
+  cameraDist: 118, minDist: 52, maxDist: 260,
+  pointers: new Map(), drag: null, pinch: null,
+  autoRotPaused: false, resumeTimer: null,
+  pitch: -0.15,
+};
+const PLANET_RESUME_DELAY = 2000;
+
+function planetPopScore(b) { return (b.dl || 0) * 3 + (b.rc ? b.rt * b.rc : 0) + (b.hc ? 2 : 0); }
+
+// Evenly spread N points on a unit sphere (standard Fibonacci-sphere construction) — used both
+// for the per-genre "continent" seed points and, indirectly, informs the anchor jitter radius.
+function fibonacciSpherePoint(i, n) {
+  const golden = Math.PI * (3 - Math.sqrt(5));
+  const y = n <= 1 ? 0 : 1 - (i / (n - 1)) * 2;
+  const radiusAtY = Math.sqrt(Math.max(0, 1 - y * y));
+  const theta = golden * i;
+  return { x: Math.cos(theta) * radiusAtY, y, z: Math.sin(theta) * radiusAtY };
+}
+
+// Nudges a point that's already ON the unit sphere sideways within its own tangent plane, then
+// re-normalizes back onto the sphere — the standard way to "jitter near a point" on a sphere
+// surface without the offset distorting into 3D depth. angleHash/distHash (0..1) pick a
+// deterministic, book-specific direction+distance so the same book always lands in the same
+// spot (matches the old map's hash-seeded, non-random layout — a re-open shouldn't reshuffle).
+function sphereJitter(seed, spreadRad, angleHash, distHash) {
+  const up = Math.abs(seed.y) < 0.99 ? { x: 0, y: 1, z: 0 } : { x: 1, y: 0, z: 0 };
+  let tx = seed.y * up.z - seed.z * up.y, ty = seed.z * up.x - seed.x * up.z, tz = seed.x * up.y - seed.y * up.x;
+  const tl = Math.hypot(tx, ty, tz) || 1; tx /= tl; ty /= tl; tz /= tl;
+  const bx = seed.y * tz - seed.z * ty, by = seed.z * tx - seed.x * tz, bz = seed.x * ty - seed.y * tx;
+  const angle = angleHash * Math.PI * 2;
+  const dist = spreadRad * Math.sqrt(distHash); // sqrt: uniform over the disk, not bunched at center
+  const ox = Math.cos(angle) * dist, oy = Math.sin(angle) * dist;
+  let nx = seed.x + tx * ox + bx * oy, ny = seed.y + ty * ox + by * oy, nz = seed.z + tz * ox + bz * oy;
+  const nl = Math.hypot(nx, ny, nz) || 1;
+  return { x: nx / nl, y: ny / nl, z: nz / nl };
+}
+
+let planetDotTexture = null;
+function getPlanetDotTexture() {
+  if (planetDotTexture) return planetDotTexture;
+  const c = document.createElement('canvas'); c.width = 64; c.height = 64;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.5, 'rgba(255,255,255,0.85)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, 64, 64);
+  planetDotTexture = new THREE.CanvasTexture(c);
+  return planetDotTexture;
+}
+function makePlanetTextSprite(text, colorCss, fontPx) {
+  const c = document.createElement('canvas');
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const padX = 10, h = (fontPx + 10) * dpr;
+  const ctx0 = c.getContext('2d');
+  ctx0.font = `700 ${fontPx * dpr}px -apple-system,BlinkMacSystemFont,sans-serif`;
+  const w = Math.ceil(ctx0.measureText(text).width) + padX * 2 * dpr;
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  ctx.font = `700 ${fontPx * dpr}px -apple-system,BlinkMacSystemFont,sans-serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(0,0,0,0.65)'; ctx.shadowBlur = 5 * dpr;
+  ctx.fillStyle = colorCss;
+  ctx.fillText(text, w / 2, h / 2);
+  const tex = new THREE.CanvasTexture(c);
+  tex.minFilter = THREE.LinearFilter;
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
+  const sprite = new THREE.Sprite(mat);
+  const scale = 11 / fontPx; // world-units-per-px, tuned against PLANET_RADIUS=40
+  sprite.scale.set((w / dpr) * scale * 0.09, (h / dpr) * scale * 0.09, 1);
+  return sprite;
+}
+
+// Fresnel-glow shell (classic "glowing planet" rim-light look) — a slightly larger sphere,
+// rendered back-face-only with additive blending, brightest where the surface grazes away from
+// the camera. No textures, just a view/normal dot product in the fragment shader.
+function makePlanetGlow(radius, colorHex) {
+  const geo = new THREE.SphereGeometry(radius, 48, 32);
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { glowColor: { value: new THREE.Color(colorHex) } },
+    vertexShader: `
+      varying vec3 vNormal;
+      void main() {
+        vNormal = normalize(normalMatrix * normal);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`,
+    fragmentShader: `
+      varying vec3 vNormal;
+      uniform vec3 glowColor;
+      void main() {
+        float intensity = pow(0.62 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.6);
+        gl_FragColor = vec4(glowColor, clamp(intensity, 0.0, 1.0));
+      }`,
+    side: THREE.BackSide, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false,
+  });
+  return new THREE.Mesh(geo, mat);
+}
+
+function planetPalette() {
+  const style = getComputedStyle(document.documentElement);
+  const v = (name, fb) => (style.getPropertyValue(name).trim() || fb);
+  return { bg: v('--bg', '#0b0e15'), card: v('--card2', '#1a2133'), line: v('--line', '#232a3d'),
+    text: v('--text', '#eef1f8'), accent: v('--accent', '#5b8cff') };
+}
+
+function buildPlanet() {
+  const pal = planetPalette();
+  const byGenre = {};
+  for (const b of DB.books) (byGenre[b.g || '?'] = byGenre[b.g || '?'] || []).push(b);
+  const total = DB.books.length || 1;
+  const genreList = Object.keys(byGenre).sort((a, b) => byGenre[b].length - byGenre[a].length);
+
+  let anchors = [];
+  const genreOf = {};
+  for (const g of genreList) {
+    const bucket = byGenre[g];
+    const k = Math.max(6, Math.round(200 * bucket.length / total));
+    const sorted = bucket.slice().sort((x, y) => {
+      const d = planetPopScore(y) - planetPopScore(x);
+      return d !== 0 ? d : hash31(x.i) - hash31(y.i);
+    });
+    for (const b of sorted.slice(0, k)) genreOf[b.i] = g;
+    anchors = anchors.concat(sorted.slice(0, k));
+  }
+
+  const genreColor = {}, genreSeed = {};
+  genreList.forEach((g, i) => {
+    genreColor[g] = CLUSTER_COLORS[i % CLUSTER_COLORS.length];
+    genreSeed[g] = fibonacciSpherePoint(i, genreList.length);
+  });
+
+  const scene = new THREE.Scene();
+  const canvas = document.getElementById('globeCanvas');
+  const camera = new THREE.PerspectiveCamera(52, canvas.clientWidth / Math.max(1, canvas.clientHeight), 0.1, 2000);
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  const bgColor = new THREE.Color(pal.bg);
+  renderer.setClearColor(bgColor, 1);
+  scene.background = bgColor;
+  scene.fog = new THREE.FogExp2(bgColor.getHex(), 0.0022);
+
+  const group = new THREE.Group();
+  scene.add(group);
+
+  // Planet body: a solid core (keeps back-side markers hidden via normal depth-testing, exactly
+  // like a real globe) plus a faint wireframe "graticule" for that map-globe read, plus the
+  // fresnel glow shell for atmosphere.
+  const core = new THREE.Mesh(
+    new THREE.SphereGeometry(PLANET_RADIUS * 0.985, 48, 32),
+    new THREE.MeshBasicMaterial({ color: new THREE.Color(pal.card) })
+  );
+  group.add(core);
+  const grid = new THREE.Mesh(
+    new THREE.SphereGeometry(PLANET_RADIUS, 24, 16),
+    new THREE.MeshBasicMaterial({ color: new THREE.Color(pal.line), wireframe: true, transparent: true, opacity: 0.35 })
+  );
+  group.add(grid);
+  group.add(makePlanetGlow(PLANET_RADIUS * 1.14, pal.accent));
+
+  const dotTex = getPlanetDotTexture();
+
+  // Hubs: one glowing marker + floating label per genre, fixed at its seed point — the
+  // "continent capitals." Tapping one toggles a highlight that dims every other genre.
+  const hubs = [], hubSprites = [], hubLabels = [];
+  for (const g of genreList) {
+    const seed = genreSeed[g];
+    const pos = { x: seed.x * PLANET_RADIUS, y: seed.y * PLANET_RADIUS, z: seed.z * PLANET_RADIUS };
+    const mat = new THREE.SpriteMaterial({ map: dotTex, color: new THREE.Color(genreColor[g]), transparent: true, depthTest: true });
+    const sprite = new THREE.Sprite(mat);
+    sprite.position.set(pos.x, pos.y, pos.z);
+    sprite.scale.setScalar(6.2);
+    sprite.userData = { kind: 'hub', genre: g };
+    group.add(sprite);
+    const label = makePlanetTextSprite(g, pal.text, 15);
+    const lp = { x: seed.x * (PLANET_RADIUS + 7), y: seed.y * (PLANET_RADIUS + 7), z: seed.z * (PLANET_RADIUS + 7) };
+    label.position.set(lp.x, lp.y, lp.z);
+    label.userData = { kind: 'hubLabel', genre: g };
+    group.add(label);
+    hubs.push({ g, seed, pos, color: genreColor[g], count: byGenre[g].length });
+    hubSprites.push(sprite); hubLabels.push(label);
+  }
+
+  // Anchors: each genre's most popular books, scattered near their hub's seed point. Bigger
+  // sprite = more popular (same signal the old map used for node radius). Also gets a lifted
+  // "flight-path" arc back to its hub — cheap (bounded by anchor count, not O(n²)) and reads
+  // as a real network across the globe rather than a scatter of unconnected dots.
+  const ANCHOR_SPREAD = 0.30; // radians — keeps a genre's cluster well inside its fibonacci "cell"
+  const anchorObjs = [], anchorSprites = [], anchorLabels = [];
+  const anchorPosById = {};
+  const arcPositions = [];
+  for (const b of anchors) {
+    const g = genreOf[b.i] || '?';
+    const seed = genreSeed[g] || { x: 0, y: 1, z: 0 };
+    const dir = sphereJitter(seed, ANCHOR_SPREAD, (hash31(b.i + '#a') % 1000) / 1000, (hash31(b.i + '#d') % 1000) / 1000);
+    const pos = { x: dir.x * PLANET_RADIUS, y: dir.y * PLANET_RADIUS, z: dir.z * PLANET_RADIUS };
+    anchorPosById[b.i] = { dir, pos };
+    const pop = planetPopScore(b);
+    const scale = (2.4 + Math.min(3.4, Math.sqrt(pop + 1) * 0.55));
+    const color = genreColor[g];
+    const mat = new THREE.SpriteMaterial({ map: dotTex, color: new THREE.Color(color), transparent: true, depthTest: true });
+    const sprite = new THREE.Sprite(mat);
+    sprite.position.set(pos.x, pos.y, pos.z);
+    sprite.scale.setScalar(scale);
+    sprite.userData = { kind: 'anchor', id: b.i, genre: g };
+    group.add(sprite);
+
+    let title = b.t || ''; if (title.length > 20) title = title.slice(0, 19) + '…';
+    const label = makePlanetTextSprite(title, pal.text, 11);
+    const lift = { x: dir.x * (PLANET_RADIUS + 3.2), y: dir.y * (PLANET_RADIUS + 3.2) + 2.6, z: dir.z * (PLANET_RADIUS + 3.2) };
+    label.position.set(lift.x, lift.y, lift.z);
+    label.userData = { kind: 'anchorLabel', pop };
+    label.visible = false;
+    group.add(label);
+
+    anchorObjs.push({ id: b.i, t: b.t, g, pop, dir, pos });
+    anchorSprites.push(sprite); anchorLabels.push(label);
+
+    // Arc: hub -> anchor, control point lifted radially outward at the midpoint so it bows up
+    // off the surface instead of cutting a straight chord through the planet.
+    const hs = genreSeed[g];
+    const midDir = { x: hs.x + dir.x, y: hs.y + dir.y, z: hs.z + dir.z };
+    const midLen = Math.hypot(midDir.x, midDir.y, midDir.z) || 1;
+    const liftR = PLANET_RADIUS * 1.09;
+    const ctrl = new THREE.Vector3(midDir.x / midLen * liftR, midDir.y / midLen * liftR, midDir.z / midLen * liftR);
+    const curve = new THREE.QuadraticBezierCurve3(
+      new THREE.Vector3(hs.x * PLANET_RADIUS, hs.y * PLANET_RADIUS, hs.z * PLANET_RADIUS), ctrl,
+      new THREE.Vector3(pos.x, pos.y, pos.z)
+    );
+    const pts = curve.getPoints(10);
+    for (let i = 0; i < pts.length - 1; i++) arcPositions.push(pts[i].x, pts[i].y, pts[i].z, pts[i + 1].x, pts[i + 1].y, pts[i + 1].z);
+  }
+  const arcGeo = new THREE.BufferGeometry();
+  arcGeo.setAttribute('position', new THREE.Float32BufferAttribute(arcPositions, 3));
+  const arcs = new THREE.LineSegments(arcGeo, new THREE.LineBasicMaterial({ color: new THREE.Color(pal.line), transparent: true, opacity: 0.35 }));
+  group.add(arcs);
+
+  // Satellites: everything else (thousands of books) — one GPU point cloud, no per-book scene
+  // object. Rides near its parent anchor (or, if its author has no anchor, hash-spread across
+  // its genre's anchors) exactly like the old map's fallback rule.
+  const anchorIdSet = new Set(anchors.map(a => a.i));
+  const primaryAnchorByAuthor = {};
+  for (const b of anchors) if (isKnownAuthor(b.a) && !(b.a in primaryAnchorByAuthor)) primaryAnchorByAuthor[b.a] = b.i;
+  const anchorsByGenre = {};
+  for (const g of genreList) anchorsByGenre[g] = anchors.filter(a => (genreOf[a.i] || '?') === g);
+  const satPos = [], satColor = [], satIds = [];
+  const SAT_SPREAD = 0.045;
+  for (const b of DB.books) {
+    if (anchorIdSet.has(b.i)) continue;
+    let parentId = isKnownAuthor(b.a) && primaryAnchorByAuthor[b.a];
+    if (!parentId) {
+      const bucket = anchorsByGenre[b.g || '?'];
+      if (bucket && bucket.length) parentId = bucket[hash31(b.i + '#gp') % bucket.length].i;
+    }
+    if (!parentId || !anchorPosById[parentId]) continue;
+    const parent = anchorPosById[parentId];
+    const dir = sphereJitter(parent.dir, SAT_SPREAD, (hash31(b.i + '#sa') % 1000) / 1000, (hash31(b.i + '#sd') % 1000) / 1000);
+    const r = PLANET_RADIUS * (1.001 + ((hash31(b.i + '#sr') % 100) / 100) * 0.02);
+    satPos.push(dir.x * r, dir.y * r, dir.z * r);
+    const c = new THREE.Color(genreColor[genreOf[parentId] || '?']);
+    satColor.push(c.r, c.g, c.b);
+    satIds.push(b.i);
+  }
+  const satGeo = new THREE.BufferGeometry();
+  satGeo.setAttribute('position', new THREE.Float32BufferAttribute(satPos, 3));
+  satGeo.setAttribute('color', new THREE.Float32BufferAttribute(satColor, 3));
+  const satMat = new THREE.PointsMaterial({ size: 1.6, map: dotTex, vertexColors: true, transparent: true, depthWrite: false, sizeAttenuation: true, opacity: 0.78 });
+  const satPoints = new THREE.Points(satGeo, satMat);
+  group.add(satPoints);
+
+  camera.position.set(0, 0, PLANET.cameraDist);
+  camera.lookAt(0, 0, 0);
+  group.rotation.x = PLANET.pitch;
+
+  PLANET.scene = scene; PLANET.camera = camera; PLANET.renderer = renderer; PLANET.group = group;
+  PLANET.hubs = hubs; PLANET.hubSprites = hubSprites; PLANET.hubLabels = hubLabels;
+  PLANET.anchors = anchorObjs; PLANET.anchorSprites = anchorSprites; PLANET.anchorLabels = anchorLabels;
+  PLANET.satPoints = satPoints; PLANET.satIds = satIds;
+  PLANET.raycaster = new THREE.Raycaster();
+  PLANET.raycaster.params.Points.threshold = 1.1;
+  PLANET.genreColor = genreColor;
+  PLANET.built = true;
+  renderGlobeLegend(byGenre, genreColor);
+  planetApplyHighlight();
+}
+
+function renderGlobeLegend(byGenre, genreColor) {
+  const el = document.getElementById('globeLegend');
+  if (!el) return;
+  const rows = Object.keys(genreColor)
+    .sort((a, b) => (byGenre[b]?.length || 0) - (byGenre[a]?.length || 0))
+    .map(g => `<div class="lg-row"><span class="lg-dot" style="background:${genreColor[g]}"></span>${esc(g)} <b>${byGenre[g] ? byGenre[g].length : 0}</b></div>`)
+    .join('');
+  el.innerHTML = rows;
+}
+
+function planetApplyHighlight() {
+  const hi = PLANET.highlightGenre;
+  for (const s of PLANET.hubSprites) s.material.opacity = !hi || s.userData.genre === hi ? 1 : 0.25;
+  for (const s of PLANET.anchorSprites) s.material.opacity = !hi || s.userData.genre === hi ? 1 : 0.12;
+}
+
+function planetResize() {
+  if (!PLANET.renderer) return;
+  const canvas = document.getElementById('globeCanvas');
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (w < 2 || h < 2) return;
+  PLANET.camera.aspect = w / h;
+  PLANET.camera.updateProjectionMatrix();
+  PLANET.renderer.setSize(w, h, false);
+}
+
+function planetPauseThenResumeAutoRotate() {
+  PLANET.autoRotPaused = true;
+  clearTimeout(PLANET.resumeTimer);
+  PLANET.resumeTimer = setTimeout(() => { PLANET.autoRotPaused = false; }, PLANET_RESUME_DELAY);
+}
+
+let planetLastTs = 0;
+function planetTick(ts) {
+  const dt = planetLastTs ? Math.min(0.05, (ts - planetLastTs) / 1000) : 0.016;
+  planetLastTs = ts;
+  if (!PLANET.autoRotPaused && !PLANET.drag && !PLANET.pinch) PLANET.group.rotation.y += 0.045 * dt;
+  // Reveal anchor titles for the most popular books once zoomed in close enough — mirrors the
+  // old map's "labels grow as you zoom" progressive reveal instead of dumping 200 at once.
+  const zoomT = 1 - (PLANET.cameraDist - PLANET.minDist) / (PLANET.maxDist - PLANET.minDist); // 0 far .. 1 close
+  const labelCap = Math.round(Math.max(0, Math.min(200, (zoomT - 0.15) / 0.85 * 200)));
+  if (labelCap !== PLANET._lastLabelCap) {
+    PLANET._lastLabelCap = labelCap;
+    const byPop = PLANET.anchors.map((a, i) => [a.pop, i]).sort((x, y) => y[0] - x[0]);
+    for (let k = 0; k < byPop.length; k++) {
+      const idx = byPop[k][1];
+      PLANET.anchorLabels[idx].visible = k < labelCap;
+    }
+  }
+  PLANET.camera.position.set(0, 0, PLANET.cameraDist);
+  PLANET.renderer.render(PLANET.scene, PLANET.camera);
+  PLANET.raf = requestAnimationFrame(planetTick);
+}
+
+function planetHitTest(clientX, clientY) {
+  const canvas = document.getElementById('globeCanvas');
+  const rect = canvas.getBoundingClientRect();
+  const ndc = new THREE.Vector2(
+    ((clientX - rect.left) / rect.width) * 2 - 1,
+    -((clientY - rect.top) / rect.height) * 2 + 1
+  );
+  PLANET.raycaster.setFromCamera(ndc, PLANET.camera);
+  const targets = PLANET.hubSprites.concat(PLANET.anchorSprites);
+  const hits = PLANET.raycaster.intersectObjects(targets, false);
+  if (hits.length) {
+    const ud = hits[0].object.userData;
+    return ud.kind === 'hub' ? { kind: 'hub', genre: ud.genre } : { kind: 'book', id: ud.id };
+  }
+  const satHits = PLANET.raycaster.intersectObject(PLANET.satPoints, false);
+  if (satHits.length) {
+    const id = PLANET.satIds[satHits[0].index];
+    if (id) return { kind: 'book', id };
+  }
+  return null;
+}
+
+function onPlanetTap(hit) {
+  if (!hit) return;
+  haptic();
+  if (hit.kind === 'hub') {
+    PLANET.highlightGenre = PLANET.highlightGenre === hit.genre ? null : hit.genre;
+    planetApplyHighlight();
+    return;
+  }
+  if (PLANET.raf) { cancelAnimationFrame(PLANET.raf); PLANET.raf = null; }
+  openedFromGlobe = true;
+  window.openDetail(hit.id);
+}
+
+function planetZoomBy(factor) {
+  PLANET.cameraDist = Math.max(PLANET.minDist, Math.min(PLANET.maxDist, PLANET.cameraDist / factor));
+}
+
+function wirePlanetInteraction() {
+  const canvas = document.getElementById('globeCanvas');
+  function pinchDist() { const pts = [...PLANET.pointers.values()]; return pts.length < 2 ? 0 : Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y); }
+  canvas.addEventListener('pointerdown', e => {
+    // A rejected setPointerCapture (invalid/inactive pointer id — synthetic-event test harnesses
+    // hit this, and it's cheap insurance against any real-world edge case too) must never abort
+    // the rest of this handler: that would silently break both drag-rotate AND tap-to-select
+    // for that whole pointer session, reading to a player as "I touch it and nothing happens."
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+    PLANET.autoRotPaused = true;
+    clearTimeout(PLANET.resumeTimer);
+    PLANET.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (PLANET.pointers.size === 1) {
+      PLANET.drag = { x0: e.clientX, y0: e.clientY, ry0: PLANET.group.rotation.y, rx0: PLANET.group.rotation.x, moved: false };
+    } else if (PLANET.pointers.size === 2) {
+      PLANET.drag = null;
+      PLANET.pinch = { d0: pinchDist(), dist0: PLANET.cameraDist };
+    }
+  });
+  canvas.addEventListener('pointermove', e => {
+    if (!PLANET.pointers.has(e.pointerId)) return;
+    PLANET.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (PLANET.pinch && PLANET.pointers.size >= 2) {
+      const d = pinchDist();
+      if (d > 0 && PLANET.pinch.d0 > 0) {
+        PLANET.cameraDist = Math.max(PLANET.minDist, Math.min(PLANET.maxDist, PLANET.pinch.dist0 * (PLANET.pinch.d0 / d)));
+      }
+      return;
+    }
+    if (!PLANET.drag) return;
+    const dx = e.clientX - PLANET.drag.x0, dy = e.clientY - PLANET.drag.y0;
+    if (!PLANET.drag.moved && Math.hypot(dx, dy) > 6) PLANET.drag.moved = true;
+    PLANET.group.rotation.y = PLANET.drag.ry0 + dx * 0.0072;
+    PLANET.group.rotation.x = Math.max(-1.15, Math.min(1.15, PLANET.drag.rx0 + dy * 0.0072));
+  });
+  function release(e) {
+    if (PLANET.pointers.has(e.pointerId)) {
+      if (PLANET.pointers.size === 1 && PLANET.drag && !PLANET.drag.moved) {
+        onPlanetTap(planetHitTest(e.clientX, e.clientY));
+      }
+      PLANET.pointers.delete(e.pointerId);
+    }
+    if (PLANET.pointers.size >= 2) {
+      PLANET.pinch = { d0: pinchDist(), dist0: PLANET.cameraDist };
+      PLANET.drag = null;
+    } else if (PLANET.pointers.size === 1) {
+      PLANET.pinch = null;
+      const remaining = [...PLANET.pointers.values()][0];
+      PLANET.drag = { x0: remaining.x, y0: remaining.y, ry0: PLANET.group.rotation.y, rx0: PLANET.group.rotation.x, moved: true };
+    } else {
+      PLANET.pinch = null; PLANET.drag = null;
+      planetPauseThenResumeAutoRotate();
+    }
+  }
+  canvas.addEventListener('pointerup', release);
+  canvas.addEventListener('pointercancel', release);
+  canvas.addEventListener('wheel', e => {
+    planetZoomBy(e.deltaY < 0 ? 1.12 : 1 / 1.12);
+    e.preventDefault();
+    planetPauseThenResumeAutoRotate();
+  }, { passive: false });
+  document.getElementById('globeZoomIn').onclick = () => { planetZoomBy(1.3); haptic(); planetPauseThenResumeAutoRotate(); };
+  document.getElementById('globeZoomOut').onclick = () => { planetZoomBy(1 / 1.3); haptic(); planetPauseThenResumeAutoRotate(); };
+  window.addEventListener('resize', planetResize);
+}
+
+function openGlobe() {
+  if (!DB.books.length) { toast('Kutubxona hali yuklanmoqda...'); return; }
+  if (!PLANET.built) { buildPlanet(); wirePlanetInteraction(); }
+  planetResize();
+  document.getElementById('globe').classList.add('open');
+  window.Telegram?.WebApp?.BackButton?.show();
+  planetLastTs = 0;
+  if (!PLANET.raf) PLANET.raf = requestAnimationFrame(planetTick);
+  window.trackEvent?.('books_map_open');
+}
+function closeGlobe() {
+  document.getElementById('globe').classList.remove('open');
+  window.Telegram?.WebApp?.BackButton?.hide();
+  if (PLANET.raf) { cancelAnimationFrame(PLANET.raf); PLANET.raf = null; }
+}
+window.globeResumeAfterDetail = function () {
+  if (PLANET.built && document.getElementById('globe').classList.contains('open') && !PLANET.raf) {
+    planetLastTs = 0;
+    PLANET.raf = requestAnimationFrame(planetTick);
+  }
+};
+window.openGlobe = openGlobe;
+window.closeGlobe = closeGlobe;
+// ============================================================================================
+
 
 // Real trees + rigged character models (CC0, Kenney Nature Kit / Mini Characters — license
 // files alongside them in models/) instead of hand-rolled primitives: a genuine step toward
