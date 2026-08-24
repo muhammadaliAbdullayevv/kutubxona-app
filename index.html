@@ -535,7 +535,6 @@
     <div class="liveGrid">
       <div class="liveTile"><div class="liveTileN" id="liveTotalBooks">–</div><div class="liveTileL">📚 Kitoblar</div></div>
       <div class="liveTile"><div class="liveTileN" id="liveTotalAudiobooks">–</div><div class="liveTileL">🎧 Audiokitoblar</div></div>
-      <div class="liveTile"><div class="liveTileN" id="liveTotalUsers">–</div><div class="liveTileL">👤 Foydalanuvchilar</div></div>
       <div class="liveTile"><div class="liveTileN" id="liveTotalDownloads">–</div><div class="liveTileL">⬇️ Jami yuklab olishlar</div></div>
       <div class="liveTile"><div class="liveTileN" id="liveTotalSearches">–</div><div class="liveTileL">🔍 Jami qidiruvlar</div></div>
       <div class="liveTile"><div class="liveTileN" id="liveTotalFavorites">–</div><div class="liveTileL">❤️ Sevimlilar</div></div>
@@ -544,8 +543,11 @@
     </div>
 
     <div id="liveAdminSec" style="display:none">
-      <h3 class="liveSecTitle">🕵️ Faollik <span class="liveAdminTag">faqat sizga ko'rinadi</span></h3>
-      <div id="liveFeed"></div>
+      <h3 class="liveSecTitle">🕵️ Egasiga <span class="liveAdminTag">faqat sizga ko'rinadi</span></h3>
+      <div class="liveGrid">
+        <div class="liveTile"><div class="liveTileN" id="liveTotalUsers">–</div><div class="liveTileL">👤 Foydalanuvchilar</div></div>
+      </div>
+      <div id="liveFeed" style="margin-top:8px"></div>
     </div>
   </div>
 </div>
@@ -606,9 +608,11 @@ function livePresenceTick(){
   if(!canAct()||document.visibilityState!=='visible')return;
   api('/api/presence/ping',{method:'POST'}).catch(()=>{});
 }
+// total_users is deliberately absent here — the public /api/stats/live endpoint withholds it
+// (owner call), it's only ever populated from the owner-gated live-feed response below.
 const LIVE_STAT_FIELDS={
   total_searches:'liveTotalSearches', today_searches:'liveTodaySearches', today_downloads:'liveTodayDownloads',
-  total_books:'liveTotalBooks', total_audiobooks:'liveTotalAudiobooks', total_users:'liveTotalUsers',
+  total_books:'liveTotalBooks', total_audiobooks:'liveTotalAudiobooks',
   total_downloads:'liveTotalDownloads', total_favorites:'liveTotalFavorites', total_ratings:'liveTotalRatings',
   total_comments:'liveTotalComments',
 };
@@ -654,6 +658,7 @@ function liveRefreshAdminFeed(){
   if(!canAct())return;
   api('/api/admin/live-feed').then(r=>{
     $('#liveAdminSec').style.display='';
+    const tu=$('#liveTotalUsers');if(tu)tu.textContent=fmtNum((r.stats&&r.stats.total_users)||0);
     renderLiveFeed(r.events);
   }).catch(()=>{$('#liveAdminSec').style.display='none';});
 }
