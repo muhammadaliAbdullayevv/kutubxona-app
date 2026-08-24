@@ -186,6 +186,39 @@
   #apControls{display:flex; align-items:center; justify-content:center; gap:18px}
   #apControls button{border:none; background:none; color:var(--text); font-size:20px; cursor:pointer; padding:2px}
   #apSpeed{font-size:13px !important; font-weight:700; border:1px solid var(--line) !important; border-radius:10px; padding:4px 8px !important; background:var(--chip) !important}
+  /* Live stats ticker — public counters + real-time clock for everyone, an extra owner-only
+     activity feed layered on top when the viewer is the bot owner (server-enforced, not just a
+     hidden div: /api/admin/live-feed 403s for anyone else, so this section simply never
+     receives data to show for a normal user). */
+  .liveDot{display:inline-block; width:8px; height:8px; border-radius:50%; background:#3ecf6a; box-shadow:0 0 0 rgba(62,207,106,.6); animation:liveDotPulse 1.8s ease-out infinite; vertical-align:middle; margin-right:2px}
+  @keyframes liveDotPulse{0%{box-shadow:0 0 0 0 rgba(62,207,106,.55)}70%{box-shadow:0 0 0 7px rgba(62,207,106,0)}100%{box-shadow:0 0 0 0 rgba(62,207,106,0)}}
+  /* Its own row under the title, not squeezed into the already-full pill row (Qur'on/profile/
+     theme) — that row has no spare width left on a typical 375-420px phone. */
+  .liveHeaderRow{display:flex; justify-content:flex-end; margin:8px 0 2px}
+  .liveBadge{display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:var(--muted);
+    background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:5px 12px 5px 10px;
+    cursor:pointer; text-decoration:none; white-space:nowrap}
+  .liveBadge #btnLiveN{color:var(--text)}
+  #liveSheetc{padding:20px 18px calc(20px + env(safe-area-inset-bottom))}
+  .liveHead{text-align:center; padding:14px 0 20px}
+  .liveClock{font-size:38px; font-weight:800; letter-spacing:.5px; font-variant-numeric:tabular-nums; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    background:linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; background-clip:text; color:transparent}
+  .liveOnlineRow{margin-top:6px; font-size:13px; font-weight:700; color:var(--muted)}
+  .liveOnlineRow #liveOnline{color:var(--text)}
+  .liveGrid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:8px}
+  .liveTile{background:var(--card2); border:1px solid var(--line); border-radius:14px; padding:14px 8px; text-align:center}
+  .liveTileN{font-size:21px; font-weight:800; color:var(--text); font-variant-numeric:tabular-nums}
+  .liveTileL{font-size:11px; color:var(--muted); font-weight:600; margin-top:3px; line-height:1.3}
+  #liveAdminSec{margin-top:20px}
+  #liveAdminSec h3{font-size:13px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); margin:0 0 8px; display:flex; align-items:center; gap:8px}
+  .liveAdminTag{text-transform:none; letter-spacing:0; font-size:11px; font-weight:600; color:var(--accent); background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:3px 9px}
+  #liveFeed{display:flex; flex-direction:column; gap:6px; max-height:340px; overflow-y:auto}
+  .lfRow{display:flex; align-items:center; gap:10px; background:var(--card2); border:1px solid var(--line); border-radius:12px; padding:9px 12px}
+  .lfIcon{font-size:18px; flex-shrink:0}
+  .lfText{flex:1; min-width:0; font-size:13px; color:var(--text)}
+  .lfText b{font-weight:700}
+  .lfTime{font-size:11px; color:var(--muted); flex-shrink:0; font-variant-numeric:tabular-nums}
+  .lfEmpty{text-align:center; color:var(--muted); font-size:13px; padding:20px 0}
   #libgameCanvas{width:100%; height:100%; touch-action:none; display:block}
   .libctrls{position:fixed; right:16px; bottom:calc(env(safe-area-inset-bottom) + 16px); display:grid; grid-template-columns:repeat(3,50px); grid-template-rows:repeat(2,50px); gap:6px; z-index:1; touch-action:none}
   .libctrls button{border:1px solid var(--line); border-radius:14px; background:var(--chip); color:var(--text); font-size:19px; font-weight:700; font-family:inherit; display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0; box-shadow:var(--shadow); user-select:none}
@@ -384,6 +417,7 @@
 <div class="wrap">
   <header>
     <h1>📚 Kutubxona <a href="quran.html" style="float:right; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle">📖 Qur'on</a><a id="btnProfile" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer">👤</a><a id="btnTheme" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer">☀️</a></h1>
+    <div class="liveHeaderRow"><a id="btnLive" class="liveBadge"><span class="liveDot"></span><span id="btnLiveN">–</span> onlayn o'quvchi</a></div>
     <div class="searchbar">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
       <input id="q" type="search" placeholder="Kitob, muallif, mavzu…" autocomplete="off" enterkeyhint="search">
@@ -473,6 +507,24 @@
   <div id="pdfProgressTrack"><div id="pdfProgressFill"></div></div>
   <div id="pdfCanvasWrap"><canvas id="pdfCanvas"></canvas><div id="pdfLoading">Yuklanmoqda...</div></div>
 </div>
+<div class="sheet" id="liveSheet" style="z-index:47">
+  <div class="sheetc" id="liveSheetc">
+    <div class="gclose" id="liveClose">✕</div>
+    <div class="liveHead">
+      <div class="liveClock" id="liveClock">00:00:00.000</div>
+      <div class="liveOnlineRow"><span class="liveDot"></span><span id="liveOnline">0</span> onlayn o'quvchi</div>
+    </div>
+    <div class="liveGrid">
+      <div class="liveTile"><div class="liveTileN" id="liveTotalSearches">–</div><div class="liveTileL">Jami qidiruvlar</div></div>
+      <div class="liveTile"><div class="liveTileN" id="liveTodaySearches">–</div><div class="liveTileL">Bugun qidirildi</div></div>
+      <div class="liveTile"><div class="liveTileN" id="liveTodayDownloads">–</div><div class="liveTileL">Bugun yuklandi</div></div>
+    </div>
+    <div id="liveAdminSec" style="display:none">
+      <h3>🕵️ Faollik <span class="liveAdminTag">faqat sizga ko'rinadi</span></h3>
+      <div id="liveFeed"></div>
+    </div>
+  </div>
+</div>
 <div id="audioPlayer">
   <div id="apTop">
     <div id="apText"><div id="apTitle">—</div><div id="apPart">—</div></div>
@@ -515,6 +567,86 @@ function api(path,opts){
   return fetch(COMMUNITY_API_BASE+path,opts).then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); });
 }
 const canAct=()=>!!tg?.initData;
+
+// ---- live stats ticker + owner-only activity feed ----
+// Public numbers (online count, search/download counters, the clock) refresh continuously in
+// the background so the header badge stays current even with the panel closed. The clock and
+// the admin feed are the only pieces scoped to the panel actually being open — no point ticking
+// milliseconds or polling an owner-only endpoint nobody is looking at.
+function trackEvent(type){
+  if(!canAct())return;
+  api('/api/track/event',{method:'POST',body:JSON.stringify({type})}).catch(()=>{});
+}
+window.trackEvent=trackEvent;
+function livePresenceTick(){
+  if(!canAct()||document.visibilityState!=='visible')return;
+  api('/api/presence/ping',{method:'POST'}).catch(()=>{});
+}
+function liveRefreshPublicStats(){
+  api('/api/stats/live').then(r=>{
+    const n=fmtNum(r.online_count||0);
+    const bn=$('#btnLiveN');if(bn)bn.textContent=n;
+    const lo=$('#liveOnline');if(lo)lo.textContent=n;
+    const ts=$('#liveTotalSearches');if(ts)ts.textContent=fmtNum(r.total_searches||0);
+    const tds=$('#liveTodaySearches');if(tds)tds.textContent=fmtNum(r.today_searches||0);
+    const tdd=$('#liveTodayDownloads');if(tdd)tdd.textContent=fmtNum(r.today_downloads||0);
+  }).catch(()=>{});
+}
+let liveClockTimer=null,liveFeedTimer=null;
+function liveTickClock(){
+  const el=$('#liveClock');if(!el)return;
+  const d=new Date(),p=(n,w=2)=>String(n).padStart(w,'0');
+  el.textContent=`${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}.${p(d.getMilliseconds(),3)}`;
+}
+function fmtAgo(tsSec){
+  const s=Math.max(0,Math.round(Date.now()/1000-tsSec));
+  if(s<5)return 'hozir';
+  if(s<60)return s+' soniya oldin';
+  const m=Math.floor(s/60);
+  if(m<60)return m+' daqiqa oldin';
+  return Math.floor(m/60)+' soat oldin';
+}
+const LIVE_EVENT_LABELS={
+  app_open:['📱',"ilovani ochdi"],
+  books_map_open:['🌐',"kitoblar xaritasini ochdi"],
+  library_game_open:['🎮',"kutubxona o'yiniga kirdi"],
+};
+function renderLiveFeed(events){
+  const box=$('#liveFeed');if(!box)return;
+  if(!events||!events.length){box.innerHTML='<div class="lfEmpty">Hali faollik yo\'q</div>';return;}
+  box.innerHTML=events.map(e=>{
+    const[icon,label]=LIVE_EVENT_LABELS[e.type]||['👤','harakat qildi'];
+    return `<div class="lfRow"><span class="lfIcon">${icon}</span><span class="lfText"><b>${esc(e.name||'Reader')}</b> ${label}</span><span class="lfTime">${fmtAgo(e.ts)}</span></div>`;
+  }).join('');
+}
+function liveRefreshAdminFeed(){
+  if(!canAct())return;
+  api('/api/admin/live-feed').then(r=>{
+    $('#liveAdminSec').style.display='';
+    renderLiveFeed(r.events);
+  }).catch(()=>{$('#liveAdminSec').style.display='none';});
+}
+function openLiveSheet(){
+  haptic();
+  $('#liveSheet').classList.add('open');
+  tg?.BackButton?.show();
+  liveTickClock();
+  if(liveClockTimer)clearInterval(liveClockTimer);
+  liveClockTimer=setInterval(liveTickClock,47);
+  liveRefreshPublicStats();
+  liveRefreshAdminFeed();
+  if(liveFeedTimer)clearInterval(liveFeedTimer);
+  liveFeedTimer=setInterval(liveRefreshAdminFeed,4000);
+}
+function closeLiveSheet(){
+  $('#liveSheet').classList.remove('open');
+  tg?.BackButton?.hide();
+  if(liveClockTimer){clearInterval(liveClockTimer);liveClockTimer=null;}
+  if(liveFeedTimer){clearInterval(liveFeedTimer);liveFeedTimer=null;}
+}
+$('#btnLive').onclick=()=>openLiveSheet();
+$('#liveClose').onclick=()=>closeLiveSheet();
+$('#liveSheet').onclick=e=>{if(e.target.id==='liveSheet')closeLiveSheet();};
 const COVERS=[['#c17a3d','#8c4a24'],['#a8452f','#6b2418'],['#4a6b4a','#2d4530'],['#c99a2e','#8a5c16'],['#5a4a6b','#382d45'],['#8a3a4a','#5c2530'],['#3a6b6b','#254545'],['#b06a2a','#6b3816'],['#6b5a3a','#453825']];
 function coverFor(id){let h=0;const s=String(id||'');for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;return COVERS[h%COVERS.length];}
 function initials(t){return String(t||'?').replace(/[^\p{L}\p{N} ]/gu,'').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'📖';}
@@ -1114,6 +1246,7 @@ function openGlobe(){
   $('#globe').classList.add('open');
   tg?.BackButton?.show();
   if(!GLOBE.raf)GLOBE.raf=requestAnimationFrame(globeTick);
+  trackEvent('books_map_open');
 }
 function closeGlobe(){
   $('#globe').classList.remove('open');
@@ -1590,7 +1723,7 @@ function loadRating(bookId){
 
 // events
 let deb;
-$('#q').addEventListener('input',e=>{state.q=e.target.value.trim();state.all=false;$('#clr').style.display=state.q?'block':'none';clearTimeout(deb);deb=setTimeout(()=>{if(state.view!=='browse'){state.view='browse';setTabs();}run();},200);});
+$('#q').addEventListener('input',e=>{state.q=e.target.value.trim();state.all=false;$('#clr').style.display=state.q?'block':'none';clearTimeout(deb);deb=setTimeout(()=>{if(state.view!=='browse'){state.view='browse';setTabs();}run();if(state.q)api('/api/track/search',{method:'POST'}).catch(()=>{});},200);});
 $('#clr').onclick=()=>{$('#q').value='';state.q='';state.all=false;$('#clr').style.display='none';run();};
 $('#sort').onchange=e=>{state.sort=e.target.value;run();};
 $('#more').onclick=()=>{state.shown+=PAGE;render();};
@@ -1661,6 +1794,11 @@ async function boot(){
   }catch(e){$('#count').textContent='';$('#grid').innerHTML='';$('#empty').style.display='block';$('#empty').innerHTML='<span class="em">⚠️</span>Ma\'lumot yuklanmadi';return;}
   await loadFavs();
   renderChips();run();
+  trackEvent('app_open');
+  liveRefreshPublicStats();
+  setInterval(liveRefreshPublicStats,6000);
+  livePresenceTick();
+  setInterval(livePresenceTick,25000);
 }
 boot();
 </script>
@@ -3596,6 +3734,7 @@ function openLibGame() {
   window.Telegram?.WebApp?.BackButton?.show();
   lgLoadModels();
   lgConnectMultiplayer();
+  window.trackEvent?.('library_game_open');
 }
 function closeLibGame() {
   document.getElementById('libgame').classList.remove('open');
