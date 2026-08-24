@@ -1913,9 +1913,16 @@ function wirePlanetInteraction() {
 
 function openGlobe() {
   if (!DB.books.length) { toast('Kutubxona hali yuklanmoqda...'); return; }
+  // .open must land BEFORE anything reads canvas.clientWidth/clientHeight — the sheet is
+  // display:none until then, so the canvas measures 0x0 and both the very first build's camera
+  // aspect ratio and every planetResize() call would lock in a degenerate 0x0 render target that
+  // never self-corrects (nothing else ever triggers another resize). That's a rendered-but-
+  // invisible sphere: the render loop runs fine, nothing throws, only the canvas stays blank —
+  // which is exactly what made this read as "I can't see anything" with the legend/controls
+  // (plain DOM, unaffected by canvas sizing) still showing normally.
+  document.getElementById('globe').classList.add('open');
   if (!PLANET.built) { buildPlanet(); wirePlanetInteraction(); }
   planetResize();
-  document.getElementById('globe').classList.add('open');
   window.Telegram?.WebApp?.BackButton?.show();
   planetLastTs = 0;
   if (!PLANET.raf) PLANET.raf = requestAnimationFrame(planetTick);
