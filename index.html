@@ -1468,7 +1468,7 @@ const PLANET = {
   satPositions: null, satIds: [], satPoints: null,
   highlightGenre: null, raycaster: null,
   cameraDist: 118, minDist: 52, maxDist: 260,
-  pointers: new Map(), drag: null, pinch: null,
+  pointers: new Map(), drag: null, pinch: null, spin: null,
   autoRotPaused: false, resumeTimer: null,
   pitch: -0.15,
 };
@@ -1509,9 +1509,13 @@ function getPlanetDotTexture() {
   if (planetDotTexture) return planetDotTexture;
   const c = document.createElement('canvas'); c.width = 64; c.height = 64;
   const ctx = c.getContext('2d');
+  // A mostly-solid core (opaque out to 60% radius) with only a thin glow rim — the earlier
+  // version faded from 100% opacity at dead center, still 85% at half-radius, meaning most of
+  // a sprite's visible area was half-transparent. At the sizes/counts used here that read as
+  // large soft overlapping blobs merging into each other rather than distinct book markers.
   const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
   g.addColorStop(0, 'rgba(255,255,255,1)');
-  g.addColorStop(0.5, 'rgba(255,255,255,0.85)');
+  g.addColorStop(0.6, 'rgba(255,255,255,1)');
   g.addColorStop(1, 'rgba(255,255,255,0)');
   ctx.fillStyle = g; ctx.fillRect(0, 0, 64, 64);
   planetDotTexture = new THREE.CanvasTexture(c);
@@ -1664,7 +1668,10 @@ function buildPlanet() {
     const pos = { x: dir.x * PLANET_RADIUS, y: dir.y * PLANET_RADIUS, z: dir.z * PLANET_RADIUS };
     anchorPosById[b.i] = { dir, pos };
     const pop = planetPopScore(b);
-    const scale = (2.4 + Math.min(3.4, Math.sqrt(pop + 1) * 0.55));
+    // Capped lower than the first pass (was up to 5.8, ~14.5% of the whole planet's radius for
+    // one dot) — combined with the old soft-gradient texture, popular anchors read as big
+    // overlapping glows swallowing their neighbors rather than distinct markers.
+    const scale = (1.7 + Math.min(2.0, Math.sqrt(pop + 1) * 0.34));
     const color = genreColor[g];
     const mat = new THREE.SpriteMaterial({ map: dotTex, color: new THREE.Color(color), transparent: true, depthTest: true });
     const sprite = new THREE.Sprite(mat);
@@ -1732,7 +1739,11 @@ function buildPlanet() {
   const satGeo = new THREE.BufferGeometry();
   satGeo.setAttribute('position', new THREE.Float32BufferAttribute(satPos, 3));
   satGeo.setAttribute('color', new THREE.Float32BufferAttribute(satColor, 3));
-  const satMat = new THREE.PointsMaterial({ size: 1.6, map: dotTex, vertexColors: true, transparent: true, depthWrite: false, sizeAttenuation: true, opacity: 0.78 });
+  // Every book IS on the sphere (verified: anchors+satellites always equals the full catalog),
+  // but at the original 1.6/0.78 the thousands-strong satellite cloud read as a faint haze
+  // barely distinguishable from empty space — reading as "most books missing" even though
+  // none actually were. Bigger, fully opaque points make "the whole catalog is here" legible.
+  const satMat = new THREE.PointsMaterial({ size: 2.3, map: dotTex, vertexColors: true, transparent: true, depthWrite: false, sizeAttenuation: true, opacity: 1 });
   const satPoints = new THREE.Points(satGeo, satMat);
   group.add(satPoints);
 
@@ -1788,11 +1799,31 @@ let planetLastTs = 0;
 function planetTick(ts) {
   const dt = planetLastTs ? Math.min(0.05, (ts - planetLastTs) / 1000) : 0.016;
   planetLastTs = ts;
-  if (!PLANET.autoRotPaused && !PLANET.drag && !PLANET.pinch) PLANET.group.rotation.y += 0.045 * dt;
+  if (PLANET.spin) {
+    // Flick momentum: keep spinning at the release velocity, decaying by a friction factor each
+    // frame, until it's too slow to see — then hand off to the normal pause-then-auto-rotate.
+    PLANET.group.rotation.y += PLANET.spin.vy * dt * 1000;
+    PLANET.group.rotation.x = Math.max(-1.15, Math.min(1.15, PLANET.group.rotation.x + PLANET.spin.vx * dt * 1000));
+    const friction = Math.pow(0.06, dt);
+    PLANET.spin.vy *= friction; PLANET.spin.vx *= friction;
+    if (Math.abs(PLANET.spin.vy) < 0.000025 && Math.abs(PLANET.spin.vx) < 0.000025) {
+      PLANET.spin = null;
+      planetPauseThenResumeAutoRotate();
+    }
+  } else if (!PLANET.autoRotPaused && !PLANET.drag && !PLANET.pinch) {
+    // 0.045 rad/s (a full turn every ~140s) was measured but visually imperceptible — barely
+    // distinguishable from "not rotating at all" over the few seconds someone actually watches it.
+    PLANET.group.rotation.y += 0.16 * dt;
+  }
   // Reveal anchor titles for the most popular books once zoomed in close enough — mirrors the
-  // old map's "labels grow as you zoom" progressive reveal instead of dumping 200 at once.
+  // old map's "labels grow as you zoom" progressive reveal instead of dumping 200 at once. A
+  // linear curve measured out to ~125 of ~220 titles visible at the DEFAULT zoom alone — a wall
+  // of overlapping text before the user even touches anything. Cubic-eased and pushed later
+  // (nothing ramps up until zoomT>0.6, i.e. real zooming-in, not just the default distance) so
+  // the overview starts with only a small, readable handful and titles earn their appearance.
   const zoomT = 1 - (PLANET.cameraDist - PLANET.minDist) / (PLANET.maxDist - PLANET.minDist); // 0 far .. 1 close
-  const labelCap = Math.round(Math.max(0, Math.min(200, (zoomT - 0.15) / 0.85 * 200)));
+  const labelT = Math.max(0, Math.min(1, (zoomT - 0.6) / 0.4));
+  const labelCap = Math.round(labelT * labelT * labelT * 200);
   if (labelCap !== PLANET._lastLabelCap) {
     PLANET._lastLabelCap = labelCap;
     const byPop = PLANET.anchors.map((a, i) => [a.pop, i]).sort((x, y) => y[0] - x[0]);
@@ -1857,8 +1888,10 @@ function wirePlanetInteraction() {
     PLANET.autoRotPaused = true;
     clearTimeout(PLANET.resumeTimer);
     PLANET.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    PLANET.spin = null; // grabbing the planet stops any momentum from a previous flick dead
     if (PLANET.pointers.size === 1) {
-      PLANET.drag = { x0: e.clientX, y0: e.clientY, ry0: PLANET.group.rotation.y, rx0: PLANET.group.rotation.x, moved: false };
+      PLANET.drag = { x0: e.clientX, y0: e.clientY, ry0: PLANET.group.rotation.y, rx0: PLANET.group.rotation.x, moved: false,
+        lastX: e.clientX, lastY: e.clientY, lastT: performance.now(), vy: 0, vx: 0 };
     } else if (PLANET.pointers.size === 2) {
       PLANET.drag = null;
       PLANET.pinch = { d0: pinchDist(), dist0: PLANET.cameraDist };
@@ -1879,6 +1912,15 @@ function wirePlanetInteraction() {
     if (!PLANET.drag.moved && Math.hypot(dx, dy) > 6) PLANET.drag.moved = true;
     PLANET.group.rotation.y = PLANET.drag.ry0 + dx * 0.0072;
     PLANET.group.rotation.x = Math.max(-1.15, Math.min(1.15, PLANET.drag.rx0 + dy * 0.0072));
+    // Instantaneous velocity (rad/ms), smoothed against the previous sample — a single raw
+    // pointermove delta is noisy (touch sampling isn't perfectly even), so this is fed into the
+    // release-time "flick" momentum below rather than used as-is.
+    const now = performance.now(), dtMs = Math.max(1, now - PLANET.drag.lastT);
+    const instVy = (e.clientX - PLANET.drag.lastX) * 0.0072 / dtMs;
+    const instVx = (e.clientY - PLANET.drag.lastY) * 0.0072 / dtMs;
+    PLANET.drag.vy = PLANET.drag.vy * 0.7 + instVy * 0.3;
+    PLANET.drag.vx = PLANET.drag.vx * 0.7 + instVx * 0.3;
+    PLANET.drag.lastX = e.clientX; PLANET.drag.lastY = e.clientY; PLANET.drag.lastT = now;
   });
   function release(e) {
     if (PLANET.pointers.has(e.pointerId)) {
@@ -1893,10 +1935,22 @@ function wirePlanetInteraction() {
     } else if (PLANET.pointers.size === 1) {
       PLANET.pinch = null;
       const remaining = [...PLANET.pointers.values()][0];
-      PLANET.drag = { x0: remaining.x, y0: remaining.y, ry0: PLANET.group.rotation.y, rx0: PLANET.group.rotation.x, moved: true };
+      PLANET.drag = { x0: remaining.x, y0: remaining.y, ry0: PLANET.group.rotation.y, rx0: PLANET.group.rotation.x, moved: true,
+        lastX: remaining.x, lastY: remaining.y, lastT: performance.now(), vy: 0, vx: 0 };
     } else {
-      PLANET.pinch = null; PLANET.drag = null;
-      planetPauseThenResumeAutoRotate();
+      // A real flick (moved past the tap threshold, with real velocity at the moment of
+      // release) keeps spinning and decays instead of stopping dead — an abrupt full-stop on
+      // release is exactly what reads as "sluggish"/"not moving right" on a real touchscreen,
+      // even though the drag itself tracked the finger correctly the whole time.
+      const wasFlick = PLANET.drag && PLANET.drag.moved && (Math.abs(PLANET.drag.vy) > 0.00006 || Math.abs(PLANET.drag.vx) > 0.00006);
+      PLANET.pinch = null;
+      if (wasFlick) {
+        PLANET.spin = { vy: PLANET.drag.vy, vx: PLANET.drag.vx };
+        PLANET.drag = null;
+      } else {
+        PLANET.drag = null;
+        planetPauseThenResumeAutoRotate();
+      }
     }
   }
   canvas.addEventListener('pointerup', release);
