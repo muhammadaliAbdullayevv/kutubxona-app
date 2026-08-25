@@ -1466,7 +1466,7 @@ const PLANET = {
   built: false, scene: null, camera: null, renderer: null, group: null, raf: null,
   hubs: [], anchors: [], anchorSprites: [], anchorLabels: [], hubSprites: [], hubLabels: [],
   satPositions: null, satIds: [], satPoints: null,
-  highlightGenre: null, raycaster: null,
+  raycaster: null,
   // minDist was 52 — only 12 units of working distance from the PLANET_RADIUS=40 surface.
   // Close enough that a single marker's glow (and its text label, which perspective-scales like
   // anything else in the scene) filled the ENTIRE screen: not "zoomed in on a book," but inside
@@ -1476,7 +1476,7 @@ const PLANET = {
   // else ever shares the frame). 90 keeps several neighboring markers on screen together even at
   // maximum zoom, so panning between them reads as actually panning, not scene-swapping.
   cameraDist: 118, minDist: 90, maxDist: 260,
-  pointers: new Map(), drag: null, pinch: null, spin: null, navTargetQuat: null, navTargetDist: null,
+  pointers: new Map(), drag: null, pinch: null, spin: null,
   autoRotPaused: false, resumeTimer: null,
   pitch: -0.15,
 };
@@ -1626,6 +1626,11 @@ function buildPlanet() {
     genreColor[g] = CLUSTER_COLORS[i % CLUSTER_COLORS.length];
     genreSeed[g] = fibonacciSpherePoint(i, genreList.length);
   });
+  // How much angular room each genre actually has before it'd start overlapping its nearest
+  // neighbor on the fibonacci sphere — scales the whole region size to the real genre count
+  // instead of a constant tuned for whatever count happened to be on screen during testing.
+  const nnSpacing = Math.sqrt(4 * Math.PI / Math.max(1, genreList.length));
+  const REGION_SPREAD = Math.min(0.6, nnSpacing * 0.42);
 
   const scene = new THREE.Scene();
   const canvas = document.getElementById('globeCanvas');
@@ -1682,16 +1687,16 @@ function buildPlanet() {
   // sprite = more popular (same signal the old map used for node radius). Also gets a lifted
   // "flight-path" arc back to its hub — cheap (bounded by anchor count, not O(n²)) and reads
   // as a real network across the globe rather than a scatter of unconnected dots.
-  const ANCHOR_SPREAD = 0.30; // radians — keeps a genre's cluster well inside its fibonacci "cell"
+  // Labeled anchors stay a bit nearer the hub than the full region so the hub->anchor arcs and
+  // labels stay legible instead of scattering all the way out to the cell's edge.
+  const ANCHOR_SPREAD = REGION_SPREAD * 0.55;
   const anchorObjs = [], anchorSprites = [], anchorLabels = [];
-  const anchorPosById = {};
   const arcPositions = [];
   for (const b of anchors) {
     const g = genreOf[b.i] || '?';
     const seed = genreSeed[g] || { x: 0, y: 1, z: 0 };
-    const dir = sphereJitter(seed, ANCHOR_SPREAD, (hash31(b.i + '#a') % 1000) / 1000, (hash31(b.i + '#d') % 1000) / 1000);
+    const dir = sphereJitter(seed, ANCHOR_SPREAD, (hash31(b.i + '#angle') % 1000) / 1000, (hash31(b.i + '#dist') % 1000) / 1000);
     const pos = { x: dir.x * PLANET_RADIUS, y: dir.y * PLANET_RADIUS, z: dir.z * PLANET_RADIUS };
-    anchorPosById[b.i] = { dir, pos };
     const pop = planetPopScore(b);
     // Capped lower than the first pass (was up to 5.8, ~14.5% of the whole planet's radius for
     // one dot) — combined with the old soft-gradient texture, popular anchors read as big
@@ -1736,28 +1741,21 @@ function buildPlanet() {
   group.add(arcs);
 
   // Satellites: everything else (thousands of books) — one GPU point cloud, no per-book scene
-  // object. Rides near its parent anchor (or, if its author has no anchor, hash-spread across
-  // its genre's anchors) exactly like the old map's fallback rule.
+  // object. Each one jitters around its OWN genre's hub seed directly, at the full region
+  // spread — not clustered around one of a handful of anchor points. Clustering around anchors
+  // made every genre read as a dozen-ish tight dot-blobs with visible gaps between them; jittering
+  // straight off the hub seed fills the whole region evenly so all ~5.4k books actually read as
+  // spread across the map, the way the map's size allows.
   const anchorIdSet = new Set(anchors.map(a => a.i));
-  const primaryAnchorByAuthor = {};
-  for (const b of anchors) if (isKnownAuthor(b.a) && !(b.a in primaryAnchorByAuthor)) primaryAnchorByAuthor[b.a] = b.i;
-  const anchorsByGenre = {};
-  for (const g of genreList) anchorsByGenre[g] = anchors.filter(a => (genreOf[a.i] || '?') === g);
   const satPos = [], satColor = [], satIds = [];
-  const SAT_SPREAD = 0.045;
   for (const b of DB.books) {
     if (anchorIdSet.has(b.i)) continue;
-    let parentId = isKnownAuthor(b.a) && primaryAnchorByAuthor[b.a];
-    if (!parentId) {
-      const bucket = anchorsByGenre[b.g || '?'];
-      if (bucket && bucket.length) parentId = bucket[hash31(b.i + '#gp') % bucket.length].i;
-    }
-    if (!parentId || !anchorPosById[parentId]) continue;
-    const parent = anchorPosById[parentId];
-    const dir = sphereJitter(parent.dir, SAT_SPREAD, (hash31(b.i + '#sa') % 1000) / 1000, (hash31(b.i + '#sd') % 1000) / 1000);
-    const r = PLANET_RADIUS * (1.001 + ((hash31(b.i + '#sr') % 100) / 100) * 0.02);
+    const g = b.g || '?';
+    const seed = genreSeed[g] || { x: 0, y: 1, z: 0 };
+    const dir = sphereJitter(seed, REGION_SPREAD, (hash31(b.i + '#satangle') % 1000) / 1000, (hash31(b.i + '#satdist') % 1000) / 1000);
+    const r = PLANET_RADIUS * (1.001 + ((hash31(b.i + '#satradius') % 100) / 100) * 0.02);
     satPos.push(dir.x * r, dir.y * r, dir.z * r);
-    const c = new THREE.Color(genreColor[genreOf[parentId] || '?']);
+    const c = new THREE.Color(genreColor[g]);
     satColor.push(c.r, c.g, c.b);
     satIds.push(b.i);
   }
@@ -1785,7 +1783,6 @@ function buildPlanet() {
   PLANET.genreColor = genreColor;
   PLANET.built = true;
   renderGlobeLegend(byGenre, genreColor);
-  planetApplyHighlight();
 }
 
 function renderGlobeLegend(byGenre, genreColor) {
@@ -1796,12 +1793,6 @@ function renderGlobeLegend(byGenre, genreColor) {
     .map(g => `<div class="lg-row"><span class="lg-dot" style="background:${genreColor[g]}"></span>${esc(g)} <b>${byGenre[g] ? byGenre[g].length : 0}</b></div>`)
     .join('');
   el.innerHTML = rows;
-}
-
-function planetApplyHighlight() {
-  const hi = PLANET.highlightGenre;
-  for (const s of PLANET.hubSprites) s.material.opacity = !hi || s.userData.genre === hi ? 1 : 0.25;
-  for (const s of PLANET.anchorSprites) s.material.opacity = !hi || s.userData.genre === hi ? 1 : 0.12;
 }
 
 function planetResize() {
@@ -1824,16 +1815,7 @@ let planetLastTs = 0;
 function planetTick(ts) {
   const dt = planetLastTs ? Math.min(0.05, (ts - planetLastTs) / 1000) : 0.016;
   planetLastTs = ts;
-  if (PLANET.navTargetQuat && !PLANET.drag && !PLANET.pinch) {
-    // Smoothly turn to face a genre just tapped (see onPlanetTap) — an eased slerp toward the
-    // target orientation, plus easing the zoom toward a comfortable viewing distance if it was
-    // further out. Cancelled the instant the user grabs the planet themselves (pointerdown).
-    const t = Math.min(1, dt * 4.5);
-    PLANET.group.quaternion.slerp(PLANET.navTargetQuat, t);
-    PLANET.group.rotation.setFromQuaternion(PLANET.group.quaternion, 'XYZ');
-    if (PLANET.navTargetDist != null) PLANET.cameraDist += (PLANET.navTargetDist - PLANET.cameraDist) * t;
-    if (PLANET.group.quaternion.angleTo(PLANET.navTargetQuat) < 0.01) { PLANET.navTargetQuat = null; PLANET.navTargetDist = null; }
-  } else if (PLANET.spin) {
+  if (PLANET.spin) {
     // Flick momentum: keep spinning at the release velocity, decaying by a friction factor each
     // frame, until it's too slow to see — then hand off to the normal pause-then-auto-rotate.
     PLANET.group.rotation.y += PLANET.spin.vy * dt * 1000;
@@ -1859,29 +1841,21 @@ function planetTick(ts) {
   // aware, so it stays correct as the planet spins — and its distance/facing relative to the
   // camera, so whatever is actually under the camera right now is what gets labeled.
   PLANET.group.updateMatrixWorld();
-  // Tapping a genre hub only ever dimmed OTHER genres' markers — it never actually changed which
-  // titles get labeled, so "tap a genre to see its books" didn't do what it visually promised.
-  // A book belonging to the highlighted genre is now always a label candidate (still gated on
-  // actually facing the camera — a label for something hidden on the far side would just be
-  // floating text with no marker under it) regardless of the normal near-camera distance filter,
-  // and highlighted-genre candidates are sorted ahead of everything else so they fill the
-  // available label slots first. (Showing literally all of a genre's — let alone the whole
-  // catalog's 5k+ — titles at once was never going to be readable regardless; this is the
-  // largest number that can be shown without recreating the original wall-of-text problem.)
+  // Reveal titles for whichever books are actually near the camera and facing it right now —
+  // recomputed every frame (cheap: a couple hundred anchors) from each one's ACTUAL current world
+  // position, so it stays correct as the planet auto-rotates or gets dragged.
   const nearThreshold = (PLANET.cameraDist - PLANET_RADIUS) + 26; // scales with zoom automatically
-  const hiGenre = PLANET.highlightGenre;
   const labelCandidates = [];
   for (let i = 0; i < PLANET.anchors.length; i++) {
-    const isHi = hiGenre && PLANET.anchors[i].g === hiGenre;
     planetWorldTmp.set(PLANET.anchors[i].pos.x, PLANET.anchors[i].pos.y, PLANET.anchors[i].pos.z).applyMatrix4(PLANET.group.matrixWorld);
     const distToCam = planetWorldTmp.distanceTo(PLANET.camera.position);
-    if (!isHi && distToCam > nearThreshold) continue;
+    if (distToCam > nearThreshold) continue;
     planetOutwardTmp.copy(planetWorldTmp).normalize();
     planetToCamTmp.subVectors(PLANET.camera.position, planetWorldTmp).normalize();
     if (planetOutwardTmp.dot(planetToCamTmp) < 0.12) continue; // facing away — hidden behind the sphere body anyway
-    labelCandidates.push({ idx: i, distToCam, pri: isHi ? 0 : 1 });
+    labelCandidates.push({ idx: i, distToCam });
   }
-  labelCandidates.sort((a, b) => a.pri - b.pri || a.distToCam - b.distToCam);
+  labelCandidates.sort((a, b) => a.distToCam - b.distToCam);
   // A raw top-26-by-distance cap still let densely-packed anchors (many books scattered within
   // one tight genre cluster, which is exactly what "zoomed all the way into one genre" looks
   // like) pile their titles directly on top of each other into unreadable overlapping text.
@@ -1901,7 +1875,7 @@ function planetTick(ts) {
     acceptedScreen.push({ x: (ndc.x * 0.5 + 0.5) * cw, y: (1 - (ndc.y * 0.5 + 0.5)) * ch });
   }
   const shownIdx = new Set();
-  const MIN_LABEL_GAP_PX = hiGenre ? 36 : 50, MAX_LABELS_SHOWN = hiGenre ? 34 : 14;
+  const MIN_LABEL_GAP_PX = 50, MAX_LABELS_SHOWN = 14;
   for (const cand of labelCandidates) {
     if (shownIdx.size >= MAX_LABELS_SHOWN) break;
     const a = PLANET.anchors[cand.idx];
@@ -1944,34 +1918,10 @@ function planetHitTest(clientX, clientY) {
 
 function onPlanetTap(hit) {
   if (!hit) return;
+  // Hubs are just a genre pointer + label now — a legend fixed to the globe, not a button. Real
+  // books (anchors and satellites) are what respond to taps.
+  if (hit.kind === 'hub') return;
   haptic();
-  if (hit.kind === 'hub') {
-    const wasOn = PLANET.highlightGenre === hit.genre;
-    PLANET.highlightGenre = wasOn ? null : hit.genre;
-    planetApplyHighlight();
-    // Highlighting alone only dimmed everything ELSE — it never brought the tapped genre INTO
-    // view, so tapping a genre currently on the far side of the sphere (the common case: most
-    // genres aren't already facing the camera) showed nothing at all, since the label system
-    // correctly refuses to label a marker hidden behind the opaque sphere body. Actually rotate
-    // to face it, and pull the zoom in a bit if it was further out, so tapping a genre reads as
-    // "take me there" the way it visually promises to.
-    if (!wasOn) {
-      const hub = PLANET.hubs.find(h => h.g === hit.genre);
-      if (hub) {
-        const seedVec = new THREE.Vector3(hub.seed.x, hub.seed.y, hub.seed.z);
-        PLANET.navTargetQuat = new THREE.Quaternion().setFromUnitVectors(seedVec, new THREE.Vector3(0, 0, 1));
-        // Only zooming IN if already further out (the original Math.min) left the view too wide
-        // whenever the user was already at/near the default zoom — a genre's whole cluster
-        // (~17deg wide) stayed small enough on screen that the label declutter pass could only
-        // fit 1-2 titles before hitting its minimum-gap rule, even though 15+ were candidates.
-        // Always target a fixed comfortable "explore this genre" distance instead.
-        PLANET.navTargetDist = PLANET.minDist + 15;
-      }
-    } else {
-      PLANET.navTargetQuat = null; PLANET.navTargetDist = null;
-    }
-    return;
-  }
   if (PLANET.raf) { cancelAnimationFrame(PLANET.raf); PLANET.raf = null; }
   openedFromGlobe = true;
   window.openDetail(hit.id);
@@ -1994,7 +1944,6 @@ function wirePlanetInteraction() {
     clearTimeout(PLANET.resumeTimer);
     PLANET.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     PLANET.spin = null; // grabbing the planet stops any momentum from a previous flick dead
-    PLANET.navTargetQuat = null; PLANET.navTargetDist = null; // ...and cancels any in-progress "navigate to this genre" turn
     if (PLANET.pointers.size === 1) {
       PLANET.drag = { x0: e.clientX, y0: e.clientY, ry0: PLANET.group.rotation.y, rx0: PLANET.group.rotation.x, moved: false,
         lastX: e.clientX, lastY: e.clientY, lastT: performance.now(), vy: 0, vx: 0 };
