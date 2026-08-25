@@ -1467,7 +1467,15 @@ const PLANET = {
   hubs: [], anchors: [], anchorSprites: [], anchorLabels: [], hubSprites: [], hubLabels: [],
   satPositions: null, satIds: [], satPoints: null,
   highlightGenre: null, raycaster: null,
-  cameraDist: 118, minDist: 52, maxDist: 260,
+  // minDist was 52 — only 12 units of working distance from the PLANET_RADIUS=40 surface.
+  // Close enough that a single marker's glow (and its text label, which perspective-scales like
+  // anything else in the scene) filled the ENTIRE screen: not "zoomed in on a book," but inside
+  // one book's marker with nothing else visible. That's the real cause of both "can't see any
+  // books" (there's only ever one giant blob on screen) AND "moves too fast" (any swipe swaps
+  // that one giant blob for the next one — there's no way for a swipe to feel gradual when nothing
+  // else ever shares the frame). 90 keeps several neighboring markers on screen together even at
+  // maximum zoom, so panning between them reads as actually panning, not scene-swapping.
+  cameraDist: 118, minDist: 90, maxDist: 260,
   pointers: new Map(), drag: null, pinch: null, spin: null,
   autoRotPaused: false, resumeTimer: null,
   pitch: -0.15,
