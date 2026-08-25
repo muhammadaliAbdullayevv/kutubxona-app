@@ -662,7 +662,11 @@ function hash31(s){let h=0;s=String(s||'');for(let i=0;i<s.length;i++)h=(h*31+s.
 // "Unknown"/"Noma'lum" isn't a real author identity — 1023+ books share it, so treating it as
 // one would falsely cluster a fifth of the catalog onto a single node.
 function isKnownAuthor(a){return !!a && !/unknown|noma.?lum/i.test(a);}
-var CLUSTER_COLORS=['#4f8fd9','#e0824a','#4caf7d','#a066c9','#2fa6a6','#d9527a','#c9a227','#7d6ad9','#5ba64f','#4aa8c9','#c96f3f','#8f9bb3','#b3853f','#5f9bd9','#6fae8f'];
+// 24 hues around the wheel, alternating lightness between adjacent ones so neighbors in sort
+// order (by book count, on the Books Planet) don't land on similar-looking colors either — the
+// previous 15-color list ran out and wrapped around for real catalogs with 18+ genres, silently
+// reusing a color for a genre already showing it elsewhere on the sphere.
+var CLUSTER_COLORS=['#cf5959','#c65c39','#cf9459','#c6a339','#cfcf59','#a3c639','#94cf59','#5cc639','#59cf59','#39c65c','#59cf94','#39c6a3','#59cfcf','#39a3c6','#5994cf','#395cc6','#5959cf','#5c39c6','#9459cf','#a339c6','#cf59cf','#c639a3','#cf5994','#c6395c'];
 // Books "Planet" — full 3D rotatable sphere, built + rendered in the module script below
 // (needs Three.js). buildPlanet/openGlobe/closeGlobe/globeResumeAfterDetail are all defined
 // there and exposed on window.
@@ -1383,10 +1387,72 @@ function buildPlanet() {
   const total = DB.books.length || 1;
   const genreList = Object.keys(byGenre).sort((a, b) => byGenre[b].length - byGenre[a].length);
 
+  const genreColor = {}, genreSeed = {};
+  genreList.forEach((g, i) => {
+    genreColor[g] = CLUSTER_COLORS[i % CLUSTER_COLORS.length];
+    genreSeed[g] = fibonacciSpherePoint(i, genreList.length);
+  });
+
+  // Every book's position now comes from ONE global, evenly-spread Fibonacci sphere sized to the
+  // whole catalog (the same construction the genre hubs themselves use) — by definition that has
+  // no gaps and no clustering, for any N. Each of those slots is claimed by whichever genre's hub
+  // is nearest to it, with distance normalized by that genre's own "radius weight" (sqrt of its
+  // book count — area scales with radius squared, so sqrt(count) is exactly the weight that makes
+  // a genre's CLAIMED AREA come out proportional to how many books it actually has). Net result:
+  // the whole sphere surface is partitioned among genres with zero dead space between them, sized
+  // like real countries by population — not every genre getting an identical island regardless of
+  // whether it has 1 book or 1200, which is what produced visible gaps between genre "blobs" with
+  // dark empty sphere in between before this.
+  const genreWeight = {};
+  for (const g of genreList) genreWeight[g] = Math.sqrt(byGenre[g].length);
+  function nearestGenre(dir) {
+    let best = genreList[0], bestScore = Infinity;
+    for (const g of genreList) {
+      const seed = genreSeed[g];
+      const dot = dir.x * seed.x + dir.y * seed.y + dir.z * seed.z; // monotonic proxy for angular distance
+      const score = (1 - dot) / genreWeight[g];
+      if (score < bestScore) { bestScore = score; best = g; }
+    }
+    return best;
+  }
+  const slotsByGenre = {};
+  for (const g of genreList) slotsByGenre[g] = [];
+  for (let i = 0; i < total; i++) {
+    const p = fibonacciSpherePoint(i, total);
+    slotsByGenre[nearestGenre(p)].push(p);
+  }
+
+  // Assign each genre's own books to its own slot pool — deterministic per-book hash shuffle (not
+  // popularity order) so re-opening the map never reshuffles anything, but a book's spot within
+  // its genre's territory doesn't spell out a "most-popular-first" bullseye either.
   let anchors = [];
-  const genreOf = {};
+  const genreOf = {}, bookDir = {};
   for (const g of genreList) {
     const bucket = byGenre[g];
+    const slots = slotsByGenre[g].length ? slotsByGenre[g] : [genreSeed[g]];
+    const shuffled = bucket.slice().sort((x, y) => hash31(x.i + '#slot') - hash31(y.i + '#slot'));
+    // Subsample EVENLY across the whole slot list, not just its first bucket.length entries.
+    // slotsByGenre[g] preserves the order it was collected in — ascending global Fibonacci
+    // index, which sweeps north pole to south pole — so a genre whose territory spans a wide
+    // latitude range but has fewer books than slots would, using only the first N entries,
+    // systematically only ever place books in the northern sliver of its own territory and
+    // leave the rest of its own cell empty (this was the actual cause of the visible gaps —
+    // not a missing-coverage bug in the partition itself, which was already verified correct).
+    const stride = slots.length / shuffled.length;
+    const useCount = new Array(slots.length).fill(0);
+    for (let j = 0; j < shuffled.length; j++) {
+      const b = shuffled[j];
+      const slotIdx = Math.min(slots.length - 1, Math.floor(j * stride));
+      const base = slots[slotIdx];
+      // Fewer slots than books (possible at the margins — a sphere carved by nearest-weighted-hub
+      // won't split down to the exact book) means some slots get reused more than once as the
+      // stride wraps back over them — nudge repeats apart with a tiny jitter so they don't render
+      // as one exactly-overlapping dot.
+      const nth = useCount[slotIdx]++;
+      bookDir[b.i] = nth > 0
+        ? sphereJitter(base, 0.025 * nth, (hash31(b.i + '#ovf') % 1000) / 1000, (hash31(b.i + '#ovd') % 1000) / 1000)
+        : base;
+    }
     // Only "anchors" ever get a text-label sprite at all (satellites are a labelless point
     // cloud, for build/render cost reasons) — a floor of 6 meant a modest genre like a 140-book
     // one had only ~6-8 labelable titles in existence, period, no matter how the label-picking
@@ -1401,17 +1467,6 @@ function buildPlanet() {
     for (const b of sorted.slice(0, k)) genreOf[b.i] = g;
     anchors = anchors.concat(sorted.slice(0, k));
   }
-
-  const genreColor = {}, genreSeed = {};
-  genreList.forEach((g, i) => {
-    genreColor[g] = CLUSTER_COLORS[i % CLUSTER_COLORS.length];
-    genreSeed[g] = fibonacciSpherePoint(i, genreList.length);
-  });
-  // How much angular room each genre actually has before it'd start overlapping its nearest
-  // neighbor on the fibonacci sphere — scales the whole region size to the real genre count
-  // instead of a constant tuned for whatever count happened to be on screen during testing.
-  const nnSpacing = Math.sqrt(4 * Math.PI / Math.max(1, genreList.length));
-  const REGION_SPREAD = Math.min(0.6, nnSpacing * 0.42);
 
   const scene = new THREE.Scene();
   const canvas = document.getElementById('globeCanvas');
@@ -1464,19 +1519,17 @@ function buildPlanet() {
     hubSprites.push(sprite); hubLabels.push(label);
   }
 
-  // Anchors: each genre's most popular books, scattered near their hub's seed point. Bigger
+  // Anchors: each genre's most popular books, positioned at their own slot from the gapless
+  // partition above (same as every other book in their genre — no separate "stay near the hub"
+  // treatment any more, since satellites now already reach the cell's actual edges too). Bigger
   // sprite = more popular (same signal the old map used for node radius). Also gets a lifted
   // "flight-path" arc back to its hub — cheap (bounded by anchor count, not O(n²)) and reads
   // as a real network across the globe rather than a scatter of unconnected dots.
-  // Labeled anchors stay a bit nearer the hub than the full region so the hub->anchor arcs and
-  // labels stay legible instead of scattering all the way out to the cell's edge.
-  const ANCHOR_SPREAD = REGION_SPREAD * 0.55;
   const anchorObjs = [], anchorSprites = [], anchorLabels = [];
   const arcPositions = [];
   for (const b of anchors) {
     const g = genreOf[b.i] || '?';
-    const seed = genreSeed[g] || { x: 0, y: 1, z: 0 };
-    const dir = sphereJitter(seed, ANCHOR_SPREAD, (hash31(b.i + '#angle') % 1000) / 1000, (hash31(b.i + '#dist') % 1000) / 1000);
+    const dir = bookDir[b.i] || genreSeed[g] || { x: 0, y: 1, z: 0 };
     const pos = { x: dir.x * PLANET_RADIUS, y: dir.y * PLANET_RADIUS, z: dir.z * PLANET_RADIUS };
     const pop = planetPopScore(b);
     // Capped lower than the first pass (was up to 5.8, ~14.5% of the whole planet's radius for
@@ -1522,18 +1575,15 @@ function buildPlanet() {
   group.add(arcs);
 
   // Satellites: everything else (thousands of books) — one GPU point cloud, no per-book scene
-  // object. Each one jitters around its OWN genre's hub seed directly, at the full region
-  // spread — not clustered around one of a handful of anchor points. Clustering around anchors
-  // made every genre read as a dozen-ish tight dot-blobs with visible gaps between them; jittering
-  // straight off the hub seed fills the whole region evenly so all ~5.4k books actually read as
-  // spread across the map, the way the map's size allows.
+  // object. Each one sits at its own slot from the gapless partition above, same as anchors — so
+  // the full catalog covers the WHOLE sphere surface with no dead space between genres, sized
+  // proportionally to how many books each genre actually has.
   const anchorIdSet = new Set(anchors.map(a => a.i));
   const satPos = [], satColor = [], satIds = [];
   for (const b of DB.books) {
     if (anchorIdSet.has(b.i)) continue;
     const g = b.g || '?';
-    const seed = genreSeed[g] || { x: 0, y: 1, z: 0 };
-    const dir = sphereJitter(seed, REGION_SPREAD, (hash31(b.i + '#satangle') % 1000) / 1000, (hash31(b.i + '#satdist') % 1000) / 1000);
+    const dir = bookDir[b.i] || genreSeed[g] || { x: 0, y: 1, z: 0 };
     const r = PLANET_RADIUS * (1.001 + ((hash31(b.i + '#satradius') % 100) / 100) * 0.02);
     satPos.push(dir.x * r, dir.y * r, dir.z * r);
     const c = new THREE.Color(genreColor[g]);
