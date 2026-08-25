@@ -701,6 +701,14 @@ function indexBook(b){b._t=canon(b.t);b._a=canon(b.a);b._g=canon(b.g);b._sm=cano
 // the loaded catalog via window.DB / window.byId for the interior bookshelf scene.
 var DB={books:[],genres:[],audiences:[],types:[],bot:''};
 var byId={};
+// Both read/written from the module script (globe/library-game code) as bare identifiers, not
+// window.-prefixed — that only works if something actually declares them first. Without this
+// declaration, openDetail()'s very first read of openedFromGlobe (building the actions row, on
+// EVERY open, from ANY entry point) threw ReferenceError before c.innerHTML ever got assigned —
+// the sheet opened (empty) but its content never rendered. Declaring var here (not let, same
+// reasoning as DB/byId above) makes them real globals every script on the page can see.
+var openedFromGlobe=false;
+var openedFromLibGame=false;
 let state={q:'',genre:'',audience:'',type:'',sort:'relevance',view:'browse',shown:24,result:[],all:false};
 let HOME={newest:[],audio:[],authors:[],genres:[]};
 let favs=new Set();
