@@ -1476,7 +1476,7 @@ const PLANET = {
   // else ever shares the frame). 90 keeps several neighboring markers on screen together even at
   // maximum zoom, so panning between them reads as actually panning, not scene-swapping.
   cameraDist: 118, minDist: 90, maxDist: 260,
-  pointers: new Map(), drag: null, pinch: null, spin: null,
+  pointers: new Map(), drag: null, pinch: null, spin: null, navTargetQuat: null, navTargetDist: null,
   autoRotPaused: false, resumeTimer: null,
   pitch: -0.15,
 };
@@ -1606,7 +1606,13 @@ function buildPlanet() {
   const genreOf = {};
   for (const g of genreList) {
     const bucket = byGenre[g];
-    const k = Math.max(6, Math.round(200 * bucket.length / total));
+    // Only "anchors" ever get a text-label sprite at all (satellites are a labelless point
+    // cloud, for build/render cost reasons) — a floor of 6 meant a modest genre like a 140-book
+    // one had only ~6-8 labelable titles in existence, period, no matter how the label-picking
+    // logic downstream was tuned. Tapping such a genre could never show "more of its books"
+    // because there simply weren't more books WITH labels to show. Raised floor and budget give
+    // every genre a meaningfully larger labeled pool to draw from.
+    const k = Math.max(15, Math.round(300 * bucket.length / total));
     const sorted = bucket.slice().sort((x, y) => {
       const d = planetPopScore(y) - planetPopScore(x);
       return d !== 0 ? d : hash31(x.i) - hash31(y.i);
@@ -1818,7 +1824,16 @@ let planetLastTs = 0;
 function planetTick(ts) {
   const dt = planetLastTs ? Math.min(0.05, (ts - planetLastTs) / 1000) : 0.016;
   planetLastTs = ts;
-  if (PLANET.spin) {
+  if (PLANET.navTargetQuat && !PLANET.drag && !PLANET.pinch) {
+    // Smoothly turn to face a genre just tapped (see onPlanetTap) — an eased slerp toward the
+    // target orientation, plus easing the zoom toward a comfortable viewing distance if it was
+    // further out. Cancelled the instant the user grabs the planet themselves (pointerdown).
+    const t = Math.min(1, dt * 4.5);
+    PLANET.group.quaternion.slerp(PLANET.navTargetQuat, t);
+    PLANET.group.rotation.setFromQuaternion(PLANET.group.quaternion, 'XYZ');
+    if (PLANET.navTargetDist != null) PLANET.cameraDist += (PLANET.navTargetDist - PLANET.cameraDist) * t;
+    if (PLANET.group.quaternion.angleTo(PLANET.navTargetQuat) < 0.01) { PLANET.navTargetQuat = null; PLANET.navTargetDist = null; }
+  } else if (PLANET.spin) {
     // Flick momentum: keep spinning at the release velocity, decaying by a friction factor each
     // frame, until it's too slow to see — then hand off to the normal pause-then-auto-rotate.
     PLANET.group.rotation.y += PLANET.spin.vy * dt * 1000;
@@ -1844,18 +1859,29 @@ function planetTick(ts) {
   // aware, so it stays correct as the planet spins — and its distance/facing relative to the
   // camera, so whatever is actually under the camera right now is what gets labeled.
   PLANET.group.updateMatrixWorld();
+  // Tapping a genre hub only ever dimmed OTHER genres' markers — it never actually changed which
+  // titles get labeled, so "tap a genre to see its books" didn't do what it visually promised.
+  // A book belonging to the highlighted genre is now always a label candidate (still gated on
+  // actually facing the camera — a label for something hidden on the far side would just be
+  // floating text with no marker under it) regardless of the normal near-camera distance filter,
+  // and highlighted-genre candidates are sorted ahead of everything else so they fill the
+  // available label slots first. (Showing literally all of a genre's — let alone the whole
+  // catalog's 5k+ — titles at once was never going to be readable regardless; this is the
+  // largest number that can be shown without recreating the original wall-of-text problem.)
   const nearThreshold = (PLANET.cameraDist - PLANET_RADIUS) + 26; // scales with zoom automatically
+  const hiGenre = PLANET.highlightGenre;
   const labelCandidates = [];
   for (let i = 0; i < PLANET.anchors.length; i++) {
+    const isHi = hiGenre && PLANET.anchors[i].g === hiGenre;
     planetWorldTmp.set(PLANET.anchors[i].pos.x, PLANET.anchors[i].pos.y, PLANET.anchors[i].pos.z).applyMatrix4(PLANET.group.matrixWorld);
     const distToCam = planetWorldTmp.distanceTo(PLANET.camera.position);
-    if (distToCam > nearThreshold) continue;
+    if (!isHi && distToCam > nearThreshold) continue;
     planetOutwardTmp.copy(planetWorldTmp).normalize();
     planetToCamTmp.subVectors(PLANET.camera.position, planetWorldTmp).normalize();
     if (planetOutwardTmp.dot(planetToCamTmp) < 0.12) continue; // facing away — hidden behind the sphere body anyway
-    labelCandidates.push({ idx: i, distToCam });
+    labelCandidates.push({ idx: i, distToCam, pri: isHi ? 0 : 1 });
   }
-  labelCandidates.sort((a, b) => a.distToCam - b.distToCam);
+  labelCandidates.sort((a, b) => a.pri - b.pri || a.distToCam - b.distToCam);
   // A raw top-26-by-distance cap still let densely-packed anchors (many books scattered within
   // one tight genre cluster, which is exactly what "zoomed all the way into one genre" looks
   // like) pile their titles directly on top of each other into unreadable overlapping text.
@@ -1875,7 +1901,7 @@ function planetTick(ts) {
     acceptedScreen.push({ x: (ndc.x * 0.5 + 0.5) * cw, y: (1 - (ndc.y * 0.5 + 0.5)) * ch });
   }
   const shownIdx = new Set();
-  const MIN_LABEL_GAP_PX = 50, MAX_LABELS_SHOWN = 14;
+  const MIN_LABEL_GAP_PX = hiGenre ? 36 : 50, MAX_LABELS_SHOWN = hiGenre ? 34 : 14;
   for (const cand of labelCandidates) {
     if (shownIdx.size >= MAX_LABELS_SHOWN) break;
     const a = PLANET.anchors[cand.idx];
@@ -1920,8 +1946,30 @@ function onPlanetTap(hit) {
   if (!hit) return;
   haptic();
   if (hit.kind === 'hub') {
-    PLANET.highlightGenre = PLANET.highlightGenre === hit.genre ? null : hit.genre;
+    const wasOn = PLANET.highlightGenre === hit.genre;
+    PLANET.highlightGenre = wasOn ? null : hit.genre;
     planetApplyHighlight();
+    // Highlighting alone only dimmed everything ELSE — it never brought the tapped genre INTO
+    // view, so tapping a genre currently on the far side of the sphere (the common case: most
+    // genres aren't already facing the camera) showed nothing at all, since the label system
+    // correctly refuses to label a marker hidden behind the opaque sphere body. Actually rotate
+    // to face it, and pull the zoom in a bit if it was further out, so tapping a genre reads as
+    // "take me there" the way it visually promises to.
+    if (!wasOn) {
+      const hub = PLANET.hubs.find(h => h.g === hit.genre);
+      if (hub) {
+        const seedVec = new THREE.Vector3(hub.seed.x, hub.seed.y, hub.seed.z);
+        PLANET.navTargetQuat = new THREE.Quaternion().setFromUnitVectors(seedVec, new THREE.Vector3(0, 0, 1));
+        // Only zooming IN if already further out (the original Math.min) left the view too wide
+        // whenever the user was already at/near the default zoom — a genre's whole cluster
+        // (~17deg wide) stayed small enough on screen that the label declutter pass could only
+        // fit 1-2 titles before hitting its minimum-gap rule, even though 15+ were candidates.
+        // Always target a fixed comfortable "explore this genre" distance instead.
+        PLANET.navTargetDist = PLANET.minDist + 15;
+      }
+    } else {
+      PLANET.navTargetQuat = null; PLANET.navTargetDist = null;
+    }
     return;
   }
   if (PLANET.raf) { cancelAnimationFrame(PLANET.raf); PLANET.raf = null; }
@@ -1946,6 +1994,7 @@ function wirePlanetInteraction() {
     clearTimeout(PLANET.resumeTimer);
     PLANET.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     PLANET.spin = null; // grabbing the planet stops any momentum from a previous flick dead
+    PLANET.navTargetQuat = null; PLANET.navTargetDist = null; // ...and cancels any in-progress "navigate to this genre" turn
     if (PLANET.pointers.size === 1) {
       PLANET.drag = { x0: e.clientX, y0: e.clientY, ry0: PLANET.group.rotation.y, rx0: PLANET.group.rotation.x, moved: false,
         lastX: e.clientX, lastY: e.clientY, lastT: performance.now(), vy: 0, vx: 0 };
