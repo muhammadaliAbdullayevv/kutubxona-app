@@ -1856,7 +1856,38 @@ function planetTick(ts) {
     labelCandidates.push({ idx: i, distToCam });
   }
   labelCandidates.sort((a, b) => a.distToCam - b.distToCam);
-  const shownIdx = new Set(labelCandidates.slice(0, 26).map(c => c.idx));
+  // A raw top-26-by-distance cap still let densely-packed anchors (many books scattered within
+  // one tight genre cluster, which is exactly what "zoomed all the way into one genre" looks
+  // like) pile their titles directly on top of each other into unreadable overlapping text.
+  // Greedily accept a candidate only if it lands far enough away, in actual screen pixels, from
+  // every label already accepted this frame — guarantees titles never visually collide, however
+  // tightly the underlying books happen to be packed in world space.
+  const cw = PLANET.renderer.domElement.clientWidth, ch = PLANET.renderer.domElement.clientHeight;
+  // Hub labels are always shown (never decluttered against each other — genres are spread far
+  // enough apart by construction) but an anchor label landing right on top of ITS OWN hub's name
+  // was still the one remaining overlap case. Seed the accepted list with visible hub positions
+  // so anchor titles keep clear of them too.
+  const acceptedScreen = [];
+  for (let h = 0; h < PLANET.hubLabels.length; h++) {
+    planetWorldTmp.copy(PLANET.hubLabels[h].position).applyMatrix4(PLANET.group.matrixWorld);
+    const ndc = planetWorldTmp.project(PLANET.camera);
+    if (ndc.z >= 1) continue; // behind the camera / off the near side, ignore
+    acceptedScreen.push({ x: (ndc.x * 0.5 + 0.5) * cw, y: (1 - (ndc.y * 0.5 + 0.5)) * ch });
+  }
+  const shownIdx = new Set();
+  const MIN_LABEL_GAP_PX = 50, MAX_LABELS_SHOWN = 14;
+  for (const cand of labelCandidates) {
+    if (shownIdx.size >= MAX_LABELS_SHOWN) break;
+    const a = PLANET.anchors[cand.idx];
+    planetWorldTmp.set(a.pos.x, a.pos.y, a.pos.z).applyMatrix4(PLANET.group.matrixWorld);
+    const ndc = planetWorldTmp.project(PLANET.camera);
+    const sx = (ndc.x * 0.5 + 0.5) * cw, sy = (1 - (ndc.y * 0.5 + 0.5)) * ch;
+    let tooClose = false;
+    for (const p of acceptedScreen) { if (Math.hypot(sx - p.x, sy - p.y) < MIN_LABEL_GAP_PX) { tooClose = true; break; } }
+    if (tooClose) continue;
+    acceptedScreen.push({ x: sx, y: sy });
+    shownIdx.add(cand.idx);
+  }
   for (let i = 0; i < PLANET.anchorLabels.length; i++) PLANET.anchorLabels[i].visible = shownIdx.has(i);
   PLANET.camera.position.set(0, 0, PLANET.cameraDist);
   PLANET.renderer.render(PLANET.scene, PLANET.camera);
