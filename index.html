@@ -1249,7 +1249,8 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.m
 const PLANET_RADIUS = 40;
 const PLANET = {
   built: false, scene: null, camera: null, renderer: null, group: null, raf: null,
-  hubs: [], anchors: [], anchorSprites: [], anchorLabels: [], hubSprites: [], hubLabels: [],
+  hubs: [], anchors: [], anchorSprites: [], hubSprites: [], hubLabels: [],
+  allLabelBooks: [], labelPool: [],
   satPositions: null, satIds: [], satPoints: null,
   raycaster: null,
   // minDist was 52 — only 12 units of working distance from the PLANET_RADIUS=40 surface.
@@ -1351,6 +1352,28 @@ function makePlanetTextSprite(text, colorCss, fontPx) {
 // Fresnel-glow shell (classic "glowing planet" rim-light look) — a slightly larger sphere,
 // rendered back-face-only with additive blending, brightest where the surface grazes away from
 // the camera. No textures, just a view/normal dot product in the fragment shader.
+// Repaints one pooled label sprite in place for a different book (see the pool built in
+// buildPlanet). Reusing the sprite/texture object rather than creating a new one per book is what
+// makes labeling any of the ~5.4k books affordable — only the handful currently on screen ever
+// own a canvas. Assigning canvas.width both resizes and clears it, and resets the 2D context
+// state, so font/alignment have to be re-set every time.
+function planetDrawPooledLabel(rec, book) {
+  const dpr = PLANET.labelDpr;
+  const ctx = rec.canvas.getContext('2d');
+  ctx.font = PLANET.labelFont;
+  const w = Math.ceil(ctx.measureText(book.title).width) + PLANET.labelPadX * 2 * dpr;
+  const h = rec.canvas.height;
+  rec.canvas.width = w;
+  ctx.font = PLANET.labelFont;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(0,0,0,0.65)'; ctx.shadowBlur = 5 * dpr;
+  ctx.fillStyle = PLANET.labelColor;
+  ctx.fillText(book.title, w / 2, h / 2);
+  rec.tex.needsUpdate = true;
+  rec.sprite.scale.set((w / dpr) * PLANET.labelWorldScale, (h / dpr) * PLANET.labelWorldScale, 1);
+  rec.sprite.position.set(book.lift.x, book.lift.y, book.lift.z);
+}
+
 function makePlanetGlow(radius, colorHex) {
   const geo = new THREE.SphereGeometry(radius, 48, 32);
   const mat = new THREE.ShaderMaterial({
@@ -1525,7 +1548,7 @@ function buildPlanet() {
   // sprite = more popular (same signal the old map used for node radius). Also gets a lifted
   // "flight-path" arc back to its hub — cheap (bounded by anchor count, not O(n²)) and reads
   // as a real network across the globe rather than a scatter of unconnected dots.
-  const anchorObjs = [], anchorSprites = [], anchorLabels = [];
+  const anchorObjs = [], anchorSprites = [];
   const arcPositions = [];
   for (const b of anchors) {
     const g = genreOf[b.i] || '?';
@@ -1544,16 +1567,8 @@ function buildPlanet() {
     sprite.userData = { kind: 'anchor', id: b.i, genre: g };
     group.add(sprite);
 
-    let title = b.t || ''; if (title.length > 20) title = title.slice(0, 19) + '…';
-    const label = makePlanetTextSprite(title, pal.text, 11);
-    const lift = { x: dir.x * (PLANET_RADIUS + 3.2), y: dir.y * (PLANET_RADIUS + 3.2) + 2.6, z: dir.z * (PLANET_RADIUS + 3.2) };
-    label.position.set(lift.x, lift.y, lift.z);
-    label.userData = { kind: 'anchorLabel', pop };
-    label.visible = false;
-    group.add(label);
-
     anchorObjs.push({ id: b.i, t: b.t, g, pop, dir, pos });
-    anchorSprites.push(sprite); anchorLabels.push(label);
+    anchorSprites.push(sprite);
 
     // Arc: hub -> anchor, control point lifted radially outward at the midpoint so it bows up
     // off the surface instead of cutting a straight chord through the planet.
@@ -1601,13 +1616,62 @@ function buildPlanet() {
   const satPoints = new THREE.Points(satGeo, satMat);
   group.add(satPoints);
 
+  // ---- Titles for EVERY book, not just the ~370 "anchors" ----------------------------------
+  // Previously only anchors ever had a text sprite built for them at all, so the other ~5000
+  // books were permanently unlabeled dots — zooming in could never reveal their titles, because
+  // those labels did not exist at any zoom level. Building 5.4k text sprites up front instead is
+  // not an option (each needs its own canvas + GPU texture). So: measure every book's label width
+  // once here (cheap, one-time), and let planetTick() assign a small pool of REUSABLE sprites to
+  // whichever books are actually near enough and un-occluded to be readable right now, redrawing
+  // a pooled sprite's canvas only when the book occupying it actually changes.
+  const labelMeasureCtx = document.createElement('canvas').getContext('2d');
+  const LABEL_DPR = Math.min(window.devicePixelRatio || 1, 2);
+  const LABEL_FONT_PX = 11, LABEL_PAD_X = 10;
+  const LABEL_FONT = `700 ${LABEL_FONT_PX * LABEL_DPR}px -apple-system,BlinkMacSystemFont,sans-serif`;
+  // Mirrors makePlanetTextSprite's own scale math so pooled labels match the hub labels' sizing.
+  const LABEL_WORLD_SCALE = (11 / LABEL_FONT_PX) * 0.09;
+  labelMeasureCtx.font = LABEL_FONT;
+  const allLabelBooks = [];
+  for (const b of DB.books) {
+    const g = b.g || '?';
+    const dir = bookDir[b.i] || genreSeed[g] || { x: 0, y: 1, z: 0 };
+    let title = b.t || ''; if (title.length > 20) title = title.slice(0, 19) + '…';
+    const texW = Math.ceil(labelMeasureCtx.measureText(title).width) + LABEL_PAD_X * 2 * LABEL_DPR;
+    allLabelBooks.push({
+      id: b.i, title,
+      worldW: (texW / LABEL_DPR) * LABEL_WORLD_SCALE,
+      pos: { x: dir.x * PLANET_RADIUS, y: dir.y * PLANET_RADIUS, z: dir.z * PLANET_RADIUS },
+      lift: { x: dir.x * (PLANET_RADIUS + 3.2), y: dir.y * (PLANET_RADIUS + 3.2) + 2.6, z: dir.z * (PLANET_RADIUS + 3.2) },
+    });
+  }
+  // Pool size is bounded by what can be legibly on screen at once (the declutter pass rarely
+  // accepts more than ~40 even on a wide desktop viewport), not by catalog size.
+  const LABEL_POOL_SIZE = 96;
+  const labelPool = [];
+  for (let i = 0; i < LABEL_POOL_SIZE; i++) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 8; canvas.height = (LABEL_FONT_PX + 10) * LABEL_DPR;
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.minFilter = THREE.LinearFilter;
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
+    sprite.visible = false;
+    sprite.renderOrder = 2; // keep titles above the dots/arcs they sit over
+    group.add(sprite);
+    labelPool.push({ sprite, canvas, tex, bookIdx: -1 });
+  }
+
   camera.position.set(0, 0, PLANET.cameraDist);
   camera.lookAt(0, 0, 0);
   group.rotation.x = PLANET.pitch;
 
   PLANET.scene = scene; PLANET.camera = camera; PLANET.renderer = renderer; PLANET.group = group;
   PLANET.hubs = hubs; PLANET.hubSprites = hubSprites; PLANET.hubLabels = hubLabels;
-  PLANET.anchors = anchorObjs; PLANET.anchorSprites = anchorSprites; PLANET.anchorLabels = anchorLabels;
+  PLANET.anchors = anchorObjs; PLANET.anchorSprites = anchorSprites;
+  PLANET.allLabelBooks = allLabelBooks;
+  PLANET.labelPool = labelPool;
+  PLANET.labelFont = LABEL_FONT; PLANET.labelDpr = LABEL_DPR;
+  PLANET.labelPadX = LABEL_PAD_X; PLANET.labelWorldScale = LABEL_WORLD_SCALE;
+  PLANET.labelColor = pal.text;
   PLANET.satPoints = satPoints; PLANET.satIds = satIds;
   PLANET.raycaster = new THREE.Raycaster();
   PLANET.raycaster.params.Points.threshold = 1.1;
@@ -1674,19 +1738,26 @@ function planetTick(ts) {
   // each one's ACTUAL current world position — rotation-aware, so it stays correct as the planet
   // auto-rotates or gets dragged.
   PLANET.group.updateMatrixWorld();
+  const AB = PLANET.allLabelBooks;
   const labelCandidates = [];
-  for (let i = 0; i < PLANET.anchors.length; i++) {
-    planetWorldTmp.set(PLANET.anchors[i].pos.x, PLANET.anchors[i].pos.y, PLANET.anchors[i].pos.z).applyMatrix4(PLANET.group.matrixWorld);
+  for (let i = 0; i < AB.length; i++) {
+    planetWorldTmp.set(AB[i].pos.x, AB[i].pos.y, AB[i].pos.z).applyMatrix4(PLANET.group.matrixWorld);
     planetOutwardTmp.copy(planetWorldTmp).normalize();
     planetToCamTmp.subVectors(PLANET.camera.position, planetWorldTmp).normalize();
     if (planetOutwardTmp.dot(planetToCamTmp) < 0.12) continue; // facing away — hidden behind the sphere body anyway
     const distToCam = planetWorldTmp.distanceTo(PLANET.camera.position);
     labelCandidates.push({ idx: i, distToCam });
   }
-  // Closer-to-camera anchors still win when two candidates compete for the same screen-space slot
-  // (so zooming into one region does still prioritize ITS titles), but nothing outside a narrow
-  // cone is excluded outright any more — every facing genre gets a fair shot at its own slots.
-  labelCandidates.sort((a, b) => a.distToCam - b.distToCam);
+  // Closer-to-camera books still win when two compete for the same screen-space slot (so zooming
+  // into a region does prioritize ITS titles), but a book that is ALREADY labeled outranks any
+  // newcomer regardless of distance. Without that hysteresis the greedy declutter below re-picks
+  // winners from scratch every frame, and the slowly-shifting distance order makes ~7 of the ~40
+  // visible titles swap out per frame even at the gentle auto-rotate speed — the whole set
+  // churning several times a second, which reads as flickering text rather than a stable map.
+  const shownNow = new Set();
+  for (const rec of PLANET.labelPool) if (rec.sprite.visible && rec.bookIdx >= 0) shownNow.add(rec.bookIdx);
+  labelCandidates.sort((a, b) =>
+    (shownNow.has(a.idx) ? 0 : 1) - (shownNow.has(b.idx) ? 0 : 1) || a.distToCam - b.distToCam);
   // No more per-genre favoritism from a hard total cap — the only real limits left are actual
   // screen space (the min-gap-px check below) and a generous ceiling comfortably above the total
   // number of anchors that will ever exist at once, so "how many titles fit legibly on screen
@@ -1719,15 +1790,20 @@ function planetTick(ts) {
     const halfW = (PLANET.hubLabels[h].scale.x / 2) * pxPerWorldUnitAt(hubDist);
     acceptedScreen.push({ x: (ndc.x * 0.5 + 0.5) * cw, y: (1 - (ndc.y * 0.5 + 0.5)) * ch, halfW });
   }
-  const shownIdx = new Set();
-  const MAX_LABELS_SHOWN = 500; // just "more than could ever exist," not a real limit
-  for (const cand of labelCandidates) {
-    if (shownIdx.size >= MAX_LABELS_SHOWN) break;
-    const a = PLANET.anchors[cand.idx];
-    planetWorldTmp.set(a.pos.x, a.pos.y, a.pos.z).applyMatrix4(PLANET.group.matrixWorld);
+  const pool = PLANET.labelPool;
+  const chosen = [];
+  // Candidates are distance-sorted, so walking only the nearest slice loses nothing that would
+  // have been accepted anyway — it just bounds the per-frame projection cost when most of a
+  // 5000-strong facing hemisphere would be rejected for overlap regardless.
+  const EXAMINE_LIMIT = Math.min(labelCandidates.length, 900);
+  for (let ci = 0; ci < EXAMINE_LIMIT; ci++) {
+    if (chosen.length >= pool.length) break;
+    const cand = labelCandidates[ci];
+    const bk = AB[cand.idx];
+    planetWorldTmp.set(bk.pos.x, bk.pos.y, bk.pos.z).applyMatrix4(PLANET.group.matrixWorld);
     const ndc = planetWorldTmp.project(PLANET.camera);
     const sx = (ndc.x * 0.5 + 0.5) * cw, sy = (1 - (ndc.y * 0.5 + 0.5)) * ch;
-    const halfW = (PLANET.anchorLabels[cand.idx].scale.x / 2) * pxPerWorldUnitAt(cand.distToCam);
+    const halfW = (bk.worldW / 2) * pxPerWorldUnitAt(cand.distToCam);
     let tooClose = false;
     for (const p of acceptedScreen) {
       const required = halfW + p.halfW + LABEL_PAD_PX;
@@ -1739,9 +1815,37 @@ function planetTick(ts) {
     }
     if (tooClose) continue;
     acceptedScreen.push({ x: sx, y: sy, halfW });
-    shownIdx.add(cand.idx);
+    chosen.push(cand.idx);
   }
-  for (let i = 0; i < PLANET.anchorLabels.length; i++) PLANET.anchorLabels[i].visible = shownIdx.has(i);
+  // Hand the winners to pooled sprites, preferring to leave a book in the slot it already
+  // occupies — frame to frame the winning set barely changes, so this keeps canvas repaints
+  // near zero while the view is steady.
+  const chosenSet = new Set(chosen);
+  const occupied = new Map();
+  const freeSlots = [];
+  for (let s = 0; s < pool.length; s++) {
+    const bi = pool[s].bookIdx;
+    if (bi >= 0 && chosenSet.has(bi) && !occupied.has(bi)) occupied.set(bi, s);
+    else freeSlots.push(s);
+  }
+  // Repainting every newly-shown label in a single frame is what a fast flick would demand;
+  // spreading it over a few frames instead trades a brief fill-in for a steady frame rate.
+  const MAX_REDRAWS_PER_FRAME = 14;
+  let redraws = 0;
+  const usedSlots = new Set();
+  for (const bi of chosen) {
+    let s = occupied.get(bi);
+    if (s === undefined) {
+      if (redraws >= MAX_REDRAWS_PER_FRAME || !freeSlots.length) continue;
+      s = freeSlots.pop();
+      planetDrawPooledLabel(pool[s], AB[bi]);
+      pool[s].bookIdx = bi;
+      redraws++;
+    }
+    pool[s].sprite.visible = true;
+    usedSlots.add(s);
+  }
+  for (let s = 0; s < pool.length; s++) if (!usedSlots.has(s)) pool[s].sprite.visible = false;
   PLANET.camera.position.set(0, 0, PLANET.cameraDist);
   PLANET.renderer.render(PLANET.scene, PLANET.camera);
   PLANET.raf = requestAnimationFrame(planetTick);
