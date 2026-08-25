@@ -1612,38 +1612,50 @@ function planetTick(ts) {
     // distinguishable from "not rotating at all" over the few seconds someone actually watches it.
     PLANET.group.rotation.y += 0.16 * dt;
   }
-  // Reveal titles for whichever books are actually near the camera right now — NOT a fixed
-  // global-popularity ranking. That first version picked the catalog's ~200 most-downloaded
-  // books regardless of where they sat on the sphere, so zooming all the way into a lower-
-  // download genre (language learning, poetry...) could show zero titles even at max zoom,
-  // because none of ITS books ever made the global top-K cut — exactly "only genre labels, no
-  // real books" once you zoom into anything but the biggest genres. Recomputed every frame
-  // (cheap: a couple hundred anchors) from each one's ACTUAL current world position — rotation-
-  // aware, so it stays correct as the planet spins — and its distance/facing relative to the
-  // camera, so whatever is actually under the camera right now is what gets labeled.
+  // Reveal titles for every book that's actually facing the camera right now (i.e. on the visible
+  // hemisphere, not hidden behind the sphere body) — genre hub names are just a "this genre lives
+  // here" sign, not a gate you have to zoom through before any of ITS books show. An earlier version
+  // also required each candidate to be within a fairly tight near-camera distance on top of that —
+  // at default zoom that cone still spans several genre regions at once, but only ~14 titles total
+  // were ever allowed to show, so whichever genre's anchors happened to sort closest won nearly
+  // every slot and every OTHER genre on screen showed zero titles — reading exactly like "titles
+  // only appear for whatever genre I've zoomed into," even without zooming into any one genre.
+  // Recomputed every frame (cheap: a couple hundred anchors total across the whole catalog) from
+  // each one's ACTUAL current world position — rotation-aware, so it stays correct as the planet
+  // auto-rotates or gets dragged.
   PLANET.group.updateMatrixWorld();
-  // Reveal titles for whichever books are actually near the camera and facing it right now —
-  // recomputed every frame (cheap: a couple hundred anchors) from each one's ACTUAL current world
-  // position, so it stays correct as the planet auto-rotates or gets dragged.
-  const nearThreshold = (PLANET.cameraDist - PLANET_RADIUS) + 26; // scales with zoom automatically
   const labelCandidates = [];
   for (let i = 0; i < PLANET.anchors.length; i++) {
     planetWorldTmp.set(PLANET.anchors[i].pos.x, PLANET.anchors[i].pos.y, PLANET.anchors[i].pos.z).applyMatrix4(PLANET.group.matrixWorld);
-    const distToCam = planetWorldTmp.distanceTo(PLANET.camera.position);
-    if (distToCam > nearThreshold) continue;
     planetOutwardTmp.copy(planetWorldTmp).normalize();
     planetToCamTmp.subVectors(PLANET.camera.position, planetWorldTmp).normalize();
     if (planetOutwardTmp.dot(planetToCamTmp) < 0.12) continue; // facing away — hidden behind the sphere body anyway
+    const distToCam = planetWorldTmp.distanceTo(PLANET.camera.position);
     labelCandidates.push({ idx: i, distToCam });
   }
+  // Closer-to-camera anchors still win when two candidates compete for the same screen-space slot
+  // (so zooming into one region does still prioritize ITS titles), but nothing outside a narrow
+  // cone is excluded outright any more — every facing genre gets a fair shot at its own slots.
   labelCandidates.sort((a, b) => a.distToCam - b.distToCam);
-  // A raw top-26-by-distance cap still let densely-packed anchors (many books scattered within
-  // one tight genre cluster, which is exactly what "zoomed all the way into one genre" looks
-  // like) pile their titles directly on top of each other into unreadable overlapping text.
+  // No more per-genre favoritism from a hard total cap — the only real limits left are actual
+  // screen space (the min-gap-px check below) and a generous ceiling comfortably above the total
+  // number of anchors that will ever exist at once, so "how many titles fit legibly on screen
+  // right now" is the sole thing deciding the count, not an arbitrary global number.
   // Greedily accept a candidate only if it lands far enough away, in actual screen pixels, from
   // every label already accepted this frame — guarantees titles never visually collide, however
   // tightly the underlying books happen to be packed in world space.
   const cw = PLANET.renderer.domElement.clientWidth, ch = PLANET.renderer.domElement.clientHeight;
+  // A flat pixel gap between label ANCHOR POINTS doesn't actually prevent overlapping TEXT — a
+  // 50px gap is plenty for two short titles but nowhere near enough for two ~20-character ones,
+  // whose rendered sprites can each be 100+ screen px wide at default zoom (confirmed visually:
+  // titles inside one genre's cluster were overlapping into unreadable text despite "passing" the
+  // old flat-gap check). Each label sprite's world-space width is already baked in at build time
+  // (makePlanetTextSprite scales it to the text's actual measured length), so convert that to an
+  // actual on-screen half-width via the standard perspective-projection scale factor and require
+  // gaps to clear the sum of both labels' real half-widths, not a guessed constant.
+  const fovRad = PLANET.camera.fov * Math.PI / 180;
+  const pxPerWorldUnitAt = (distToCam) => ch / (2 * distToCam * Math.tan(fovRad / 2));
+  const LABEL_PAD_PX = 8;
   // Hub labels are always shown (never decluttered against each other — genres are spread far
   // enough apart by construction) but an anchor label landing right on top of ITS OWN hub's name
   // was still the one remaining overlap case. Seed the accepted list with visible hub positions
@@ -1653,20 +1665,30 @@ function planetTick(ts) {
     planetWorldTmp.copy(PLANET.hubLabels[h].position).applyMatrix4(PLANET.group.matrixWorld);
     const ndc = planetWorldTmp.project(PLANET.camera);
     if (ndc.z >= 1) continue; // behind the camera / off the near side, ignore
-    acceptedScreen.push({ x: (ndc.x * 0.5 + 0.5) * cw, y: (1 - (ndc.y * 0.5 + 0.5)) * ch });
+    const hubDist = planetWorldTmp.distanceTo(PLANET.camera.position);
+    const halfW = (PLANET.hubLabels[h].scale.x / 2) * pxPerWorldUnitAt(hubDist);
+    acceptedScreen.push({ x: (ndc.x * 0.5 + 0.5) * cw, y: (1 - (ndc.y * 0.5 + 0.5)) * ch, halfW });
   }
   const shownIdx = new Set();
-  const MIN_LABEL_GAP_PX = 50, MAX_LABELS_SHOWN = 14;
+  const MAX_LABELS_SHOWN = 500; // just "more than could ever exist," not a real limit
   for (const cand of labelCandidates) {
     if (shownIdx.size >= MAX_LABELS_SHOWN) break;
     const a = PLANET.anchors[cand.idx];
     planetWorldTmp.set(a.pos.x, a.pos.y, a.pos.z).applyMatrix4(PLANET.group.matrixWorld);
     const ndc = planetWorldTmp.project(PLANET.camera);
     const sx = (ndc.x * 0.5 + 0.5) * cw, sy = (1 - (ndc.y * 0.5 + 0.5)) * ch;
+    const halfW = (PLANET.anchorLabels[cand.idx].scale.x / 2) * pxPerWorldUnitAt(cand.distToCam);
     let tooClose = false;
-    for (const p of acceptedScreen) { if (Math.hypot(sx - p.x, sy - p.y) < MIN_LABEL_GAP_PX) { tooClose = true; break; } }
+    for (const p of acceptedScreen) {
+      const required = halfW + p.halfW + LABEL_PAD_PX;
+      // Cheap horizontal-first check (labels are wide, short — width dominates the overlap test;
+      // a plain circular radius would over-reject vertically stacked labels that don't actually
+      // overlap left-right) with a vertical fallback so two labels merely near the same x but
+      // clearly stacked vertically (different rows) don't needlessly block each other either.
+      if (Math.abs(sx - p.x) < required && Math.abs(sy - p.y) < (Math.min(halfW, p.halfW) * 0.6 + LABEL_PAD_PX)) { tooClose = true; break; }
+    }
     if (tooClose) continue;
-    acceptedScreen.push({ x: sx, y: sy });
+    acceptedScreen.push({ x: sx, y: sy, halfW });
     shownIdx.add(cand.idx);
   }
   for (let i = 0; i < PLANET.anchorLabels.length; i++) PLANET.anchorLabels[i].visible = shownIdx.has(i);
