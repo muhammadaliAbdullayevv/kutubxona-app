@@ -3639,10 +3639,27 @@ function lgCanvasUp(e) {
   if (id) lgOpenBook(id);
 }
 function lgOpenBook(id) {
+  // openDetail() silently no-ops (if(!b)return;) for an id it can't find in byId — and this
+  // function used to cancel LG.raf and hand off to it unconditionally. When that happened, the
+  // detail sheet never opened, so the ONLY resume path (closeSheet()'s openedFromLibGame check)
+  // never fired either: the loop was already stopped with nothing left to restart it — a
+  // permanent freeze the watchdog below had to paper over every 1.5s. Checking the same
+  // existence guard openDetail uses, before touching the loop at all, means a lookup miss now
+  // just does nothing (as if the tap missed), instead of stopping a loop that will never restart.
+  if (!byId[id]) return;
   window.haptic?.('light');
   if (LG.raf) { cancelAnimationFrame(LG.raf); LG.raf = null; }
   window.openedFromLibGame = true;
-  window.openDetail(id);
+  try {
+    window.openDetail(id);
+  } catch (e) {
+    // Any other unexpected failure inside openDetail (already past the byId guard) must not
+    // leave the loop stopped either — undo the commitment immediately rather than waiting on
+    // the watchdog.
+    window.openedFromLibGame = false;
+    window.lgResumeAfterDetail?.();
+    throw e;
+  }
 }
 
 const LG_KEY_MAP = {
