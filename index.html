@@ -102,6 +102,21 @@
   .si .prog,.book .prog{height:4px; border-radius:3px; background:var(--line); margin:8px 1px 0; overflow:hidden}
   .si .prog .progbar,.book .prog .progbar{height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2)); border-radius:3px}
   .book .resume{display:block; width:100%; margin-top:6px; border:0; border-radius:10px; padding:7px; font-size:12px; font-weight:800; color:#fff; background:linear-gradient(135deg,var(--accent),var(--accent2)); cursor:pointer; font-family:inherit}
+  /* Home hero — single most-recent in-progress book, replaces the old multi-item shelf */
+  .hero{position:relative; border-radius:20px; padding:20px; margin:4px 0 18px; box-shadow:var(--shadow); display:flex; gap:16px; align-items:center; cursor:pointer}
+  .heroCover{width:76px; height:106px; border-radius:10px; flex-shrink:0; background:rgba(0,0,0,.15); display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative; box-shadow:0 6px 16px rgba(0,0,0,.35)}
+  .heroCover .ini{font-size:26px; font-weight:800; color:#fff}
+  .heroInfo{flex:1; min-width:0; color:#fff}
+  .heroTitle{font-size:17px; font-weight:800; line-height:1.25; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
+  .heroAuthor{font-size:13px; opacity:.85; margin-top:2px}
+  .heroProg{height:5px; border-radius:3px; background:rgba(255,255,255,.3); margin:12px 0 10px; overflow:hidden}
+  .heroProg b{display:block; height:100%; background:#fff; border-radius:3px}
+  .heroBtn{border:0; background:rgba(255,255,255,.22); color:#fff; font-weight:800; font-size:13.5px; padding:9px 16px; border-radius:999px; cursor:pointer; font-family:inherit}
+  /* Topic chips — real per-book tags, not curated editorial collections */
+  .tchip{flex:0 0 auto; background:transparent; border:1px solid var(--line); color:var(--text); padding:8px 14px; border-radius:999px; font-size:13px; font-weight:700; white-space:nowrap; cursor:pointer}
+  /* Trending window toggle (Kunlik/Haftalik/Oylik) inside the "Top kitoblar" shelf */
+  .tw{flex:0 0 auto; background:var(--chip); border:1px solid var(--line); color:var(--muted); padding:6px 13px; border-radius:999px; font-size:12.5px; font-weight:700; white-space:nowrap; cursor:pointer}
+  .tw.on{background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border-color:transparent}
   /* Auto-scrolling "recently added" ticker, top of home */
   .mqwrap{overflow-x:auto; scrollbar-width:none; padding:2px 0 6px; margin:0 -14px}
   .mqwrap::-webkit-scrollbar{display:none}
@@ -620,7 +635,7 @@ var byId={};
 // reasoning as DB/byId above) makes them real globals every script on the page can see.
 var openedFromGlobe=false;
 let state={q:'',genre:'',audience:'',type:'',sort:'relevance',view:'browse',shown:24,result:[],all:false};
-let HOME={newest:[],audio:[],authors:[],genres:[],continue:[]};
+let HOME={newest:[],audio:[],authors:[],genres:[],continue:[],topics:[],trending:[]};
 let favs=new Set();
 const PAGE=24;
 
@@ -753,22 +768,15 @@ function buildHome(){
   for(const b of DB.books){const a=(b.a||'').trim();if(a&&a.length>1&&!/noma'?lum/i.test(a))ac[a]=(ac[a]||0)+1;}
   HOME.authors=Object.entries(ac).filter(([a,c])=>c>=2).sort((x,y)=>y[1]-x[1]).slice(0,16).map(([a,c])=>({a,c}));
   HOME.genres=DB.genres.slice(0,5).map(g=>({v:g.v,c:g.c,books:DB.books.filter(b=>b.g===g.v).slice(0,18)}));
+  // Topic chips: real per-book tags (the `s` array — already part of search relevance in
+  // score()/indexBook's _subs), not an editorial "collections" feature — no curation needed,
+  // just the most common tags across the catalog. Threshold of 15 keeps rare/noisy tags out.
+  const tc={};
+  for(const b of DB.books)for(const t of (b.s||[])){const k=(t||'').trim();if(k)tc[k]=(tc[k]||0)+1;}
+  HOME.topics=Object.entries(tc).filter(([t,c])=>c>=15).sort((x,y)=>y[1]-x[1]).slice(0,12).map(([t])=>t);
 }
 function siHtml(b,i){const[c1,c2]=coverFor(b.i);return `<div class="si" data-id="${esc(b.i)}" style="--d:${Math.min(i||0,12)*30}ms"><div class="sc" style="background:linear-gradient(135deg,${c1},${c2})">${b.hc?`<img class="ci" src="covers/${encodeURIComponent(b.i)}.jpg" loading="lazy" onerror="this.remove()">`:''}${b.ha?'<span class="aud">🎧</span>':''}<span class="ini">${esc(initials(b.t))}</span></div><div class="st">${esc(b.t)}</div><div class="sa">${esc(b.a||'')}</div>${b.rc?`<div class="sr">⭐ <b>${b.rt}</b> (${b.rc})</div>`:''}</div>`;}
 function shelf(title,books,see){return `<div class="section"><div class="shead"><h2>${esc(title)}</h2>${see?`<span class="see" ${see}>Barchasi →</span>`:''}</div><div class="shelf">${books.map((b,i)=>siHtml(b,i)).join('')}</div></div>`;}
-// "Continue reading/listening" card — same .si skeleton as siHtml so it shares all existing
-// sizing/animation/click-wiring, plus a kind badge (📖 read vs 🎧 listen, since a book with both
-// unfinished a PDF AND audio progress only ever appears once, keyed to whichever was touched more
-// recently server-side) and a percent-complete bar fed by webapi's /api/profile/continue.
-function continueSiHtml(item,i){
-  const b=item.book,pct=item.percent==null?0:item.percent;
-  const[c1,c2]=coverFor(b.i);
-  return `<div class="si" data-id="${esc(b.i)}" style="--d:${Math.min(i||0,12)*30}ms"><div class="sc" style="background:linear-gradient(135deg,${c1},${c2})">${b.hc?`<img class="ci" src="covers/${encodeURIComponent(b.i)}.jpg" loading="lazy" onerror="this.remove()">`:''}<span class="kind">${item.kind==='listen'?'🎧':'📖'}</span><span class="ini">${esc(initials(b.t))}</span></div><div class="prog"><div class="progbar" style="width:${pct}%"></div></div><div class="st">${esc(b.t)}</div><div class="sa">${pct}% • ${esc(b.a||'')}</div></div>`;
-}
-function continueShelf(items,see){
-  if(!items.length)return'';
-  return `<div class="section"><div class="shead"><h2>▶️ Davom eting</h2>${see?`<span class="see" ${see}>Barchasi →</span>`:''}</div><div class="shelf">${items.map((it,i)=>continueSiHtml(it,i)).join('')}</div></div>`;
-}
 // Fetched separately (not blocking initial paint like books.json is) and merged in after the
 // fact — auth + a DB round trip on top of the static catalog load, so the home screen shows its
 // normal shelves immediately and this one fades in a beat later once it resolves. Only ever
@@ -781,6 +789,63 @@ async function loadContinueReading(){
     if(items.length){HOME.continue=items;if(isHome())renderHome();else if(state.view==='continue')run();}
   }catch(e){}
 }
+// Hero card — the single most-recent in-progress book, big and prominent above everything
+// else. Replaces the old multi-item "Davom eting" shelf on the home screen (the full list still
+// lives one tap away in the Mutolaaxonam tab) so the same top item isn't shown twice in a row.
+function heroHtml(item){
+  const b=item.book,pct=item.percent==null?0:item.percent;
+  const[c1,c2]=coverFor(b.i);
+  return `<div class="hero" style="background:linear-gradient(135deg,${c1},${c2})" data-id="${esc(b.i)}">
+    <div class="heroCover">${b.hc?`<img class="ci" src="covers/${encodeURIComponent(b.i)}.jpg" loading="lazy" onerror="this.remove()">`:''}<span class="ini">${esc(initials(b.t))}</span></div>
+    <div class="heroInfo">
+      <div class="heroTitle">${esc(b.t)}</div>
+      <div class="heroAuthor">${esc(b.a||'')}</div>
+      <div class="heroProg"><b style="width:${pct}%"></b></div>
+      <button class="heroBtn" data-resume="${esc(b.i)}" data-kind="${item.kind}">${item.kind==='listen'?'🎧':'📖'} O'qish (${pct}%) →</button>
+    </div>
+  </div>`;
+}
+// Topic chips row — tapping one runs it as a search term, reusing the exact same relevance
+// engine every other search already goes through (tags are indexed into _subs already).
+function topicsHtml(topics){
+  if(!topics.length)return'';
+  return `<div class="row" id="topicChips">${topics.map(t=>`<span class="tchip" data-topic="${esc(t)}">#${esc(t)}</span>`).join('')}</div>`;
+}
+// "Siz uchun" — a simple, honest content-based heuristic (genres of the books you've favorited
+// or are reading, weighted by frequency), not a real recommendation model. Computed fresh at
+// render time (not cached on HOME/buildHome) since it depends on favs/HOME.continue, both of
+// which resolve asynchronously after the initial catalog load.
+function computeForYou(){
+  const seedIds=new Set([...favs,...HOME.continue.map(it=>it.id)]);
+  if(!seedIds.size)return[];
+  const gc={};
+  for(const id of seedIds){const b=byId[id];if(b&&b.g)gc[b.g]=(gc[b.g]||0)+1;}
+  const topGenres=Object.entries(gc).sort((x,y)=>y[1]-x[1]).slice(0,2).map(([g])=>g);
+  if(!topGenres.length)return[];
+  return DB.books.filter(b=>topGenres.includes(b.g)&&!seedIds.has(b.i))
+    .sort((x,y)=>(y.rt||0)*(y.rc||0)-(x.rt||0)*(x.rc||0)||(y.dl||0)-(x.dl||0))
+    .slice(0,18);
+}
+// Trending shelf with a Kunlik/Haftalik/Oylik toggle, backed by /api/books/trending (a real
+// timestamped event log — see db.py's book_download_events, migration 95). The log starts
+// empty at deploy time, so every window looks the same (near-empty) at first; that's honestly
+// reflected here rather than hidden, since it'll fill in as real usage accumulates.
+let trendingWindow='week';
+function trendingShelf(books){
+  const btn=(w,l)=>`<span class="tw${trendingWindow===w?' on':''}" data-w="${w}">${l}</span>`;
+  const body=books.length?`<div class="shelf">${books.map((b,i)=>siHtml(b,i)).join('')}</div>`:`<p class="hint" style="margin:0 14px 4px">Hali yetarli statistika yo'q — tez orada to'planadi.</p>`;
+  return `<div class="section"><div class="shead"><h2>🔥 Top kitoblar</h2></div>
+    <div class="row" id="trendWin">${btn('day','Kunlik')}${btn('week','Haftalik')}${btn('month','Oylik')}</div>
+    ${body}
+  </div>`;
+}
+async function loadTrending(){
+  try{
+    const r=await api('/api/books/trending?window='+trendingWindow+'&limit=18');
+    HOME.trending=(r.items||[]).map(it=>byId[it.id]).filter(Boolean);
+  }catch(e){HOME.trending=[];}
+  if(isHome())renderHome();
+}
 function marqueeShelf(title,books,see){
   if(!books.length)return '';
   const cards=books.map((b,i)=>siHtml(b,i)).join('');
@@ -790,15 +855,27 @@ function marqueeShelf(title,books,see){
 }
 function renderHome(){
   const h=$('#home');let html='';
-  if(HOME.continue.length)html+=continueShelf(HOME.continue.slice(0,12),'data-see="continue"');
+  if(HOME.continue.length)html+=heroHtml(HOME.continue[0]);
+  if(HOME.topics.length)html+=topicsHtml(HOME.topics);
+  const forYou=computeForYou();
+  if(forYou.length)html+=shelf("✨ Siz uchun",forYou);
   if(HOME.newest.length)html+=marqueeShelf("🆕 Yangi qo'shilgan",HOME.newest,'data-see="newest"');
   if(HOME.authors.length)html+=`<div class="section"><div class="shead"><h2>✍️ Mashhur mualliflar</h2></div><div class="authchips">${HOME.authors.map(a=>`<div class="authchip" data-auth="${esc(a.a)}"><span class="an">${esc(a.a)}</span><span class="ac">${a.c} ta kitob</span></div>`).join('')}</div></div>`;
   if(HOME.audio.length)html+=shelf("🎧 Audiokitoblar",HOME.audio,'data-see="audio"');
+  html+=trendingShelf(HOME.trending);
   for(const g of HOME.genres)html+=shelf(g.v,g.books,`data-see="genre" data-v="${esc(g.v)}"`);
   h.innerHTML=html;
   h.querySelectorAll('.si').forEach(el=>el.onclick=()=>openDetail(el.dataset.id));
+  h.querySelectorAll('.hero').forEach(el=>el.onclick=e=>{if(e.target.closest('[data-resume]'))return;openDetail(el.dataset.id);});
+  h.querySelectorAll('.hero [data-resume]').forEach(el=>el.onclick=e=>{
+    e.stopPropagation();
+    const id=el.dataset.resume,b=byId[id];
+    if(el.dataset.kind==='listen')openAudioPlayer(id,b?.t);else openPdfReader(id,b?.t);
+  });
+  h.querySelectorAll('[data-topic]').forEach(el=>el.onclick=()=>{state.all=false;$('#q').value=el.dataset.topic;state.q=el.dataset.topic;$('#clr').style.display='block';haptic();run();window.scrollTo(0,0);});
+  h.querySelectorAll('#trendWin .tw').forEach(el=>el.onclick=()=>{haptic();trendingWindow=el.dataset.w;loadTrending();});
   h.querySelectorAll('[data-auth]').forEach(el=>el.onclick=()=>{state.all=false;$('#q').value=el.dataset.auth;state.q=el.dataset.auth;$('#clr').style.display='block';haptic();run();window.scrollTo(0,0);});
-  h.querySelectorAll('[data-see]').forEach(el=>el.onclick=()=>{const s=el.dataset.see;if(s==='newest'){state.all=true;state.sort='newest';$('#sort').value='newest';}else if(s==='audio'){state.type='audio';renderChips();}else if(s==='genre'){state.genre=el.dataset.v;renderChips();}else if(s==='continue'){state.view='continue';state.all=false;state.sort='relevance';$('#sort').value='relevance';setTabs();}haptic();run();window.scrollTo(0,0);});
+  h.querySelectorAll('[data-see]').forEach(el=>el.onclick=()=>{const s=el.dataset.see;if(s==='newest'){state.all=true;state.sort='newest';$('#sort').value='newest';}else if(s==='audio'){state.type='audio';renderChips();}else if(s==='genre'){state.genre=el.dataset.v;renderChips();}haptic();run();window.scrollTo(0,0);});
 }
 // ---- gentle auto-scroll for the "recently added" ticker, native scroll underneath so a
 // touch/swipe always fully overrides it (pauses the moment a finger touches it, resumes a
@@ -1431,6 +1508,7 @@ async function boot(){
   await loadFavs();
   renderChips();run();
   loadContinueReading();
+  loadTrending();
   trackEvent('app_open');
   liveRefreshPublicStats();
   setInterval(liveRefreshPublicStats,6000);
