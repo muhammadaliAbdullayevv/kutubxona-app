@@ -334,7 +334,7 @@
   .liveBadgeRight{display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700; opacity:.92}
   /* The panel is a full page (like the PDF reader), not a bottom drawer — a "footer" card reads
      as a minor add-on; a whole page reads as what it actually is, the app's stats dashboard. */
-  #liveSheet,#listSheet,#shelvesSheet,#reviewsSheet,#writeReviewSheet,#profileEditSheet{flex-direction:column}
+  #liveSheet,#listSheet,#shelvesSheet,#reviewsSheet,#writeReviewSheet,#profileEditSheet,#avatarCropSheet{flex-direction:column}
   /* Generalized from the Statistika panel's own topbar so new full-page sheets (Reading Room's
      drill-in lists, Javon) get the same "whole page, not a bottom drawer" treatment for free. */
   #liveTopbar,.stopbar{flex-shrink:0; display:flex; align-items:center; justify-content:space-between; gap:12px;
@@ -431,6 +431,13 @@
   .genderPick{display:flex; gap:8px}
   .genderPick .chip{flex:1; text-align:center; padding:10px}
   #profileSaveBtn{width:100%; margin-top:6px}
+  /* ---- avatar crop tool (#avatarCropSheet) ---- */
+  .cropWrap{position:relative; width:300px; height:300px; max-width:80vw; max-height:80vw; border-radius:12px; overflow:hidden; background:#111; touch-action:none; margin:6px 0 16px}
+  #cropCanvas{width:100%; height:100%; display:block}
+  .cropMask{position:absolute; inset:0; pointer-events:none; box-shadow:0 0 0 9999px rgba(0,0,0,.55); border-radius:50%; border:2px solid rgba(255,255,255,.9)}
+  #cropZoom{width:100%; max-width:320px; margin:4px 0 18px}
+  .cropActions{display:flex; gap:10px; width:100%; max-width:320px}
+  .cropActions .btn{flex:1}
   .pcard{display:flex; align-items:center; gap:12px; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px 14px; margin:14px 0; cursor:pointer}
   .pcard .avWrap{position:relative; flex-shrink:0}
   .pcard .avImg{position:absolute; top:0; left:0; border-radius:50%; object-fit:cover}
@@ -606,6 +613,18 @@
 <div class="sheet" id="profileEditSheet" style="z-index:52; align-items:stretch; background:var(--bg)">
   <div class="stopbar"><div class="stopbarTitle">👤 Profilni tahrirlash</div><div class="gclose" id="profileEditClose">✕</div></div>
   <div class="ssheetc" id="profileEditSheetc"></div>
+</div>
+<div class="sheet" id="avatarCropSheet" style="z-index:54; align-items:stretch; background:var(--bg)">
+  <div class="stopbar"><div class="stopbarTitle">Rasmni moslashtirish</div><div class="gclose" id="avatarCropClose">✕</div></div>
+  <div class="ssheetc" id="avatarCropSheetc" style="display:flex; flex-direction:column; align-items:center">
+    <div class="cropWrap" id="cropWrap"><canvas id="cropCanvas"></canvas><div class="cropMask"></div></div>
+    <p class="hint" style="text-align:center">Rasmni surish uchun torting, kattalashtirish uchun siqing yoki slayderdan foydalaning</p>
+    <input type="range" id="cropZoom" min="100" max="300" value="100">
+    <div class="cropActions">
+      <button class="btn ghost" id="cropCancelBtn">Bekor qilish</button>
+      <button class="btn primary" id="cropConfirmBtn">Saqlash</button>
+    </div>
+  </div>
 </div>
 
 <div class="sheet" id="sheet">
@@ -2065,16 +2084,14 @@ function openProfileEdit(){
       <div class="pField"><label>E-pochta</label><input type="email" id="pfEmail" maxlength="120" value="${esc(p.email||'')}" placeholder="siz@misol.com"></div>
       <button class="btn primary" id="profileSaveBtn">Saqlash</button>`;
     // --- avatar upload/delete ---
+    // The file input itself stays a plain <input type=file accept=image/*> with no `capture`
+    // attribute — that's deliberate: adding capture would force camera-only on many mobile
+    // browsers, but we want the native chooser's normal "Camera OR gallery/files" choice.
     $('#avCamBtn').onclick=()=>$('#avFile').click();
     $('#avFile').onchange=(e)=>{
       const f=e.target.files&&e.target.files[0];if(!f)return;
-      const fd=new FormData();fd.append('file',f);
-      haptic();
-      api('/api/profile/avatar',{method:'POST',body:fd}).then(r=>{
-        p.avatar_version=r.avatar_version;
-        toast('Rasm yangilandi');
-        openProfileEdit(); // simplest correct re-render: refetch+rebuild rather than patch the DOM by hand
-      }).catch(()=>toast('Rasm yuklanmadi'));
+      openAvatarCrop(f);
+      e.target.value=''; // reset so picking the exact same file again still fires 'change'
     };
     const delBtn=$('#avDelBtn');
     if(delBtn)delBtn.onclick=()=>{
@@ -2132,6 +2149,122 @@ function openProfileEdit(){
 function closeProfileEdit(){$('#profileEditSheet').classList.remove('open');tg?.BackButton?.hide();}
 $('#profileEditClose').onclick=closeProfileEdit;
 $('#profileEditSheet').onclick=e=>{if(e.target.id==='profileEditSheet')closeProfileEdit();};
+
+// ---- avatar crop tool — pinch/drag to reposition+zoom a picked photo before it's uploaded,
+// instead of blindly center-cropping whatever framing the gallery/camera happened to produce.
+// The exported region is always a square (cover-fit, no gaps) — the circular mask here is only a
+// preview of how it'll look once CSS border-radius:50% clips it everywhere the avatar is shown;
+// the backend's own Pillow center-crop is still there as a safety net for any non-square blob
+// that somehow arrives another way (e.g. a future non-cropped upload path).
+let cropState=null;
+function openAvatarCrop(file){
+  const url=URL.createObjectURL(file);
+  const img=new Image();
+  img.onload=()=>{
+    $('#avatarCropSheet').classList.add('open');
+    tg?.BackButton?.show();
+    // Must wait for the sheet's own layout pass before reading cropWrap's size — reading it in
+    // the same tick .open was applied can still measure the pre-open (display:none) box on some
+    // engines, the exact 0x0-canvas trap already hit once before with the Books Planet globe.
+    requestAnimationFrame(()=>{initCropCanvas(img);URL.revokeObjectURL(url);});
+  };
+  img.onerror=()=>{toast('Rasmni ochib bo\'lmadi');URL.revokeObjectURL(url);};
+  img.src=url;
+}
+function initCropCanvas(img){
+  const canvas=$('#cropCanvas'),wrap=$('#cropWrap');
+  const cssSize=wrap.clientWidth||300;
+  const dpr=Math.min(window.devicePixelRatio||1,2);
+  canvas.width=Math.round(cssSize*dpr);canvas.height=Math.round(cssSize*dpr);
+  const minScale=Math.max(canvas.width/img.width,canvas.height/img.height);
+  cropState={
+    img, ctx:canvas.getContext('2d'), canvas,
+    scale:minScale, minScale,
+    offX:(canvas.width-img.width*minScale)/2,
+    offY:(canvas.height-img.height*minScale)/2,
+  };
+  $('#cropZoom').value=100;
+  drawCrop();
+  wireCropGestures();
+}
+function drawCrop(){
+  const{ctx,canvas,img,scale,offX,offY}=cropState;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.drawImage(img,offX,offY,img.width*scale,img.height*scale);
+}
+function clampCropOffsets(){
+  const{canvas,img,scale}=cropState;
+  const w=img.width*scale,h=img.height*scale;
+  cropState.offX=Math.min(0,Math.max(canvas.width-w,cropState.offX));
+  cropState.offY=Math.min(0,Math.max(canvas.height-h,cropState.offY));
+}
+function setCropScale(newScale){
+  const{canvas,offX,offY,scale:oldScale,minScale}=cropState;
+  newScale=Math.max(minScale,Math.min(minScale*3,newScale));
+  // Zoom around the canvas's own center (not the origin) so the visible crop doesn't visually
+  // jump when the slider/pinch changes scale.
+  const cx=canvas.width/2,cy=canvas.height/2;
+  const imgX=(cx-offX)/oldScale,imgY=(cy-offY)/oldScale;
+  cropState.scale=newScale;
+  cropState.offX=cx-imgX*newScale;
+  cropState.offY=cy-imgY*newScale;
+  clampCropOffsets();
+  $('#cropZoom').value=Math.round((newScale/minScale)*100);
+  drawCrop();
+}
+function wireCropGestures(){
+  const canvas=$('#cropCanvas');
+  const pointers=new Map();
+  let dragStart=null,pinchStart=null;
+  const dist=()=>{const p=[...pointers.values()];return Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y);};
+  canvas.onpointerdown=e=>{
+    canvas.setPointerCapture(e.pointerId);
+    pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(pointers.size===1){dragStart={x:e.clientX,y:e.clientY,offX:cropState.offX,offY:cropState.offY};}
+    else if(pointers.size===2){pinchStart={d:dist(),scale:cropState.scale};dragStart=null;}
+  };
+  canvas.onpointermove=e=>{
+    if(!pointers.has(e.pointerId))return;
+    pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(pointers.size===1&&dragStart){
+      const rect=canvas.getBoundingClientRect();
+      const dpr=canvas.width/rect.width;
+      cropState.offX=dragStart.offX+(e.clientX-dragStart.x)*dpr;
+      cropState.offY=dragStart.offY+(e.clientY-dragStart.y)*dpr;
+      clampCropOffsets();
+      drawCrop();
+    }else if(pointers.size===2&&pinchStart){
+      setCropScale(pinchStart.scale*(dist()/pinchStart.d));
+    }
+  };
+  function release(e){
+    pointers.delete(e.pointerId);
+    if(pointers.size<2)pinchStart=null;
+    dragStart=pointers.size===1?{x:[...pointers.values()][0].x,y:[...pointers.values()][0].y,offX:cropState.offX,offY:cropState.offY}:null;
+  }
+  canvas.onpointerup=release;
+  canvas.onpointercancel=release;
+  canvas.onwheel=e=>{e.preventDefault();setCropScale(cropState.scale*(e.deltaY<0?1.08:1/1.08));};
+  $('#cropZoom').oninput=e=>setCropScale(cropState.minScale*(parseInt(e.target.value,10)/100));
+}
+function closeAvatarCrop(){$('#avatarCropSheet').classList.remove('open');tg?.BackButton?.hide();cropState=null;}
+$('#cropCancelBtn').onclick=closeAvatarCrop;
+$('#avatarCropClose').onclick=closeAvatarCrop;
+$('#avatarCropSheet').onclick=e=>{if(e.target.id==='avatarCropSheet')closeAvatarCrop();};
+$('#cropConfirmBtn').onclick=()=>{
+  if(!cropState)return;
+  const btn=$('#cropConfirmBtn');btn.disabled=true;btn.textContent='Saqlanmoqda...';
+  cropState.canvas.toBlob(blob=>{
+    if(!blob){toast('Xatolik yuz berdi');btn.disabled=false;btn.textContent='Saqlash';return;}
+    const fd=new FormData();fd.append('file',blob,'avatar.jpg');
+    haptic('medium');
+    api('/api/profile/avatar',{method:'POST',body:fd}).then(()=>{
+      toast('Rasm yangilandi');
+      closeAvatarCrop();
+      openProfileEdit(); // refetch+rebuild the edit sheet behind this one, same as the old direct-upload path did
+    }).catch(()=>{toast('Rasm yuklanmadi');btn.disabled=false;btn.textContent='Saqlash';});
+  },'image/jpeg',0.9);
+};
 let myBadgesCache=null;
 function loadProfile(){
   renderThemeChips();
@@ -2454,7 +2587,7 @@ document.querySelectorAll('.viewThemeBtn').forEach(el=>el.onclick=toggleThemeQui
 
 function skeletonShelf(){return `<div class="section"><div class="shead"><h2 class="skel" style="width:140px;height:16px;border-radius:6px"></h2></div><div class="shelf">${Array(4).fill('<div class="si"><div class="skel" style="height:170px;border-radius:14px"></div></div>').join('')}</div></div>`;}
 async function boot(){
-  if(tg){tg.ready();tg.expand();tg.disableVerticalSwipes?.();tg.BackButton?.onClick(()=>{if($('#pdfSheet').classList.contains('open'))closePdfReader();else if($('#writeReviewSheet').classList.contains('open'))closeWriteReview();else if($('#reviewsSheet').classList.contains('open'))closeReviewsSheet();else if($('#profileEditSheet').classList.contains('open'))closeProfileEdit();else if($('#shelvesSheet').classList.contains('open'))closeShelvesSheet();else if($('#listSheet').classList.contains('open'))closeListSheet();else if($('#sheet').classList.contains('open'))closeSheet();else if($('#globe').classList.contains('open'))closeGlobe();});applyThemeMode();tg.onEvent?.('themeChanged',()=>{if(themeMode==='system')applyThemeMode();});}
+  if(tg){tg.ready();tg.expand();tg.disableVerticalSwipes?.();tg.BackButton?.onClick(()=>{if($('#pdfSheet').classList.contains('open'))closePdfReader();else if($('#avatarCropSheet').classList.contains('open'))closeAvatarCrop();else if($('#writeReviewSheet').classList.contains('open'))closeWriteReview();else if($('#reviewsSheet').classList.contains('open'))closeReviewsSheet();else if($('#profileEditSheet').classList.contains('open'))closeProfileEdit();else if($('#shelvesSheet').classList.contains('open'))closeShelvesSheet();else if($('#listSheet').classList.contains('open'))closeListSheet();else if($('#sheet').classList.contains('open'))closeSheet();else if($('#globe').classList.contains('open'))closeGlobe();});applyThemeMode();tg.onEvent?.('themeChanged',()=>{if(themeMode==='system')applyThemeMode();});}
   if('serviceWorker' in navigator)window.addEventListener('load',()=>{
     navigator.serviceWorker.register('./sw.js').then(reg=>{
       // A long-lived, never-navigated Mini App session (Telegram keeps the WebView warm across
