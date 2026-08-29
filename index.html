@@ -194,7 +194,7 @@
      website's top-right X) plus share + a 3-dot overflow menu on the right. #sheetClose is an
      id selector so it outranks the shared .gclose's right-side positioning without touching any
      other sheet that still wants a plain top-right close X (globe, Statistika, PDF reader). */
-  #sheetClose{left:14px; right:auto; font-size:24px}
+  #sheetClose,#pdfClose{left:14px; right:auto; font-size:24px}
   .gshare,.gmenu{position:fixed; top:calc(env(safe-area-inset-top) + 14px); width:36px; height:36px; border-radius:50%; background:var(--chip); border:1px solid var(--line); color:var(--text); display:flex; align-items:center; justify-content:center; font-size:16px; cursor:pointer; z-index:2}
   .gshare{right:58px}
   .gmenu{right:14px}
@@ -233,7 +233,14 @@
   #pdfCanvasWrap.loading #pdfCanvas{opacity:0}
   #pdfLoading{position:absolute; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:78px 20px 20px}
   #pdfLoading.show{display:flex}
-  .pdfSkelPage{width:min(70vw,300px); height:auto; aspect-ratio:3/4.2; border-radius:12px; box-shadow:var(--shadow)}
+  /* The book's own cover (same gradient/image/initials as everywhere else in the app), not a
+     generic gray box — opening a book should feel like opening THAT book from the first frame,
+     with a diagonal shine sweep standing in for the shimmer now that the surface underneath is
+     colored art rather than a flat skeleton tone. */
+  .pdfSkelPage{width:min(70vw,300px); height:auto; aspect-ratio:3/4.2; border-radius:12px; box-shadow:var(--shadow); position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center}
+  .pdfSkelPage .ci{position:absolute; inset:0; width:100%; height:100%; object-fit:cover}
+  .pdfSkelPage .ini{font-size:34px; font-weight:800; color:rgba(255,255,255,.92); text-shadow:0 2px 8px rgba(0,0,0,.3)}
+  .pdfSkelShine{position:absolute; inset:0; background:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.3) 50%,transparent 70%); background-size:200% 100%; animation:sh 1.4s infinite}
   .pdfLoadingText{color:var(--muted); font-size:13.5px; font-weight:600}
   /* Above every sheet (including #pdfSheet at 60) — this is a persistent mini-player meant to
      stay visible and usable no matter what else is open, the same way a real music app's
@@ -486,14 +493,14 @@
 </div>
 <div class="sheet" id="globe" style="z-index:45"><canvas id="globeCanvas"></canvas><div class="gclose" id="globeClose">✕</div><div class="gzoom"><button id="globeZoomIn" type="button">+</button><button id="globeZoomOut" type="button">−</button></div><div class="glegend" id="globeLegend"></div></div>
 <div class="sheet" id="pdfSheet" style="z-index:60; align-items:stretch; background:var(--bg)">
-  <div class="gclose" id="pdfClose">✕</div>
+  <div class="gclose" id="pdfClose">‹</div>
   <div id="pdfToolbar">
     <button id="pdfPrev" type="button">◀</button>
     <span id="pdfPageInfo">— / —</span>
     <button id="pdfNext" type="button">▶</button>
   </div>
   <div id="pdfProgressTrack"><div id="pdfProgressFill"></div></div>
-  <div id="pdfCanvasWrap"><canvas id="pdfCanvas"></canvas><div id="pdfLoading"><div class="pdfSkelPage skel"></div><div class="pdfLoadingText">Sahifa tayyorlanmoqda...</div></div></div>
+  <div id="pdfCanvasWrap"><canvas id="pdfCanvas"></canvas><div id="pdfLoading"><div class="pdfSkelPage" id="pdfSkelPage"></div><div class="pdfLoadingText">Sahifa tayyorlanmoqda...</div></div></div>
 </div>
 <div class="sheet" id="liveSheet" style="z-index:47; align-items:stretch; background:var(--bg)">
   <div id="liveTopbar"><div id="liveTopbarTitle">📊 Statistika</div><div class="gclose" id="liveClose">✕</div></div>
@@ -1562,11 +1569,24 @@ function pdfFlushProgress(){
   }).catch(()=>{});
 }
 
+// The gradient is set as #pdfSkelPage's own background (not a separate position:absolute overlay
+// div) deliberately — an absolutely-positioned layer paints ABOVE plain-flow content regardless
+// of DOM order (positioned elements form their own later paint group), which silently hid the
+// initials/image behind an "empty-looking" gradient the first time this was built this way.
+function pdfSkelBgHtml(b){
+  if(!b)return{bg:'',html:'<div class="pdfSkelShine"></div>'};
+  const[c1,c2]=coverFor(b.i);
+  return{bg:`linear-gradient(135deg,${c1},${c2})`,html:`${b.hc?`<img class="ci" src="covers/${encodeURIComponent(b.i)}.jpg" onerror="this.remove()">`:''}<span class="ini">${esc(initials(b.t))}</span><div class="pdfSkelShine"></div>`};
+}
 async function openPdfReader(id,title){
   if(!canAct()){toast("Ilovada o'qish uchun botni Telegram ichida oching");return;}
   haptic();
   $('#pdfSheet').classList.add('open');
   tg?.BackButton?.show();
+  const skel=pdfSkelBgHtml(byId[id]);
+  const skelEl=$('#pdfSkelPage');
+  skelEl.style.background=skel.bg;
+  skelEl.innerHTML=skel.html;
   pdfSetLoading(true);
   $('#pdfPageInfo').textContent='— / —';
   pdfBookId=id;
