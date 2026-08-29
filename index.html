@@ -52,7 +52,7 @@
   .chip.on{background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border-color:transparent}
   .chip.on .n{opacity:.85}
   .tabs{display:flex; gap:6px; margin-top:2px}
-  .tab{flex:1; text-align:center; padding:9px; border-radius:12px; font-weight:700; font-size:14px; color:var(--muted); background:var(--card); border:1px solid var(--line); cursor:pointer}
+  .tab{flex:1; text-align:center; padding:9px; border-radius:12px; font-weight:700; font-size:14px; color:var(--muted); background:var(--card); border:1px solid var(--line); cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
   .tab.on{color:#fff; background:linear-gradient(135deg,var(--accent),var(--accent2)); border-color:transparent}
   .bar{display:flex; justify-content:space-between; align-items:center; margin:14px 2px 8px}
   .bar .lbl{font-size:13px; color:var(--muted); font-weight:600}
@@ -97,8 +97,9 @@
   .si .sr{font-size:11px; color:var(--muted); margin:2px 1px 0; font-variant-numeric:tabular-nums}
   .si .sr b{color:var(--text)}
   .si .kind{position:absolute; top:7px; left:7px; background:rgba(0,0,0,.35); border-radius:7px; padding:2px 6px; font-size:11px}
-  .si .prog{height:4px; border-radius:3px; background:var(--line); margin:8px 1px 0; overflow:hidden}
-  .si .prog .progbar{height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2)); border-radius:3px}
+  .si .prog,.book .prog{height:4px; border-radius:3px; background:var(--line); margin:8px 1px 0; overflow:hidden}
+  .si .prog .progbar,.book .prog .progbar{height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2)); border-radius:3px}
+  .book .resume{display:block; width:100%; margin-top:6px; border:0; border-radius:10px; padding:7px; font-size:12px; font-weight:800; color:#fff; background:linear-gradient(135deg,var(--accent),var(--accent2)); cursor:pointer; font-family:inherit}
   /* Auto-scrolling "recently added" ticker, top of home */
   .mqwrap{overflow-x:auto; scrollbar-width:none; padding:2px 0 6px; margin:0 -14px}
   .mqwrap::-webkit-scrollbar{display:none}
@@ -276,6 +277,7 @@
     <div class="tabs">
       <div class="tab on" id="tabBrowse">Barchasi</div>
       <div class="tab" id="tabFav">❤️ Saqlanganlar</div>
+      <div class="tab" id="tabContinue">▶️ Davom eting</div>
     </div>
     <div class="row" id="genres"></div>
     <div class="row" id="filters"></div>
@@ -541,6 +543,7 @@ function compute(){
   const terms=norm(state.q).split(/\s+/).filter(Boolean);
   let list;
   if(state.view==='favorites'){list=[...favs].map(id=>byId[id]).filter(Boolean);}
+  else if(state.view==='continue'){list=HOME.continue.map(it=>({...it.book,_kind:it.kind,_percent:it.percent}));}
   else{list=DB.books;}
   let arr=[];
   for(const b of list){
@@ -587,15 +590,42 @@ function cardHtml(b,i){
       <div class="g">${esc(b.g||'')}</div></div></div>`;
 }
 function fmtNum(n){n=n||0;return n>=1000?(n/1000).toFixed(n>=10000?0:1).replace(/\.0$/,'')+'k':String(n);}
+// Reading Room card — same .book/.cover/.meta skeleton as cardHtml() for visual consistency with
+// every other grid card, plus a progress bar and a resume button that jumps straight into the
+// reader/player (openPdfReader/openAudioPlayer already resume at the saved page/part on their
+// own, so this is a true one-tap continue, not a detour through the detail sheet).
+function continueCardHtml(b,i){
+  const[c1,c2]=coverFor(b.i);const fav=favs.has(b.i);
+  return `<div class="book" data-id="${esc(b.i)}" style="--d:${Math.min(i||0,12)*30}ms">
+    <div class="cover" style="background:linear-gradient(135deg,${c1},${c2})">
+      ${b.hc?`<img class="ci" src="covers/${encodeURIComponent(b.i)}.jpg" loading="lazy" onerror="this.remove()">`:''}
+      <span class="fav" data-fav="${esc(b.i)}">${fav?'❤️':'🤍'}</span>
+      <span class="ini">${esc(initials(b.t))}</span>
+    </div>
+    <div class="meta"><div class="t">${esc(b.t)}</div>
+      <div class="a">${esc(b.a||'Noma\'lum muallif')}</div>
+      <div class="prog"><div class="progbar" style="width:${b._percent||0}%"></div></div>
+      <button class="resume" data-resume="${esc(b.i)}" data-kind="${b._kind}">${b._kind==='listen'?'🎧 Tinglash':'📄 O\'qish'} · ${b._percent||0}%</button>
+    </div></div>`;
+}
 function render(){
   const grid=$('#grid');
   const slice=state.result.slice(0,state.shown);
-  grid.innerHTML=slice.map((b,i)=>cardHtml(b,i)).join('');
-  grid.querySelectorAll('.book').forEach(el=>el.onclick=e=>{if(e.target.closest('[data-fav]'))return;openDetail(el.dataset.id);});
+  const isContinue=state.view==='continue';
+  grid.innerHTML=slice.map((b,i)=>isContinue?continueCardHtml(b,i):cardHtml(b,i)).join('');
+  grid.querySelectorAll('.book').forEach(el=>el.onclick=e=>{if(e.target.closest('[data-fav]')||e.target.closest('[data-resume]'))return;openDetail(el.dataset.id);});
   grid.querySelectorAll('[data-fav]').forEach(el=>el.onclick=e=>{e.stopPropagation();toggleFav(el.dataset.fav);});
+  grid.querySelectorAll('[data-resume]').forEach(el=>el.onclick=e=>{
+    e.stopPropagation();
+    const id=el.dataset.resume,b=byId[id];
+    if(el.dataset.kind==='listen')openAudioPlayer(id,b?.t);else openPdfReader(id,b?.t);
+  });
+  $('#sort').style.display=isContinue?'none':'';
   $('#empty').style.display=state.result.length?'none':'block';
+  if(isContinue)$('#empty').innerHTML=canAct()?'<span class="em">📖</span>Hozircha o\'qilayotgan kitob yo\'q — birortasini boshlang':'<span class="em">🔒</span>Kuzatish uchun botni Telegram ichida oching';
+  else $('#empty').innerHTML='<span class="em">🔍</span>Hech narsa topilmadi';
   $('#more').style.display=state.result.length>state.shown?'block':'none';
-  const noun=state.view==='favorites'?'saqlangan':'kitob';
+  const noun=state.view==='favorites'?'saqlangan':state.view==='continue'?"o'qilayotgan":'kitob';
   $('#count').textContent=state.result.length?`${state.result.length} ta ${noun}`:'';
 }
 // ---- discovery homepage (shown when browsing with no query/filter) ----
@@ -618,9 +648,9 @@ function continueSiHtml(item,i){
   const[c1,c2]=coverFor(b.i);
   return `<div class="si" data-id="${esc(b.i)}" style="--d:${Math.min(i||0,12)*30}ms"><div class="sc" style="background:linear-gradient(135deg,${c1},${c2})">${b.hc?`<img class="ci" src="covers/${encodeURIComponent(b.i)}.jpg" loading="lazy" onerror="this.remove()">`:''}<span class="kind">${item.kind==='listen'?'🎧':'📖'}</span><span class="ini">${esc(initials(b.t))}</span></div><div class="prog"><div class="progbar" style="width:${pct}%"></div></div><div class="st">${esc(b.t)}</div><div class="sa">${pct}% • ${esc(b.a||'')}</div></div>`;
 }
-function continueShelf(items){
+function continueShelf(items,see){
   if(!items.length)return'';
-  return `<div class="section"><div class="shead"><h2>▶️ Davom eting</h2></div><div class="shelf">${items.map((it,i)=>continueSiHtml(it,i)).join('')}</div></div>`;
+  return `<div class="section"><div class="shead"><h2>▶️ Davom eting</h2>${see?`<span class="see" ${see}>Barchasi →</span>`:''}</div><div class="shelf">${items.map((it,i)=>continueSiHtml(it,i)).join('')}</div></div>`;
 }
 // Fetched separately (not blocking initial paint like books.json is) and merged in after the
 // fact — auth + a DB round trip on top of the static catalog load, so the home screen shows its
@@ -631,7 +661,7 @@ async function loadContinueReading(){
   try{
     const r=await api('/api/profile/continue');
     const items=(r.items||[]).map(it=>({...it,book:byId[it.id]})).filter(x=>x.book);
-    if(items.length){HOME.continue=items;if(isHome())renderHome();}
+    if(items.length){HOME.continue=items;if(isHome())renderHome();else if(state.view==='continue')run();}
   }catch(e){}
 }
 function marqueeShelf(title,books,see){
@@ -643,7 +673,7 @@ function marqueeShelf(title,books,see){
 }
 function renderHome(){
   const h=$('#home');let html='';
-  if(HOME.continue.length)html+=continueShelf(HOME.continue);
+  if(HOME.continue.length)html+=continueShelf(HOME.continue.slice(0,12),'data-see="continue"');
   if(HOME.newest.length)html+=marqueeShelf("🆕 Yangi qo'shilgan",HOME.newest,'data-see="newest"');
   if(HOME.authors.length)html+=`<div class="section"><div class="shead"><h2>✍️ Mashhur mualliflar</h2></div><div class="authchips">${HOME.authors.map(a=>`<div class="authchip" data-auth="${esc(a.a)}"><span class="an">${esc(a.a)}</span><span class="ac">${a.c} ta kitob</span></div>`).join('')}</div></div>`;
   if(HOME.audio.length)html+=shelf("🎧 Audiokitoblar",HOME.audio,'data-see="audio"');
@@ -651,7 +681,7 @@ function renderHome(){
   h.innerHTML=html;
   h.querySelectorAll('.si').forEach(el=>el.onclick=()=>openDetail(el.dataset.id));
   h.querySelectorAll('[data-auth]').forEach(el=>el.onclick=()=>{state.all=false;$('#q').value=el.dataset.auth;state.q=el.dataset.auth;$('#clr').style.display='block';haptic();run();window.scrollTo(0,0);});
-  h.querySelectorAll('[data-see]').forEach(el=>el.onclick=()=>{const s=el.dataset.see;if(s==='newest'){state.all=true;state.sort='newest';$('#sort').value='newest';}else if(s==='audio'){state.type='audio';renderChips();}else if(s==='genre'){state.genre=el.dataset.v;renderChips();}haptic();run();window.scrollTo(0,0);});
+  h.querySelectorAll('[data-see]').forEach(el=>el.onclick=()=>{const s=el.dataset.see;if(s==='newest'){state.all=true;state.sort='newest';$('#sort').value='newest';}else if(s==='audio'){state.type='audio';renderChips();}else if(s==='genre'){state.genre=el.dataset.v;renderChips();}else if(s==='continue'){state.view='continue';state.all=false;state.sort='relevance';$('#sort').value='relevance';setTabs();}haptic();run();window.scrollTo(0,0);});
 }
 // ---- gentle auto-scroll for the "recently added" ticker, native scroll underneath so a
 // touch/swipe always fully overrides it (pauses the moment a finger touches it, resumes a
@@ -1166,9 +1196,10 @@ $('#clr').onclick=()=>{$('#q').value='';state.q='';state.all=false;$('#clr').sty
 $('#sort').onchange=e=>{state.sort=e.target.value;run();};
 $('#more').onclick=()=>{state.shown+=PAGE;render();};
 $('#sheet').onclick=e=>{if(e.target.id==='sheet')closeSheet();};
-function setTabs(){$('#tabBrowse').classList.toggle('on',state.view==='browse');$('#tabFav').classList.toggle('on',state.view==='favorites');}
+function setTabs(){$('#tabBrowse').classList.toggle('on',state.view==='browse');$('#tabFav').classList.toggle('on',state.view==='favorites');$('#tabContinue').classList.toggle('on',state.view==='continue');}
 $('#tabBrowse').onclick=()=>{state.view='browse';state.q='';$('#q').value='';$('#clr').style.display='none';state.genre='';state.audience='';state.type='';state.all=false;renderChips();setTabs();run();window.scrollTo(0,0);};
 $('#tabFav').onclick=()=>{state.view='favorites';state.all=false;setTabs();run();};
+$('#tabContinue').onclick=()=>{state.view='continue';state.all=false;state.sort='relevance';$('#sort').value='relevance';setTabs();run();window.scrollTo(0,0);};
 window.addEventListener('scroll',()=>{if(isHome())return;if(window.innerHeight+window.scrollY>=document.body.offsetHeight-500&&state.result.length>state.shown){state.shown+=PAGE;render();}});
 
 // ---- theme: day / night / system (manual choice always wins; "system" follows Telegram's
