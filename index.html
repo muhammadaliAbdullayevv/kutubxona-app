@@ -2209,23 +2209,40 @@ async function boot(){
       setInterval(()=>{if(document.visibilityState==='visible')reg.update().catch(()=>{});},180000);
     }).catch(()=>{});
     // The shell/data caches are served cache-first-then-refresh, so a stale client can lag a
-    // load behind a new deploy. Once a new SW actually takes control, force exactly one reload
-    // so the fresh shell/JS is what actually runs.
-    // A short per-load DEBOUNCE, not a permanent "already reloaded once, ever" flag — an earlier
-    // version used the latter, which backfired: Telegram's Mini App WebView often stays warm
-    // across what looks like a close/reopen to the user (it isn't a real new page load), so
-    // sessionStorage survives too. Once that flag got set for the FIRST auto-update this tab
-    // ever saw, every later real deploy silently stopped reloading it — the user could be stuck
-    // on week-old JS no matter how many times a bug got fixed since. A time-boxed debounce still
-    // blocks a genuine rapid-fire loop (repeated controllerchange within the same load) while
-    // letting every later deploy (minutes/hours apart in practice) actually take effect.
-    navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    // load behind a new deploy. Once a new SW actually takes control, the fresh shell/JS needs a
+    // reload to actually run — but firing that reload the instant controllerchange happens
+    // yanks the page out from under whatever the user is doing right that moment (this used to
+    // snap mid-tap: e.g. tapping the Mutolaaxonam/Davra nav tab right as a new SW claimed the
+    // page would reset state.view back to home a beat later, reading as "the tab didn't switch"
+    // or "switched late"). A fresh SW install+claim can land within the first few seconds of
+    // ANY open right after a deploy, which is exactly when the user is most likely to be
+    // actively tapping around — so instead of reloading immediately, defer it to the next
+    // moment that's actually safe: the page going to background (nothing visible happens) or a
+    // few seconds of no touch/scroll (nothing mid-gesture to interrupt).
+    let pendingSwReload=false,lastInteractionAt=Date.now();
+    ['pointerdown','keydown','scroll'].forEach(evt=>document.addEventListener(evt,()=>{lastInteractionAt=Date.now();},{passive:true,capture:true}));
+    function applyPendingSwReload(force){
+      if(!pendingSwReload)return;
+      if(!force&&Date.now()-lastInteractionAt<5000)return;
       let last=0;
       try{last=parseInt(sessionStorage.getItem('swReloadedAt')||'0',10);}catch(e){}
       if(Date.now()-last<10000)return;
       try{sessionStorage.setItem('swReloadedAt',String(Date.now()));}catch(e){}
+      pendingSwReload=false;
       window.location.reload();
-    });
+    }
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')applyPendingSwReload(true);});
+    setInterval(()=>applyPendingSwReload(false),3000);
+    // A short per-load DEBOUNCE inside applyPendingSwReload above, not a permanent "already
+    // reloaded once, ever" flag — an earlier version used the latter, which backfired:
+    // Telegram's Mini App WebView often stays warm across what looks like a close/reopen to the
+    // user (it isn't a real new page load), so sessionStorage survives too. Once that flag got
+    // set for the FIRST auto-update this tab ever saw, every later real deploy silently stopped
+    // reloading it — the user could be stuck on week-old JS no matter how many times a bug got
+    // fixed since. A time-boxed debounce still blocks a genuine rapid-fire loop (repeated
+    // controllerchange within the same load) while letting every later deploy (minutes/hours
+    // apart in practice) actually take effect.
+    navigator.serviceWorker.addEventListener('controllerchange',()=>{pendingSwReload=true;});
   });
   // Most first loads land on the home view, not a filtered grid — show shimmer shelves
   // (matching what will actually render) instead of a generic grid skeleton.
