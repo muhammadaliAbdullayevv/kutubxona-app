@@ -218,18 +218,20 @@
      other sheet that still wants a plain top-right close X (globe, Statistika, PDF reader). */
   #sheetClose,#pdfClose{left:14px; right:auto; font-size:24px}
   .gmenu{position:fixed; top:calc(env(safe-area-inset-top) + 14px); right:14px; width:36px; height:36px; border-radius:50%; background:var(--chip); border:1px solid var(--line); color:var(--text); display:flex; align-items:center; justify-content:center; font-size:16px; cursor:pointer; z-index:2}
-  /* Want-to-read as a full-width, labeled button in the normal content flow (not fixed chrome
-     floating over the cover art — it was overlapping the banner before) — fills with color once
-     tapped, label text stays the same in both states, only the fill communicates "added". */
-  .sheetWantBtn{display:flex; align-items:center; justify-content:center; gap:6px; width:100%; height:38px; border-radius:12px; background:var(--chip); border:1px solid var(--line); color:var(--text); font-size:13.5px; font-weight:700; cursor:pointer; margin:12px 0 4px; box-sizing:border-box}
-  .sheetWantBtn.on{background:linear-gradient(135deg,var(--accent),var(--accent2)); border-color:transparent; color:#fff}
   .menuPanel{position:absolute; top:44px; right:0; background:var(--card); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); min-width:220px; overflow:hidden; text-align:left}
   .menuItem{padding:13px 16px; font-size:14px; font-weight:600; cursor:pointer; white-space:nowrap; color:var(--text)}
   .menuItem+.menuItem{border-top:1px solid var(--line)}
   .menuItem:active{background:var(--chip)}
-  .quickActions{display:flex; gap:8px; margin:10px 0 0}
-  .qaBtn{display:flex; align-items:center; justify-content:center; width:38px; height:38px; border-radius:12px; background:var(--chip); border:1px solid var(--line); font-size:16px; cursor:pointer; color:var(--text)}
+  /* Favorite heart + want-to-read share one row — a fixed-width square next to a button that
+     takes whatever width is left, not two separate stacked rows. */
+  .quickActions{display:flex; gap:8px; align-items:stretch; margin:10px 0 0}
+  .qaBtn{display:flex; align-items:center; justify-content:center; gap:5px; flex:0 0 auto; height:38px; padding:0 14px; border-radius:12px; background:var(--chip); border:1px solid var(--line); font-size:13.5px; font-weight:700; cursor:pointer; color:var(--text); white-space:nowrap}
   .qaBtn.on{background:linear-gradient(135deg,var(--accent),var(--accent2)); border-color:transparent; color:#fff}
+  /* Want-to-read fills the rest of the row, in the normal content flow (not fixed chrome
+     floating over the cover art — it was overlapping the banner before) — fills with color once
+     tapped, label text stays the same in both states, only the fill communicates "added". */
+  .sheetWantBtn{flex:1; display:flex; align-items:center; justify-content:center; gap:6px; height:38px; border-radius:12px; background:var(--chip); border:1px solid var(--line); color:var(--text); font-size:13.5px; font-weight:700; cursor:pointer; box-sizing:border-box; min-width:0}
+  .sheetWantBtn.on{background:linear-gradient(135deg,var(--accent),var(--accent2)); border-color:transparent; color:#fff}
   /* A quick rating readout right under the title/author — the first thing a reader actually
      looks for on a book page — instead of making them scroll to the full "Reyting" section
      further down. Uses the same b.rt/b.rc the catalog cards already carry, so it's instant
@@ -1419,7 +1421,7 @@ function toggleFav(id){
   if(favs.has(id))favs.delete(id);else favs.add(id);
   saveFavs();
   if(state.view==='reading')renderReading();else render();
-  if($('#sheet').classList.contains('open')){const el=$('#dFav');if(el){const on=favs.has(id);el.classList.toggle('on',on);el.textContent=on?'❤️':'🤍';}}
+  if($('#sheet').classList.contains('open')){const el=$('#dFav');if(el){const on=favs.has(id);el.classList.toggle('on',on);el.textContent=(on?'❤️':'🤍')+' Sevimli';}}
   if($('#listSheet').classList.contains('open')){const el=$(`#listSheetc [data-fav="${CSS.escape(id)}"]`);if(el)el.textContent=favs.has(id)?'❤️':'🤍';}
   toast(favs.has(id)?'❤️ Saqlandi':'Olib tashlandi');
 }
@@ -1449,9 +1451,9 @@ function openDetail(id){
       <div class="dauthor">${esc(b.a||'Noma\'lum muallif')}</div>
       ${b.rc?`<div class="dRatingLine">${starsHtml(b.rt)}<b>${b.rt}</b><span class="dRatingCount">(${fmtNum(b.rc)} ta baho)</span></div>`:''}
       <div class="quickActions">
-        <span class="qaBtn ${fav?'on':''}" id="dFav">${fav?'❤️':'🤍'}</span>
+        <span class="qaBtn ${fav?'on':''}" id="dFav">${fav?'❤️':'🤍'} Sevimli</span>
+        <div class="sheetWantBtn" id="sheetWant"><span id="sheetWantIcon">+</span> Albatta, o'qiyman</div>
       </div>
-      <div class="sheetWantBtn" id="sheetWant"><span id="sheetWantIcon">+</span> Albatta, o'qiyman</div>
       <div class="pills">${pill('📂',b.g)}${pill('🎯',audLabel)}${pill('🗓',b.y)}${pill('🌐',b.l)}<span class="pill">${b.ha?'🎧':'📄'} <b>${esc(typeTxt)}</b></span>${b.mb?`<span class="pill">💾 <b>${b.mb} MB</b></span>`:''}${b.dl?`<span class="pill">⬇️ <b>${fmtNum(b.dl)}</b></span>`:''}<span class="pill" id="pillReading" style="display:none">👀 <b><span id="pillReadingN">0</span> o'qimoqda</b></span><span class="pill" id="pillWant" style="display:none">🔖 <b><span id="pillWantN">0</span> o'qimoqchi</b></span></div>
       ${b.sm?`<div class="sec"><h3>Qisqacha</h3><p>${esc(b.sm)}</p></div>`:''}
       ${b.d?`<div class="sec"><h3>Tavsif</h3><p>${esc(b.d)}</p></div>`:''}
