@@ -246,7 +246,7 @@
      rather than duration/narrator data this catalog doesn't carry. Replaces both the old inline
      "★★★★★ 4.6 (40)" line here AND the 5/4/3/2/1 distribution bar chart further down in the
      Reyting section — that breakdown graph is gone in favor of this simpler at-a-glance row. */
-  .dStatRow{display:flex; margin:10px 0 4px}
+  .dStatRow{display:flex; margin:10px 0 14px}
   .dStat{flex:1; text-align:center; padding:0 6px; min-width:0}
   .dStat+.dStat{border-left:1px solid var(--line)}
   .dStatL{font-size:11px; color:var(--muted); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
@@ -1467,11 +1467,11 @@ function openDetail(id){
         <div class="dStat"><div class="dStatL">O'qimoqda</div><div class="dStatV" id="dStatReading">–</div></div>
         <div class="dStat"><div class="dStatL">Yuklab olingan</div><div class="dStatV">${b.dl?fmtNum(b.dl):'–'}</div></div>
       </div>
+      <div class="pills">${pill('📂',b.g)}${pill('🎯',audLabel)}${pill('🗓',b.y)}${pill('🌐',b.l)}<span class="pill">${b.ha?'🎧':'📄'} <b>${esc(typeTxt)}</b></span>${b.mb?`<span class="pill">💾 <b>${b.mb} MB</b></span>`:''}</div>
       <div class="quickActions">
         <span class="qaBtn ${fav?'on':''}" id="dFav">${fav?'❤️':'🤍'} Sevimli</span>
         <div class="sheetWantBtn" id="sheetWant"><span id="sheetWantIcon">+</span> Albatta, o'qiyman</div>
       </div>
-      <div class="pills">${pill('📂',b.g)}${pill('🎯',audLabel)}${pill('🗓',b.y)}${pill('🌐',b.l)}<span class="pill">${b.ha?'🎧':'📄'} <b>${esc(typeTxt)}</b></span>${b.mb?`<span class="pill">💾 <b>${b.mb} MB</b></span>`:''}</div>
       ${b.sm?`<div class="sec"><h3>Qisqacha</h3><p>${esc(b.sm)}</p></div>`:''}
       ${b.d?`<div class="sec"><h3>Tavsif</h3><p>${esc(b.d)}</p></div>`:''}
       ${(b.s&&b.s.length)?`<div class="sec"><h3>Mavzular</h3><div class="subs" id="subsWrap">${subsHtml(b.s)}</div></div>`:''}
