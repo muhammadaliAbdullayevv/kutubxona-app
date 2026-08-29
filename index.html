@@ -163,11 +163,26 @@
   #sheet{background:var(--bg); align-items:stretch}
   #sheet .sheetc{max-height:none; height:100%; border-radius:0}
   @keyframes up{from{transform:translateY(40px); opacity:.6}to{transform:none; opacity:1}}
-  .dhero{height:150px; display:flex; align-items:flex-end; padding:16px; position:relative}
-  .dgrip{position:absolute; top:8px; left:50%; transform:translateX(-50%); width:38px; height:4px; border-radius:2px; background:rgba(255,255,255,.4)}
-  .dhero .ini{font-size:44px; font-weight:800; color:#fff; text-shadow:0 2px 10px rgba(0,0,0,.35)}
+  /* A book cover is portrait-shaped; the old .dhero just object-fit:cover'd it across a short
+     WIDE banner, which crops/stretches anything that isn't already that exact ratio — visibly
+     wrong for a real cover, worse for a squarish placeholder/watermark image. Now: the properly-
+     proportioned cover sits centered at its own natural shape, with the same image blurred and
+     scaled up behind it as ambient color filling the rest of the banner (the Apple Music/Spotify
+     "blurred album art backdrop" pattern) instead of a hard, badly-cropped edge-to-edge stretch. */
+  .dhero{height:230px; display:flex; align-items:center; justify-content:center; padding:16px; position:relative; overflow:hidden}
+  .dheroBlur{position:absolute; inset:-24px; z-index:0}
+  .dheroBlur .ci{filter:blur(26px) brightness(.55); transform:scale(1.15)}
+  .dheroCover{position:relative; z-index:1; width:124px; height:174px; flex-shrink:0; border-radius:10px; overflow:hidden; box-shadow:0 14px 34px rgba(0,0,0,.5); display:flex; align-items:center; justify-content:center}
+  .dhero .ini{position:static; font-size:34px; font-weight:800; color:#fff; text-shadow:0 2px 10px rgba(0,0,0,.35)}
   .dbody{padding:16px 18px 0}
   .dtitle{font-size:20px; font-weight:800; line-height:1.25; margin:0 0 4px}
+  /* Davra/Mutolaaxonam/Profil's titles felt bare with nothing beside them once the header's
+     search/theme/profile row correctly stopped bleeding onto every screen — a quick theme toggle
+     alongside each title keeps that one genuinely useful control reachable without a trip to
+     Sahifam, without reviving the redundant profile-shortcut icon. */
+  .viewHead{display:flex; align-items:center; justify-content:space-between; margin-bottom:4px}
+  .viewHead .dtitle{margin-bottom:0}
+  .viewThemeBtn{flex-shrink:0; width:34px; height:34px; border-radius:50%; background:var(--chip); border:1px solid var(--line); color:var(--text); display:flex; align-items:center; justify-content:center; font-size:15px; cursor:pointer}
   .dauthor{color:var(--muted); font-size:14px; margin-bottom:14px}
   .pills{display:flex; flex-wrap:wrap; gap:7px; margin-bottom:16px}
   .pill{background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:5px 11px; font-size:12px; color:var(--muted); font-weight:600}
@@ -203,6 +218,10 @@
      other sheet that still wants a plain top-right close X (globe, Statistika, PDF reader). */
   #sheetClose,#pdfClose{left:14px; right:auto; font-size:24px}
   .gshare,.gmenu{position:fixed; top:calc(env(safe-area-inset-top) + 14px); width:36px; height:36px; border-radius:50%; background:var(--chip); border:1px solid var(--line); color:var(--text); display:flex; align-items:center; justify-content:center; font-size:16px; cursor:pointer; z-index:2}
+  /* #sheetWant reuses .gshare's circle but needs its own filled "active" state (same "Albatta
+     o'qiyman" toggle that used to be the labeled .quickActions button, now promoted to the top
+     row) — the plain .gshare/.gmenu styling has no notion of an on/off state to build on. */
+  #sheetWant.on{background:linear-gradient(135deg,var(--accent),var(--accent2)); border-color:transparent; color:#fff}
   .gshare{right:58px}
   .gmenu{right:14px}
   .menuPanel{position:absolute; top:44px; right:0; background:var(--card); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); min-width:220px; overflow:hidden; text-align:left}
@@ -215,7 +234,6 @@
   .quickActions{display:flex; gap:8px; margin:10px 0 4px}
   .qaBtn{display:flex; align-items:center; justify-content:center; gap:6px; padding:9px 14px; border-radius:12px; background:var(--chip); border:1px solid var(--line); font-size:13.5px; font-weight:700; cursor:pointer; color:var(--text); font-family:inherit}
   .qaBtn.on{background:linear-gradient(135deg,var(--accent),var(--accent2)); border-color:transparent; color:#fff}
-  .wantBtn{flex:1}
   .gzoom{position:fixed; right:14px; top:50%; transform:translateY(-50%); display:flex; flex-direction:column; gap:10px; z-index:1}
   .gzoom button{width:42px; height:42px; border-radius:50%; background:var(--chip); border:1px solid var(--line); color:var(--text); font-size:21px; font-weight:700; font-family:inherit; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:var(--shadow); padding:0; line-height:1; transition:transform .15s}
   .gzoom button:active{transform:scale(.9)}
@@ -244,11 +262,13 @@
      generic gray box — opening a book should feel like opening THAT book from the first frame,
      with a diagonal shine sweep standing in for the shimmer now that the surface underneath is
      colored art rather than a flat skeleton tone. */
-  .pdfSkelPage{width:min(70vw,300px); height:auto; aspect-ratio:3/4.2; border-radius:12px; box-shadow:var(--shadow); position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center}
+  .pdfSkelPage{width:min(70vw,300px); height:auto; aspect-ratio:3/4.2; border-radius:12px; box-shadow:var(--shadow); position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center; animation:pdfPulse 2.4s ease-in-out infinite}
   .pdfSkelPage .ci{position:absolute; inset:0; width:100%; height:100%; object-fit:cover}
   .pdfSkelPage .ini{font-size:34px; font-weight:800; color:rgba(255,255,255,.92); text-shadow:0 2px 8px rgba(0,0,0,.3)}
   .pdfSkelShine{position:absolute; inset:0; background:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.3) 50%,transparent 70%); background-size:200% 100%; animation:sh 1.4s infinite}
-  .pdfLoadingText{color:var(--muted); font-size:13.5px; font-weight:600}
+  @keyframes pdfPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.02)}}
+  .pdfLoadingText{color:var(--muted); font-size:13.5px; font-weight:600; transition:opacity .2s; min-height:17px}
+  @media (prefers-reduced-motion: reduce){.pdfSkelPage{animation:none}.pdfSkelShine{animation:none}}
   /* Above every sheet (including #pdfSheet at 60) — this is a persistent mini-player meant to
      stay visible and usable no matter what else is open, the same way a real music app's
      mini-player does. It used to sit at z-index 48, BELOW the book detail sheet (50) that's
@@ -453,18 +473,18 @@
        Statistika dashboard) not on a screen you navigate to directly; switching away is done by
        tapping another destination, same as #home/#grid already work. -->
   <div id="profileView" style="display:none">
-    <h2 class="dtitle">👤 Profil</h2>
+    <div class="viewHead"><h2 class="dtitle">👤 Profil</h2><span class="viewThemeBtn" id="btnThemeProfile">🌙</span></div>
     <div class="sec"><h3>Mavzu</h3><div class="row" id="themeChips" style="padding:2px 0; margin:0"></div></div>
     <div id="pBody">Yuklanmoqda...</div>
   </div>
   <div id="davraView" style="display:none">
-    <h2 class="dtitle">💬 Davra</h2>
+    <div class="viewHead"><h2 class="dtitle">💬 Davra</h2><span class="viewThemeBtn" id="btnThemeDavra">🌙</span></div>
     <div id="davraList"></div>
     <div class="empty" id="davraEmpty" style="display:none"><span class="em">💬</span>Hali hech narsa yo'q</div>
     <button class="more" id="davraMore" style="display:none">Yana yuklash</button>
   </div>
   <div id="readingView" style="display:none">
-    <h2 class="dtitle">📖 Mutolaaxonam</h2>
+    <div class="viewHead"><h2 class="dtitle">📖 Mutolaaxonam</h2><span class="viewThemeBtn" id="btnThemeReading">🌙</span></div>
     <div id="rrCurrent"></div>
     <div class="section" id="rrShelfSec" style="display:none">
       <div class="shead"><h2>📑 O'qilayotgan kitoblar</h2><span class="see" id="rrSeeAll">Barchasi →</span></div>
@@ -489,9 +509,10 @@
 <div class="sheet" id="sheet">
   <div class="sheetc" id="sheetc"></div>
   <div class="gclose" id="sheetClose">‹</div>
-  <div class="gshare" id="sheetShare">↗️</div>
+  <div class="gshare" id="sheetWant">📌</div>
   <div class="gmenu" id="sheetMenu">⋮
     <div class="menuPanel" id="sheetMenuPanel" style="display:none">
+      <div class="menuItem" id="miShare">↗️ Ulashish</div>
       <div class="menuItem" id="miShelf">📚 Javonga qo'shish</div>
       <div class="menuItem" id="miMarkRead">✓ O'qildi deb belgilash</div>
       <div class="menuItem" id="miMarkListened" style="display:none">🎧 Tinglandi deb belgilash</div>
@@ -507,7 +528,7 @@
     <button id="pdfNext" type="button">▶</button>
   </div>
   <div id="pdfProgressTrack"><div id="pdfProgressFill"></div></div>
-  <div id="pdfCanvasWrap"><canvas id="pdfCanvas"></canvas><div id="pdfLoading"><div class="pdfSkelPage" id="pdfSkelPage"></div><div class="pdfLoadingText">Sahifa tayyorlanmoqda...</div></div></div>
+  <div id="pdfCanvasWrap"><canvas id="pdfCanvas"></canvas><div id="pdfLoading"><div class="pdfSkelPage" id="pdfSkelPage"></div><div class="pdfLoadingText" id="pdfLoadingText">Sahifa tayyorlanmoqda...</div></div></div>
 </div>
 <div class="sheet" id="liveSheet" style="z-index:47; align-items:stretch; background:var(--bg)">
   <div id="liveTopbar"><div id="liveTopbarTitle">📊 Statistika</div><div class="gclose" id="liveClose">✕</div></div>
@@ -1399,13 +1420,15 @@ function openDetail(id){
   const audLabel=(DB.audiences.find(a=>a.v===b.au)||{}).l;
   const typeTxt=b.ha?(b.ap>1?`Audiokitob · ${b.ap} qism`:'Audiokitob'):'PDF / matn';
   c.innerHTML=`
-    <div class="dhero" style="background:linear-gradient(135deg,${c1},${c2})">${b.hc?`<img class="ci" src="covers/${encodeURIComponent(b.i)}.jpg" onerror="this.remove()">`:''}<div class="dgrip"></div><span class="ini">${esc(initials(b.t))}</span></div>
+    <div class="dhero" style="background:linear-gradient(135deg,${c1},${c2})">
+      ${b.hc?`<div class="dheroBlur"><img class="ci" src="covers/${encodeURIComponent(b.i)}.jpg" onerror="this.parentElement.remove()"></div>`:''}
+      <div class="dheroCover">${b.hc?`<img class="ci" src="covers/${encodeURIComponent(b.i)}.jpg" onerror="this.remove()">`:''}<span class="ini">${esc(initials(b.t))}</span></div>
+    </div>
     <div class="dbody">
       <h2 class="dtitle">${esc(b.t)}</h2>
       <div class="dauthor">${esc(b.a||'Noma\'lum muallif')}</div>
       <div class="quickActions">
         <span class="qaBtn ${fav?'on':''}" id="dFav">${fav?'❤️':'🤍'}</span>
-        <span class="qaBtn wantBtn" id="dWant">📌 Albatta o'qiyman</span>
       </div>
       <div class="pills">${pill('📂',b.g)}${pill('🎯',audLabel)}${pill('🗓',b.y)}${pill('🌐',b.l)}<span class="pill">${b.ha?'🎧':'📄'} <b>${esc(typeTxt)}</b></span>${b.mb?`<span class="pill">💾 <b>${b.mb} MB</b></span>`:''}${b.dl?`<span class="pill">⬇️ <b>${fmtNum(b.dl)}</b></span>`:''}<span class="pill" id="pillReading" style="display:none">👀 <b><span id="pillReadingN">0</span> o'qimoqda</b></span><span class="pill" id="pillWant" style="display:none">🔖 <b><span id="pillWantN">0</span> o'qimoqchi</b></span></div>
       ${b.sm?`<div class="sec"><h3>Qisqacha</h3><p>${esc(b.sm)}</p></div>`:''}
@@ -1440,16 +1463,21 @@ function openDetail(id){
   const dListen=$('#dListen');
   if(dListen)dListen.onclick=()=>openAudioPlayer(b.i,b.t);
   $('#dFav').onclick=()=>toggleFav(b.i);
-  $('#dWant').onclick=()=>toggleWantToRead(b.i);
+  $('#sheetWant').onclick=()=>toggleWantToRead(b.i);
   const dBackGlobe=$('#dBackGlobe');
   if(dBackGlobe)dBackGlobe.onclick=()=>closeSheet();
   c.querySelectorAll('[data-sub]').forEach(el=>el.onclick=()=>{closeSheet();$('#q').value=el.dataset.sub;state.q=el.dataset.sub;$('#clr').style.display='block';state.all=false;if(state.view!=='search'){state.view='search';setTabs();}run();window.scrollTo(0,0);});
   c.querySelectorAll('.si').forEach(el=>el.onclick=()=>openDetail(el.dataset.id));
   _wireFmtButtons(c);
-  // Share + the 3-dot overflow menu (Javon / mark as read / mark as listened) live outside
-  // #sheetc (fixed chrome, like the back arrow) but their actions depend on which book is open,
-  // so they're rewired fresh on every openDetail() — same as everything above.
-  $('#sheetShare').onclick=()=>{const txt=`📚 ${b.t}${b.a?' — '+b.a:''}`;const s=`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(txt)}`;tg?.openTelegramLink?tg.openTelegramLink(s):navigator.share?.({title:b.t,url});};
+  // The top-row want-to-read toggle + the 3-dot overflow menu (share / Javon / mark as read /
+  // mark as listened) live outside #sheetc (fixed chrome, like the back arrow) but their actions
+  // depend on which book is open, so they're rewired fresh on every openDetail() — same as
+  // everything above.
+  $('#miShare').onclick=()=>{
+    $('#sheetMenuPanel').style.display='none';
+    const txt=`📚 ${b.t}${b.a?' — '+b.a:''}`;const s=`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(txt)}`;
+    tg?.openTelegramLink?tg.openTelegramLink(s):navigator.share?.({title:b.t,url});
+  };
   $('#miMarkListened').style.display=b.ha?'block':'none';
   $('#miShelf').onclick=()=>{$('#sheetMenuPanel').style.display='none';if(!canAct()){toast('Botni Telegram ichida oching');return;}openShelvesSheet(b.i);};
   $('#miMarkRead').onclick=()=>{
@@ -1487,7 +1515,7 @@ function loadBookExtras(id){
   }).catch(()=>{});
   if(!canAct())return;
   api('/api/books/'+encodeURIComponent(id)+'/progress').then(r=>{
-    const el=$('#dWant');
+    const el=$('#sheetWant');
     if(!el||!$('#sheet').classList.contains('open'))return;
     el.classList.toggle('on',!!r.want_to_read);
   }).catch(()=>{});
@@ -1496,7 +1524,7 @@ function toggleWantToRead(id){
   if(!canAct()){toast("Botni Telegram ichida oching");return;}
   haptic('medium');
   api('/api/books/'+encodeURIComponent(id)+'/want-to-read',{method:'POST'}).then(r=>{
-    const el=$('#dWant');
+    const el=$('#sheetWant');
     if(el)el.classList.toggle('on',r.want_to_read);
     toast(r.want_to_read?"📌 Albatta o'qiyman ro'yxatiga qo'shildi":"Ro'yxatdan olib tashlandi");
     loadBookExtras(id);
@@ -1523,7 +1551,38 @@ function getStreamToken(scope){
 
 // ---- PDF reader ----
 let pdfDoc=null,pdfPageNum=1,pdfPageCount=0,pdfRendering=false,pdfLib=null,pdfBookId=null;
-function pdfSetLoading(on){$('#pdfLoading').classList.toggle('show',on);$('#pdfCanvasWrap').classList.toggle('loading',on);}
+// A loading state that never changes reads as "stuck," even when it's just a big file taking its
+// normal time — rotating status lines keep it feeling alive. The "your connection looks slow"
+// line is deliberately NOT a fixed timeout: it's scaled by the book's own known size (≈450ms/MB,
+// clamped 7-30s) so a 150MB book isn't flagged at the same point a 5MB one would be.
+const PDF_LOADING_MESSAGES=["Sahifa tayyorlanmoqda...","Kitob yuklanmoqda...","Deyarli tayyor...","Birozdan keyin ochiladi..."];
+let pdfLoadingMsgTimer=null,pdfSlowWarnTimer=null;
+function pdfStartLoadingMessages(){
+  const textEl=$('#pdfLoadingText');
+  let i=0;
+  textEl.textContent=PDF_LOADING_MESSAGES[0];
+  clearInterval(pdfLoadingMsgTimer);
+  pdfLoadingMsgTimer=setInterval(()=>{
+    i=(i+1)%PDF_LOADING_MESSAGES.length;
+    textEl.style.opacity=0;
+    setTimeout(()=>{textEl.textContent=PDF_LOADING_MESSAGES[i];textEl.style.opacity=1;},200);
+  },2400);
+  const book=byId[pdfBookId];
+  const sizeMb=book&&book.mb?Number(book.mb):15;
+  const slowMs=Math.max(7000,Math.min(30000,sizeMb*450));
+  clearTimeout(pdfSlowWarnTimer);
+  pdfSlowWarnTimer=setTimeout(()=>{
+    clearInterval(pdfLoadingMsgTimer);
+    textEl.style.opacity=0;
+    setTimeout(()=>{textEl.textContent="🌐 Internet aloqangiz sekin ko'rinadi — biroz kuting...";textEl.style.opacity=1;},200);
+  },slowMs);
+}
+function pdfStopLoadingMessages(){clearInterval(pdfLoadingMsgTimer);clearTimeout(pdfSlowWarnTimer);}
+function pdfSetLoading(on){
+  $('#pdfLoading').classList.toggle('show',on);
+  $('#pdfCanvasWrap').classList.toggle('loading',on);
+  if(on)pdfStartLoadingMessages();else pdfStopLoadingMessages();
+}
 function pdfUpdateProgressBar(){
   const bar=$('#pdfProgressFill');
   if(bar)bar.style.width=(pdfPageCount?Math.min(100,pdfPageNum/pdfPageCount*100):0)+'%';
@@ -1983,8 +2042,10 @@ function applyThemeMode(){
   document.documentElement.setAttribute('data-theme',t);
   const meta=$('#themeColorMeta');
   if(meta)meta.setAttribute('content',t==='day'?'#f7f5f0':'#14100b');
+  const icon=t==='day'?'☀️':'🌙';
   const btn=$('#btnTheme');
-  if(btn)btn.textContent=t==='day'?'☀️':'🌙';
+  if(btn)btn.textContent=icon;
+  document.querySelectorAll('.viewThemeBtn').forEach(el=>el.textContent=icon);
 }
 function setThemeMode(m){
   themeMode=m;
@@ -1992,12 +2053,14 @@ function setThemeMode(m){
   applyThemeMode();
 }
 applyThemeMode();
-$('#btnTheme').onclick=()=>{
+function toggleThemeQuick(){
   haptic();
   const next=resolveTheme()==='day'?'night':'day';
   setThemeMode(next);
   toast(next==='day'?'☀️ Kunduzgi rejim':'🌙 Tungi rejim');
-};
+}
+$('#btnTheme').onclick=toggleThemeQuick;
+document.querySelectorAll('.viewThemeBtn').forEach(el=>el.onclick=toggleThemeQuick);
 
 function skeletonShelf(){return `<div class="section"><div class="shead"><h2 class="skel" style="width:140px;height:16px;border-radius:6px"></h2></div><div class="shelf">${Array(4).fill('<div class="si"><div class="skel" style="height:170px;border-radius:14px"></div></div>').join('')}</div></div>`;}
 async function boot(){
