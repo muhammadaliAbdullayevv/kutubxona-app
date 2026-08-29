@@ -23,6 +23,8 @@
     /* Set from JS (measured, not guessed) whenever the audio mini-player shows/hides — lets
        .actions below make room for it instead of being covered by it. */
     --audio-player-h:0px;
+    /* Fixed, not measured — #bottomNav's height never changes, unlike the audio player. */
+    --bottomnav-h:60px;
   }
   /* Day — daylight reading room: cool near-white, not parchment. */
   :root[data-theme="day"]{
@@ -36,7 +38,7 @@
     padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom); overscroll-behavior-y:none;
     transition:background-color .25s, color .25s}
   body,.book,.si,.card,header,.sheetc,.chip,.tab,.btn,.pill,.authchip{transition:background-color .25s, border-color .25s, color .25s}
-  .wrap{max-width:760px; margin:0 auto; padding:12px 14px 90px}
+  .wrap{max-width:760px; margin:0 auto; padding:12px 14px calc(90px + var(--bottomnav-h))}
   header{position:sticky; top:0; z-index:20; background:linear-gradient(180deg,var(--bg) 72%,transparent); padding:8px 14px 10px; margin:0 -14px 4px}
   h1{font-size:20px; font-weight:700; margin:2px 0 10px; letter-spacing:.2px}
   .searchbar{display:flex; align-items:center; gap:8px; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:10px 12px}
@@ -170,9 +172,21 @@
      mini-player does. It used to sit at z-index 48, BELOW the book detail sheet (50) that's
      almost always what's open right when you tap "Tinglash" — opening from there rendered the
      player hidden behind that sheet's dark backdrop, which read as "where did the player go". */
-  #audioPlayer{position:fixed; left:10px; right:10px; bottom:calc(env(safe-area-inset-bottom) + 10px); z-index:65;
+  #audioPlayer{position:fixed; left:10px; right:10px; bottom:calc(env(safe-area-inset-bottom) + 10px + var(--bottomnav-h)); z-index:65;
     background:var(--card); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow); padding:10px 14px 12px; display:none}
   #audioPlayer.show{display:block}
+  /* Primary app-level navigation — sits under every full-screen overlay (.sheet's z-index
+     starts at 45), so it's automatically covered whenever a detail/profile/reader/globe sheet
+     is open without needing extra show/hide JS. The audio mini-player (z-index 65) floats above
+     it instead, offset up by --bottomnav-h so the two never overlap. */
+  #bottomNav{position:fixed; left:0; right:0; bottom:0; z-index:30; display:flex;
+    background:var(--card); border-top:1px solid var(--line); padding:6px 4px calc(4px + env(safe-area-inset-bottom));
+    box-shadow:0 -4px 20px rgba(0,0,0,.12)}
+  .navitem{flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; padding:6px 2px;
+    border:none; background:none; color:var(--muted); font-family:inherit; cursor:pointer; border-radius:12px}
+  .navitem .ni{font-size:19px; line-height:1}
+  .navitem .nl{font-size:10.5px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%}
+  .navitem.on{color:var(--accent)}
   #apTop{display:flex; align-items:center; gap:10px}
   #apText{flex:1; min-width:0}
   #apTitle{font-size:13px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
@@ -361,6 +375,12 @@
     <button id="apSpeed" type="button">1x</button>
   </div>
 </div>
+<nav id="bottomNav">
+  <button type="button" class="navitem on" id="navAsosiy"><span class="ni">🏠</span><span class="nl">Asosiy</span></button>
+  <button type="button" class="navitem" id="navMutolaa"><span class="ni">▶️</span><span class="nl">Mutolaaxonam</span></button>
+  <button type="button" class="navitem" id="navDavra"><span class="ni">💬</span><span class="nl">Davra</span></button>
+  <button type="button" class="navitem" id="navSahifam"><span class="ni">👤</span><span class="nl">Sahifam</span></button>
+</nav>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1204,10 +1224,24 @@ $('#clr').onclick=()=>{$('#q').value='';state.q='';state.all=false;$('#clr').sty
 $('#sort').onchange=e=>{state.sort=e.target.value;run();};
 $('#more').onclick=()=>{state.shown+=PAGE;render();};
 $('#sheet').onclick=e=>{if(e.target.id==='sheet')closeSheet();};
-function setTabs(){$('#tabBrowse').classList.toggle('on',state.view==='browse');$('#tabFav').classList.toggle('on',state.view==='favorites');$('#tabContinue').classList.toggle('on',state.view==='continue');}
+function setTabs(){
+  $('#tabBrowse').classList.toggle('on',state.view==='browse');
+  $('#tabFav').classList.toggle('on',state.view==='favorites');
+  $('#tabContinue').classList.toggle('on',state.view==='continue');
+  $('#navAsosiy').classList.toggle('on',state.view==='browse'||state.view==='favorites');
+  $('#navMutolaa').classList.toggle('on',state.view==='continue');
+}
 $('#tabBrowse').onclick=()=>{state.view='browse';state.q='';$('#q').value='';$('#clr').style.display='none';state.genre='';state.audience='';state.type='';state.all=false;renderChips();setTabs();run();window.scrollTo(0,0);};
 $('#tabFav').onclick=()=>{state.view='favorites';state.all=false;setTabs();run();};
 $('#tabContinue').onclick=()=>{state.view='continue';state.all=false;state.sort='relevance';$('#sort').value='relevance';setTabs();run();window.scrollTo(0,0);};
+// ---- bottom nav: primary app-level navigation, layered on top of the existing top-tab-bar
+// rather than replacing it (Asosiy/Mutolaaxonam just trigger the same handlers as their
+// top-tab equivalents — kept as one source of truth instead of duplicating the state changes).
+// Davra isn't built yet (a later stage), so it's a honest "coming soon" toast, not a dead link.
+$('#navAsosiy').onclick=()=>{haptic();$('#tabBrowse').click();};
+$('#navMutolaa').onclick=()=>{haptic();$('#tabContinue').click();};
+$('#navDavra').onclick=()=>{haptic();toast('💬 Davra: tez orada!');};
+$('#navSahifam').onclick=()=>{haptic();$('#btnProfile').click();};
 window.addEventListener('scroll',()=>{if(isHome())return;if(window.innerHeight+window.scrollY>=document.body.offsetHeight-500&&state.result.length>state.shown){state.shown+=PAGE;render();}});
 
 // ---- theme: day / night / system (manual choice always wins; "system" follows Telegram's
