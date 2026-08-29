@@ -1475,7 +1475,7 @@ function openDetail(id){
       ${b.sm?`<div class="sec"><h3>Qisqacha</h3><p>${esc(b.sm)}</p></div>`:''}
       ${b.d?`<div class="sec"><h3>Tavsif</h3><p>${esc(b.d)}</p></div>`:''}
       ${(b.s&&b.s.length)?`<div class="sec"><h3>Mavzular</h3><div class="subs" id="subsWrap">${subsHtml(b.s)}</div></div>`:''}
-      <div class="sec" id="rSec"><div class="shead"><h3>⭐ Reyting</h3><span class="see" id="rSeeAll" style="display:none">Barchasi →</span></div><div id="rBody">Yuklanmoqda...</div></div>
+      <div class="sec" id="rSec"><div class="shead"><h3>Izohlar</h3><span class="see" id="rSeeAll" style="display:none">Barcha izohlar →</span></div><div id="rBody">Yuklanmoqda...</div></div>
       ${relatedShelf(b)}
     </div>
     <div class="actions">
@@ -1995,30 +1995,32 @@ function wireRatingVotes(scope,bookId,onVoted){
     };
   });
 }
-function loadReviewPreview(bookId){
+function loadReviewPreview(bookId,totalCount){
   const wrap=$('#rPreview');if(!wrap)return;
+  const seeAll=$('#rSeeAll');
+  // "Barcha izohlar (N)" — N is the same count /rating already returned (every rating counts,
+  // same set the full list page itself shows), not a separate guess.
+  if(seeAll)seeAll.textContent=`Barcha izohlar (${fmtNum(totalCount)}) →`;
   api('/api/books/'+encodeURIComponent(bookId)+'/ratings?limit=8').then(r=>{
     const reviews=(r.ratings||[]).filter(x=>x.review_text);
-    const seeAll=$('#rSeeAll');
     if(!reviews.length){wrap.innerHTML='';if(seeAll)seeAll.style.display='none';return;}
     wrap.innerHTML=`<div class="rshelf">${reviews.map(reviewCardHtml).join('')}</div>`;
-    if(seeAll){seeAll.style.display='inline';seeAll.onclick=()=>openReviewsSheet(bookId);}
+    if(seeAll&&totalCount){seeAll.style.display='inline';seeAll.onclick=()=>openReviewsSheet(bookId);}
   }).catch(()=>{wrap.innerHTML='';});
 }
 function loadRating(bookId){
   // The big number + stars already show at the top of the page now (in .dStatRow, from the
-  // catalog's own b.rt/b.rc — instant, no round trip) — this section just needs the exact live
-  // count and the write/see-all actions, not a second copy of the same headline number plus a
-  // 5/4/3/2/1 distribution graph most readers never look at.
+  // catalog's own b.rt/b.rc — instant, no round trip) — repeating "4/5 — N ta baho" here too was
+  // a straight duplicate, so this section is just the reviews themselves: a preview shelf first,
+  // the write/edit action below it (matching the reference's own order), no distribution graph.
   const body=$('#rBody');if(!body)return;
   api('/api/books/'+encodeURIComponent(bookId)+'/rating').then(r=>{
     body.innerHTML=`
-      <p class="hint" style="margin:0 0 12px">${r.count?`${starsHtml(r.average)} <b>${r.average}</b>/5 — ${fmtNum(r.count)} ta baho`:"Hali baho yo'q — birinchi bo'ling"}</p>
-      ${canAct()?`<button class="btn primary" id="rWriteBtn" style="width:100%; margin-bottom:4px">${r.my_rating?"✍️ Bahoni tahrirlash":"✍️ Baho qoldirish"}</button>`:'<p class="hint">Baho berish uchun botda oching.</p>'}
-      <div id="rPreview"></div>`;
+      <div id="rPreview"></div>
+      ${canAct()?`<button class="btn primary" id="rWriteBtn" style="width:100%; margin-top:10px">${r.my_rating?"✍️ Bahoni tahrirlash":"Kitob haqida izoh qoldirish"}</button>`:'<p class="hint">Baho berish uchun botda oching.</p>'}`;
     const writeBtn=$('#rWriteBtn');
     if(writeBtn)writeBtn.onclick=()=>openWriteReview(bookId);
-    loadReviewPreview(bookId);
+    loadReviewPreview(bookId,r.count||0);
   }).catch(()=>{body.innerHTML='<p class="hint">Yuklanmadi.</p>';});
 }
 
