@@ -334,7 +334,7 @@
   .liveBadgeRight{display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700; opacity:.92}
   /* The panel is a full page (like the PDF reader), not a bottom drawer — a "footer" card reads
      as a minor add-on; a whole page reads as what it actually is, the app's stats dashboard. */
-  #liveSheet,#listSheet,#shelvesSheet,#reviewsSheet,#writeReviewSheet{flex-direction:column}
+  #liveSheet,#listSheet,#shelvesSheet,#reviewsSheet,#writeReviewSheet,#profileEditSheet{flex-direction:column}
   /* Generalized from the Statistika panel's own topbar so new full-page sheets (Reading Room's
      drill-in lists, Javon) get the same "whole page, not a bottom drawer" treatment for free. */
   #liveTopbar,.stopbar{flex-shrink:0; display:flex; align-items:center; justify-content:space-between; gap:12px;
@@ -410,6 +410,35 @@
   .wrOverall b{color:var(--text); font-size:14px}
   #writeReviewSheetc textarea{width:100%; background:var(--card); border:1px solid var(--line); border-radius:10px; color:var(--text); padding:9px; font:inherit; resize:vertical; min-height:90px; margin-top:14px; box-sizing:border-box}
   .rdel{background:none; color:var(--danger); border:0; font-weight:700; cursor:pointer; padding:8px 4px}
+  /* ---- profile settings form (#profileEditSheet) ---- */
+  .avatarEdit{display:flex; flex-direction:column; align-items:center; gap:8px; margin-bottom:22px}
+  .avatarEdit .avWrap{position:relative; width:96px; height:96px}
+  .avatarEdit .avImg{position:absolute; top:0; left:0; width:96px; height:96px; border-radius:50%; object-fit:cover; display:block; border:1px solid var(--line)}
+  .avatarEdit .avInitials{width:96px; height:96px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:30px; font-weight:800; color:#fff}
+  .avatarEdit .avCam{position:absolute; right:-2px; bottom:-2px; width:32px; height:32px; border-radius:50%; background:var(--accent); color:#fff; display:flex; align-items:center; justify-content:center; font-size:15px; border:2px solid var(--bg); cursor:pointer}
+  .avatarEdit .avDel{color:var(--danger); font-size:12.5px; font-weight:700; cursor:pointer; background:none; border:0; padding:2px}
+  .pField{margin-bottom:16px}
+  .pField label{display:block; font-size:12.5px; font-weight:700; color:var(--muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:.3px}
+  .pField input[type=text],.pField input[type=tel],.pField input[type=email],.pField input[type=date],.pField textarea{width:100%; background:var(--card); border:1px solid var(--line); border-radius:10px; color:var(--text); padding:10px; font:inherit; box-sizing:border-box}
+  .pField textarea{resize:vertical; min-height:70px}
+  .pField .cnt{text-align:right; font-size:11.5px; color:var(--muted); margin-top:3px}
+  .tahRow{position:relative}
+  .tahRow .at{position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--muted); font-weight:700; pointer-events:none}
+  .tahRow input{padding-left:24px !important}
+  .tStatus{font-size:12px; margin-top:5px; font-weight:600}
+  .tStatus.ok{color:#2fbf6f}
+  .tStatus.bad{color:var(--danger)}
+  .genderPick{display:flex; gap:8px}
+  .genderPick .chip{flex:1; text-align:center; padding:10px}
+  #profileSaveBtn{width:100%; margin-top:6px}
+  .pcard{display:flex; align-items:center; gap:12px; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px 14px; margin:14px 0; cursor:pointer}
+  .pcard .avWrap{position:relative; flex-shrink:0}
+  .pcard .avImg{position:absolute; top:0; left:0; border-radius:50%; object-fit:cover}
+  .pcard .avInitials{border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:800; color:#fff}
+  .pcardInfo{flex:1; min-width:0}
+  .pcardName{font-weight:800; font-size:15px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .pcardSub{font-size:12.5px; color:var(--muted); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .pcardChev{font-size:22px; color:var(--muted)}
   .rrow{padding:10px 0; border-top:1px solid var(--line)}
   .rrow:first-child{border-top:0}
   .rrow .rstars{color:#ffb100; font-size:13px}
@@ -501,6 +530,7 @@
        tapping another destination, same as #home/#grid already work. -->
   <div id="profileView" style="display:none">
     <div class="viewHead"><h2 class="dtitle">👤 Profil</h2><span class="viewThemeBtn" id="btnThemeProfile">🌙</span></div>
+    <div id="pProfileCard"></div>
     <div class="sec"><h3>Mavzu</h3><div class="row" id="themeChips" style="padding:2px 0; margin:0"></div></div>
     <div id="pBody">Yuklanmoqda...</div>
   </div>
@@ -544,6 +574,10 @@
 <div class="sheet" id="writeReviewSheet" style="z-index:53; align-items:stretch; background:var(--bg)">
   <div class="stopbar"><div class="stopbarTitle">✍️ Izoh qoldirish</div><div class="gclose" id="writeReviewClose">✕</div></div>
   <div class="ssheetc" id="writeReviewSheetc"></div>
+</div>
+<div class="sheet" id="profileEditSheet" style="z-index:52; align-items:stretch; background:var(--bg)">
+  <div class="stopbar"><div class="stopbarTitle">👤 Profilni tahrirlash</div><div class="gclose" id="profileEditClose">✕</div></div>
+  <div class="ssheetc" id="profileEditSheetc"></div>
 </div>
 
 <div class="sheet" id="sheet">
@@ -647,7 +681,9 @@ function deliverBook(id){
 function api(path,opts){
   opts=opts||{};opts.headers=opts.headers||{};
   if(tg?.initData)opts.headers['Authorization']='tma '+tg.initData;
-  if(opts.body)opts.headers['Content-Type']='application/json';
+  // A FormData body (avatar upload) must NOT get a manual Content-Type — the browser needs to
+  // set its own multipart boundary, and overriding it here breaks the upload's parsing server-side.
+  if(opts.body&&!(opts.body instanceof FormData))opts.headers['Content-Type']='application/json';
   return fetch(COMMUNITY_API_BASE+path,opts).then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); });
 }
 const canAct=()=>!!tg?.initData;
@@ -1941,8 +1977,135 @@ function renderThemeChips(){
     $('#themeChips').querySelectorAll('.chip').forEach(c=>c.classList.toggle('on',c.dataset.m===themeMode));
   });
 }
+const myUid=()=>tg?.initDataUnsafe?.user?.id;
+function avatarUrl(uid,v){return COMMUNITY_API_BASE+'/api/profile/avatar/'+encodeURIComponent(uid)+(v?'?v='+v:'?v=0');}
+// Small circular avatar+name row at the top of the Profil screen — tap opens the full editor.
+// Kept as its own render pass (not folded into loadProfile's single big innerHTML) since the
+// avatar can change from the editor without needing to reload the whole stats block underneath.
+function renderProfileCard(){
+  const card=$('#pProfileCard');if(!card||!canAct())return;
+  const uid=myUid();
+  api('/api/profile/settings').then(p=>{
+    myProfileCache=p;
+    const name=p.display_name||'Foydalanuvchi';
+    const sub=p.tahallus?('@'+p.tahallus):'Profilni to\'ldirish →';
+    const[c1,c2]=coverFor(String(uid||'u'));
+    // Initials+gradient always renders as the base layer; a real photo (if any) is an absolutely
+    // positioned sibling on top that removes itself on load failure — same layering trick already
+    // used for book covers (.ci/.ini), so a missing/broken avatar file degrades to initials
+    // instead of showing a broken-image icon.
+    const img=p.avatar_version?`<img class="avImg" style="width:52px;height:52px" src="${avatarUrl(uid,p.avatar_version)}" onerror="this.remove()">`:'';
+    card.innerHTML=`<div class="pcard" id="pProfileCardBtn">
+      <div class="avWrap" style="width:52px;height:52px"><div class="avInitials" style="width:52px;height:52px;font-size:18px;background:linear-gradient(135deg,${c1},${c2})">${esc(initials(name))}</div>${img}</div>
+      <div class="pcardInfo"><div class="pcardName">${esc(name)}</div><div class="pcardSub">${esc(sub)}</div></div>
+      <span class="pcardChev">›</span>
+    </div>`;
+    $('#pProfileCardBtn').onclick=()=>openProfileEdit();
+  }).catch(()=>{card.innerHTML='';});
+}
+let myProfileCache=null;
+function openProfileEdit(){
+  haptic();
+  $('#profileEditSheetc').innerHTML='Yuklanmoqda...';
+  $('#profileEditSheet').classList.add('open');
+  tg?.BackButton?.show();
+  const uid=myUid();
+  api('/api/profile/settings').then(p=>{
+    myProfileCache=p;
+    let gender=p.gender||null;
+    const[c1,c2]=coverFor(String(uid||'u'));
+    // Same base-layer-initials + on-top-photo-that-self-removes-on-error pattern as the compact
+    // profile card and book covers elsewhere — a missing/broken avatar file degrades to initials
+    // instead of a broken-image icon.
+    const avatarHtml=()=>`<div class="avInitials" style="background:linear-gradient(135deg,${c1},${c2})">${esc(initials(p.display_name||'?'))}</div>${p.avatar_version?`<img class="avImg" id="avPreview" src="${avatarUrl(uid,p.avatar_version)}" onerror="this.remove()">`:''}`;
+    $('#profileEditSheetc').innerHTML=`
+      <div class="avatarEdit">
+        <div class="avWrap" id="avWrap">${avatarHtml()}<div class="avCam" id="avCamBtn">📷</div></div>
+        <input type="file" accept="image/*" id="avFile" style="display:none">
+        ${p.avatar_version?'<button class="avDel" id="avDelBtn">Rasmni o\'chirish</button>':''}
+      </div>
+      <div class="pField"><label>Qisqacha men haqimda</label><textarea id="pfBio" maxlength="500" placeholder="O'zingiz haqingizda qisqacha yozing...">${esc(p.bio||'')}</textarea><div class="cnt" id="pfBioCnt">0/500</div></div>
+      <div class="pField"><label>To'liq ism</label><input type="text" id="pfName" maxlength="80" value="${esc(p.display_name||'')}" placeholder="Ismingiz Familiyangiz"></div>
+      <div class="pField"><label>Tahallus (username)</label><div class="tahRow"><span class="at">@</span><input type="text" id="pfTahallus" maxlength="32" value="${esc(p.tahallus||'')}" placeholder="foydalanuvchi_nomi"></div><div class="tStatus" id="pfTahallusStatus"></div></div>
+      <div class="pField"><label>Tug'ilgan sana</label><input type="date" id="pfBirth" value="${esc(p.birth_date||'')}"></div>
+      <div class="pField"><label>Jins</label><div class="genderPick" id="pfGender">
+        <span class="chip${gender==='male'?' on':''}" data-g="male">👨 Erkak</span>
+        <span class="chip${gender==='female'?' on':''}" data-g="female">👩 Ayol</span>
+      </div></div>
+      <div class="pField"><label>Telefon raqam</label><input type="tel" id="pfPhone" maxlength="32" value="${esc(p.phone_number||'')}" placeholder="+998 XX XXX XX XX"></div>
+      <div class="pField"><label>E-pochta</label><input type="email" id="pfEmail" maxlength="120" value="${esc(p.email||'')}" placeholder="siz@misol.com"></div>
+      <button class="btn primary" id="profileSaveBtn">Saqlash</button>`;
+    // --- avatar upload/delete ---
+    $('#avCamBtn').onclick=()=>$('#avFile').click();
+    $('#avFile').onchange=(e)=>{
+      const f=e.target.files&&e.target.files[0];if(!f)return;
+      const fd=new FormData();fd.append('file',f);
+      haptic();
+      api('/api/profile/avatar',{method:'POST',body:fd}).then(r=>{
+        p.avatar_version=r.avatar_version;
+        toast('Rasm yangilandi');
+        openProfileEdit(); // simplest correct re-render: refetch+rebuild rather than patch the DOM by hand
+      }).catch(()=>toast('Rasm yuklanmadi'));
+    };
+    const delBtn=$('#avDelBtn');
+    if(delBtn)delBtn.onclick=()=>{
+      haptic();
+      api('/api/profile/avatar/delete',{method:'POST'}).then(r=>{p.avatar_version=r.avatar_version;toast('Rasm o\'chirildi');openProfileEdit();}).catch(()=>{});
+    };
+    // --- bio counter ---
+    const bioEl=$('#pfBio'),bioCnt=$('#pfBioCnt');
+    const updBioCnt=()=>bioCnt.textContent=bioEl.value.length+'/500';
+    updBioCnt();bioEl.oninput=updBioCnt;
+    // --- gender pills ---
+    $('#pfGender').querySelectorAll('.chip').forEach(el=>el.onclick=()=>{
+      gender=(gender===el.dataset.g)?null:el.dataset.g; // tap again to clear
+      $('#pfGender').querySelectorAll('.chip').forEach(c=>c.classList.toggle('on',c.dataset.g===gender));
+    });
+    // --- tahallus live availability check, debounced ---
+    let tahDeb;
+    const tahEl=$('#pfTahallus'),tahStatus=$('#pfTahallusStatus');
+    tahEl.oninput=()=>{
+      clearTimeout(tahDeb);
+      const v=tahEl.value.trim();
+      if(!v){tahStatus.textContent='';tahStatus.className='tStatus';return;}
+      if(!/^[A-Za-z0-9_]{3,32}$/.test(v)){tahStatus.textContent='3-32 ta harf/raqam/_ (probel va maxsus belgilarsiz)';tahStatus.className='tStatus bad';return;}
+      tahStatus.textContent='Tekshirilmoqda...';tahStatus.className='tStatus';
+      tahDeb=setTimeout(()=>{
+        api('/api/profile/tahallus-available?value='+encodeURIComponent(v)).then(r=>{
+          if(tahEl.value.trim()!==v)return; // stale response, user kept typing
+          tahStatus.textContent=r.available?'✓ Mavjud':'✗ Band, boshqasini tanlang';
+          tahStatus.className='tStatus '+(r.available?'ok':'bad');
+        }).catch(()=>{});
+      },450);
+    };
+    // --- save ---
+    $('#profileSaveBtn').onclick=()=>{
+      const tv=tahEl.value.trim();
+      if(tv&&!/^[A-Za-z0-9_]{3,32}$/.test(tv)){toast('Tahallus formati noto\'g\'ri');return;}
+      haptic('medium');
+      const btn=$('#profileSaveBtn');btn.disabled=true;btn.textContent='Saqlanmoqda...';
+      api('/api/profile/settings',{method:'POST',body:JSON.stringify({
+        display_name:$('#pfName').value.trim()||null,
+        tahallus:tv||null,
+        birth_date:$('#pfBirth').value||null,
+        gender:gender,
+        phone_number:$('#pfPhone').value.trim()||null,
+        email:$('#pfEmail').value.trim()||null,
+        bio:bioEl.value.trim()||null,
+      })}).then(()=>{
+        toast('Profil saqlandi');
+        closeProfileEdit();
+        renderProfileCard();
+      }).catch(()=>{toast('Saqlashda xatolik — tahallus band bo\'lishi mumkin');btn.disabled=false;btn.textContent='Saqlash';});
+    };
+  }).catch(()=>{$('#profileEditSheetc').innerHTML='<p class="hint">Yuklanmadi.</p>';});
+}
+function closeProfileEdit(){$('#profileEditSheet').classList.remove('open');tg?.BackButton?.hide();}
+$('#profileEditClose').onclick=closeProfileEdit;
+$('#profileEditSheet').onclick=e=>{if(e.target.id==='profileEditSheet')closeProfileEdit();};
 function loadProfile(){
   renderThemeChips();
+  renderProfileCard();
   const body=$('#pBody');if(!body)return;
   if(!canAct()){body.innerHTML='<p class="hint">Profilingizni ko\'rish uchun botda oching.</p>';return;}
   api('/api/profile/me').then(r=>{
@@ -2199,7 +2362,7 @@ document.querySelectorAll('.viewThemeBtn').forEach(el=>el.onclick=toggleThemeQui
 
 function skeletonShelf(){return `<div class="section"><div class="shead"><h2 class="skel" style="width:140px;height:16px;border-radius:6px"></h2></div><div class="shelf">${Array(4).fill('<div class="si"><div class="skel" style="height:170px;border-radius:14px"></div></div>').join('')}</div></div>`;}
 async function boot(){
-  if(tg){tg.ready();tg.expand();tg.disableVerticalSwipes?.();tg.BackButton?.onClick(()=>{if($('#pdfSheet').classList.contains('open'))closePdfReader();else if($('#writeReviewSheet').classList.contains('open'))closeWriteReview();else if($('#reviewsSheet').classList.contains('open'))closeReviewsSheet();else if($('#shelvesSheet').classList.contains('open'))closeShelvesSheet();else if($('#listSheet').classList.contains('open'))closeListSheet();else if($('#sheet').classList.contains('open'))closeSheet();else if($('#globe').classList.contains('open'))closeGlobe();});applyThemeMode();tg.onEvent?.('themeChanged',()=>{if(themeMode==='system')applyThemeMode();});}
+  if(tg){tg.ready();tg.expand();tg.disableVerticalSwipes?.();tg.BackButton?.onClick(()=>{if($('#pdfSheet').classList.contains('open'))closePdfReader();else if($('#writeReviewSheet').classList.contains('open'))closeWriteReview();else if($('#reviewsSheet').classList.contains('open'))closeReviewsSheet();else if($('#profileEditSheet').classList.contains('open'))closeProfileEdit();else if($('#shelvesSheet').classList.contains('open'))closeShelvesSheet();else if($('#listSheet').classList.contains('open'))closeListSheet();else if($('#sheet').classList.contains('open'))closeSheet();else if($('#globe').classList.contains('open'))closeGlobe();});applyThemeMode();tg.onEvent?.('themeChanged',()=>{if(themeMode==='system')applyThemeMode();});}
   if('serviceWorker' in navigator)window.addEventListener('load',()=>{
     navigator.serviceWorker.register('./sw.js').then(reg=>{
       // A long-lived, never-navigated Mini App session (Telegram keeps the WebView warm across
