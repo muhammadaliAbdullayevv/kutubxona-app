@@ -49,6 +49,26 @@
   .searchbar svg{flex:0 0 auto; opacity:.7}
   .searchbar input{flex:1; background:none; border:0; outline:none; color:var(--text); font-size:15px}
   .searchbar .clr{opacity:.5; padding:2px 4px; display:none; cursor:pointer}
+  /* Search's own header — an explicit back arrow (previously the only way out was remembering
+     the bottom-nav Asosiy tab) plus a filter icon that replaces the old always-visible genre/
+     type/audience chip rows with an on-demand panel. */
+  #searchHeader{display:flex; align-items:center; gap:10px; margin-bottom:10px}
+  .sbackBtn{font-size:26px; line-height:1; color:var(--text); cursor:pointer; padding:2px 6px 2px 0; flex:0 0 auto}
+  .stitle{flex:1; font-size:19px; font-weight:800; margin:0}
+  .sfilterBtn{font-size:18px; cursor:pointer; flex:0 0 auto; width:34px; height:34px; border-radius:10px; background:var(--chip); border:1px solid var(--line); display:flex; align-items:center; justify-content:center}
+  .sfilterBtn.on{background:linear-gradient(135deg,var(--accent),var(--accent2)); border-color:transparent}
+  #genres.filterPanel,#filters.filterPanel{display:none}
+  /* Popular-books list rows (search landing's "Eng ommabop") — a compact cover+title+author row,
+     matching the reference app's list style rather than our usual card grid. */
+  .prow{display:flex; align-items:center; gap:12px; padding:10px 2px; border-top:1px solid var(--line); cursor:pointer}
+  .prow:first-child{border-top:0}
+  .pcov{flex:0 0 auto; width:46px; height:62px; border-radius:8px; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center; box-shadow:var(--shadow)}
+  .pcov .ci{position:absolute; inset:0; width:100%; height:100%; object-fit:cover}
+  .pcov .ini{font-size:13px; font-weight:800; color:rgba(255,255,255,.9)}
+  .pbody{flex:1; min-width:0}
+  .pt{font-size:14px; font-weight:700; line-height:1.25; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
+  .pa{font-size:12px; color:var(--muted); margin-top:2px}
+  .pchev{color:var(--muted); font-size:18px; flex-shrink:0}
   .mapbtn{display:flex; align-items:center; justify-content:center; gap:8px; width:100%; margin-top:10px; padding:13px; border:0; border-radius:14px; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; font-weight:800; font-size:14.5px; font-family:inherit; cursor:pointer; box-shadow:var(--shadow); transition:transform .15s}
   .mapbtn:active{transform:scale(.97)}
   .row{display:flex; gap:8px; align-items:center; overflow-x:auto; scrollbar-width:none; padding:10px 14px 2px; margin:0 -14px}
@@ -325,8 +345,20 @@
 <body>
 <div class="wrap">
   <header>
-    <h1>📚 Kutubxona <a href="quran.html" id="btnQuran" style="float:right; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle">📖 Qur'on</a><a id="btnProfile" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer">👤</a><a id="btnTheme" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer">☀️</a><a id="btnSearchIcon" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer">🔍</a></h1>
-    <div class="liveHeaderRow"><a id="btnLive" class="liveBadge">📊 Statistika<span class="liveBadgeRight"><span class="liveDot"></span><span id="btnLiveN">–</span> onlayn</span></a></div>
+    <div id="homeHeader">
+      <h1>📚 Kutubxona <a href="quran.html" id="btnQuran" style="float:right; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle">📖 Qur'on</a><a id="btnProfile" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer">👤</a><a id="btnTheme" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer">☀️</a><a id="btnSearchIcon" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer">🔍</a></h1>
+      <div class="liveHeaderRow"><a id="btnLive" class="liveBadge">📊 Statistika<span class="liveBadgeRight"><span class="liveDot"></span><span id="btnLiveN">–</span> onlayn</span></a></div>
+    </div>
+    <!-- Search's own header: an explicit back arrow (the thing that was missing — the only way
+         out used to be remembering to tap the bottom-nav Asosiy tab) plus a filter icon that
+         replaces the old always-visible genre/type/audience chip rows below with an on-demand
+         panel, so the search screen isn't three stacked chip rows deep before you've typed
+         anything. -->
+    <div id="searchHeader" style="display:none">
+      <span class="sbackBtn" id="btnSearchBack">‹</span>
+      <h2 class="stitle">Qidiruv</h2>
+      <span class="sfilterBtn" id="btnFilterOpen">⚙️</span>
+    </div>
     <div class="searchbar">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
       <input id="q" type="search" placeholder="Kitob, muallif, mavzu…" autocomplete="off" enterkeyhint="search">
@@ -348,6 +380,23 @@
   </div>
 
   <div id="home" style="display:none"></div>
+  <!-- Search landing (no query/filter yet): categories + your own recent searches (honest
+       substitute for "most searched by everyone", which we have no aggregate data for) + a
+       popular-books list — shown instead of dumping the full catalog grid immediately. -->
+  <div id="searchDiscovery" style="display:none">
+    <div class="section">
+      <div class="shead"><h2>Ruknlar</h2><span class="see" id="seeAllGenres">Barchasi →</span></div>
+      <div class="row" id="discGenres"></div>
+    </div>
+    <div class="section" id="recentSearchSec" style="display:none">
+      <div class="shead"><h2>Oxirgi qidiruvlar</h2></div>
+      <div class="row" id="recentSearches"></div>
+    </div>
+    <div class="section">
+      <div class="shead"><h2>Eng ommabop</h2></div>
+      <div id="popularList"></div>
+    </div>
+  </div>
   <div class="grid" id="grid"></div>
   <button class="more" id="more" style="display:none">Yana yuklash</button>
   <div class="empty" id="empty" style="display:none"><span class="em">🔍</span>Hech narsa topilmadi</div>
@@ -665,7 +714,7 @@ var byId={};
 // reasoning as DB/byId above) makes them real globals every script on the page can see.
 var openedFromGlobe=false;
 let state={q:'',genre:'',audience:'',type:'',sort:'relevance',view:'browse',shown:24,result:[],all:false};
-let HOME={newest:[],audio:[],authors:[],continue:[],topics:[],trending:[]};
+let HOME={newest:[],audio:[],authors:[],continue:[],continueLoaded:false,topics:[],trending:[]};
 let favs=new Set();
 const PAGE=24;
 
@@ -732,6 +781,78 @@ function renderChips(){
   f.innerHTML=DB.types.map(x=>`<span class="chip ${state.type===x.v?'on':''}" data-k="type" data-v="${x.v}">${x.v==='audio'?'🎧':'📄'} ${esc(x.l)}<span class="n">${x.c}</span></span>`).join('')+
     DB.audiences.map(x=>`<span class="chip ${state.audience===x.v?'on':''}" data-k="audience" data-v="${esc(x.v)}">${esc(x.l)}<span class="n">${x.c}</span></span>`).join('');
   f.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{const k=c.dataset.k;state[k]=state[k]===c.dataset.v?'':c.dataset.v;state.all=false;haptic();renderChips();run();});
+}
+// The genre/type/audience chip rows used to sit permanently under the search bar — now they're
+// an on-demand panel behind the filter icon, closed by default (and force-closed whenever we
+// leave the search area, see showArea()).
+let filterPanelOpen=false;
+function toggleFilterPanel(force){
+  filterPanelOpen=force!==undefined?force:!filterPanelOpen;
+  $('#genres').classList.toggle('filterPanel',!filterPanelOpen);
+  $('#filters').classList.toggle('filterPanel',!filterPanelOpen);
+  $('#btnFilterOpen').classList.toggle('on',filterPanelOpen);
+}
+$('#btnFilterOpen').onclick=()=>{haptic();toggleFilterPanel();};
+$('#seeAllGenres').onclick=()=>{haptic();toggleFilterPanel(true);window.scrollTo(0,0);};
+// Back arrow — the explicit, always-visible way out of search that was missing before (the only
+// exit used to be remembering the bottom-nav Asosiy tab). Same reset as tapping Asosiy itself.
+$('#btnSearchBack').onclick=()=>{
+  haptic();state.view='browse';state.q='';$('#q').value='';$('#clr').style.display='none';
+  state.genre='';state.audience='';state.type='';state.all=false;renderChips();setTabs();run();window.scrollTo(0,0);
+};
+
+// ---- search landing: categories, your own recent searches, and a popular-books list — shown
+// instead of the full catalog the instant you open search. "Eng ko'p qidirilganlar" is backed by
+// a real cross-user aggregate (search_term_stats, migration 97) once it has data; while it's
+// still cold (a brand-new table starts empty) your own recent searches fill the same slot so the
+// section isn't empty on day one — same honest "starts sparse, fills in as usage accumulates"
+// pattern as the trending-books windows.
+let recentSearches=[];
+try{recentSearches=JSON.parse(localStorage.getItem('recentSearches')||'[]');}catch(e){recentSearches=[];}
+function pushRecentSearch(term){
+  term=(term||'').trim();
+  if(!term)return;
+  recentSearches=[term,...recentSearches.filter(t=>t.toLowerCase()!==term.toLowerCase())].slice(0,8);
+  try{localStorage.setItem('recentSearches',JSON.stringify(recentSearches));}catch(e){}
+}
+let topSearchTerms=[];
+async function loadTopSearchTerms(){
+  try{
+    const r=await api('/api/search/top-terms?limit=8');
+    topSearchTerms=(r.items||[]).map(it=>it.term);
+  }catch(e){topSearchTerms=[];}
+  if(isSearchDiscovery())renderSearchDiscovery();
+}
+function popularRowHtml(b){
+  const[c1,c2]=coverFor(b.i);
+  return `<div class="prow" data-id="${esc(b.i)}">
+    <div class="pcov" style="background:linear-gradient(135deg,${c1},${c2})">${b.hc?`<img class="ci" src="covers/${encodeURIComponent(b.i)}.jpg" loading="lazy" onerror="this.remove()">`:''}<span class="ini">${esc(initials(b.t))}</span></div>
+    <div class="pbody"><div class="pt">${esc(b.t)}</div><div class="pa">${esc(b.a||'')}</div></div>
+    <span class="pchev">›</span>
+  </div>`;
+}
+function goSearchTerm(term){
+  haptic();$('#q').value=term;state.q=term;state.all=false;$('#clr').style.display='block';run();window.scrollTo(0,0);
+}
+function renderSearchDiscovery(){
+  const dg=$('#discGenres');
+  dg.innerHTML=DB.genres.slice(0,8).map(g=>`<span class="tchip" data-genre="${esc(g.v)}">#${esc(g.v)}</span>`).join('');
+  dg.querySelectorAll('[data-genre]').forEach(el=>el.onclick=()=>{haptic();state.genre=el.dataset.genre;state.all=false;run();window.scrollTo(0,0);});
+
+  const terms=topSearchTerms.length?topSearchTerms:recentSearches;
+  const recSec=$('#recentSearchSec');
+  if(terms.length){
+    recSec.style.display='block';
+    $('#recentSearchSec h2').textContent=topSearchTerms.length?"Eng ko'p qidirilganlar":'Oxirgi qidiruvlar';
+    $('#recentSearches').innerHTML=terms.map(t=>`<span class="chip" data-term="${esc(t)}">${esc(t)}</span>`).join('');
+    $('#recentSearches').querySelectorAll('[data-term]').forEach(el=>el.onclick=()=>goSearchTerm(el.dataset.term));
+  }else{
+    recSec.style.display='none';
+  }
+
+  const popular=DB.books.slice().sort((a,b)=>(b.dl||0)-(a.dl||0)).slice(0,10);
+  $('#popularList').innerHTML=popular.map(b=>popularRowHtml(b)).join('');
+  $('#popularList').querySelectorAll('.prow').forEach(el=>el.onclick=()=>openDetail(el.dataset.id));
 }
 
 function cardHtml(b,i){
@@ -1006,12 +1127,16 @@ function shelf(title,books,see){return `<div class="section"><div class="shead">
 // normal shelves immediately and this one fades in a beat later once it resolves. Only ever
 // called when canAct() (real Telegram session), since the endpoint requires auth anyway.
 async function loadContinueReading(){
-  if(!canAct())return;
+  if(!canAct()){HOME.continueLoaded=true;return;}
   try{
     const r=await api('/api/profile/continue');
     const items=(r.items||[]).map(it=>({...it,book:byId[it.id]})).filter(x=>x.book);
-    if(items.length){HOME.continue=items;if(isHome())renderHome();else if(state.view==='reading')renderReading();}
+    if(items.length)HOME.continue=items;
   }catch(e){}
+  // Always flip this (success, empty, or failure alike) and re-render — otherwise a genuinely
+  // empty continue-list leaves the hero skeleton spinning forever instead of clearing.
+  HOME.continueLoaded=true;
+  if(isHome())renderHome();else if(state.view==='reading')renderReading();
 }
 // Hero card — the single most-recent in-progress book, big and prominent above everything
 // else. Replaces the old multi-item "Davom eting" shelf on the home screen (the full list still
@@ -1077,9 +1202,11 @@ function marqueeShelf(title,books,see){
     <div class="mqwrap"><div class="mqtrack">${cards}${cards}</div></div>
   </div>`;
 }
+function heroSkeletonHtml(){return `<div class="hero" style="pointer-events:none; background:var(--card)"><div class="heroCover skel" style="border-radius:14px"></div><div class="heroInfo"><div class="skel" style="height:16px;width:70%;border-radius:6px;margin-bottom:8px"></div><div class="skel" style="height:12px;width:40%;border-radius:6px"></div></div></div>`;}
 function renderHome(){
   const h=$('#home');let html='';
   if(HOME.continue.length)html+=heroHtml(HOME.continue[0]);
+  else if(canAct()&&!HOME.continueLoaded)html+=heroSkeletonHtml();
   if(HOME.topics.length)html+=topicsHtml(HOME.topics);
   const forYou=computeForYou();
   if(forYou.length)html+=shelf("✨ Siz uchun",forYou);
@@ -1096,10 +1223,10 @@ function renderHome(){
     const id=el.dataset.resume,b=byId[id];
     if(el.dataset.kind==='listen')openAudioPlayer(id,b?.t);else openPdfReader(id,b?.t);
   });
-  h.querySelectorAll('[data-topic]').forEach(el=>el.onclick=()=>{state.all=false;$('#q').value=el.dataset.topic;state.q=el.dataset.topic;$('#clr').style.display='block';haptic();run();window.scrollTo(0,0);});
+  h.querySelectorAll('[data-topic]').forEach(el=>el.onclick=()=>{state.view='search';state.all=false;$('#q').value=el.dataset.topic;state.q=el.dataset.topic;$('#clr').style.display='block';haptic();setTabs();run();window.scrollTo(0,0);});
   h.querySelectorAll('#trendWin .tw').forEach(el=>el.onclick=()=>{haptic();trendingWindow=el.dataset.w;loadTrending();});
-  h.querySelectorAll('[data-auth]').forEach(el=>el.onclick=()=>{state.all=false;$('#q').value=el.dataset.auth;state.q=el.dataset.auth;$('#clr').style.display='block';haptic();run();window.scrollTo(0,0);});
-  h.querySelectorAll('[data-see]').forEach(el=>el.onclick=()=>{const s=el.dataset.see;if(s==='newest'){state.all=true;state.sort='newest';$('#sort').value='newest';}else if(s==='audio'){state.type='audio';renderChips();}haptic();run();window.scrollTo(0,0);});
+  h.querySelectorAll('[data-auth]').forEach(el=>el.onclick=()=>{state.view='search';state.all=false;$('#q').value=el.dataset.auth;state.q=el.dataset.auth;$('#clr').style.display='block';haptic();setTabs();run();window.scrollTo(0,0);});
+  h.querySelectorAll('[data-see]').forEach(el=>el.onclick=()=>{state.view='search';const s=el.dataset.see;if(s==='newest'){state.all=true;state.sort='newest';$('#sort').value='newest';}else if(s==='audio'){state.type='audio';renderChips();}haptic();setTabs();run();window.scrollTo(0,0);});
 }
 // ---- gentle auto-scroll for the "recently added" ticker, native scroll underneath so a
 // touch/swipe always fully overrides it (pauses the moment a finger touches it, resumes a
@@ -1150,37 +1277,43 @@ var CLUSTER_COLORS=['#cf5959','#c65c39','#cf9459','#c6a339','#cfcf59','#a3c639',
 $('#btnGlobe').onclick=()=>{haptic();window.openGlobe?.();};
 $('#globeClose').onclick=()=>window.closeGlobe?.();
 
-function isHome(){return state.view==='browse'&&!state.q&&!state.genre&&!state.audience&&!state.type&&!state.all;}
-// Every primary destination — Asosiy's #home or #grid, and Profil/Davra/Mutolaaxonam's own
-// containers — is a peer area swapped in-place here. The search/map-button chrome makes sense
-// on home too (still want to search from the main page), but the genre/filter chip rows only
-// make sense once actually browsing/searching all books (#grid) — showing them on #home as well
-// was the main source of home-page clutter (genre chips + genre shelves + topic chips, all at
-// once), so they're scoped to 'grid' only here.
+// 'browse' is exclusively the home state now; a distinct 'search' view (entered via the header's
+// search icon, "Barchasi →" links, genre/topic/author taps, etc.) covers both the search LANDING
+// (no query/filter yet — categories + recent searches + popular list) and actual results, so the
+// two states share one back arrow / filter icon / search input instead of home and search fighting
+// over the same chrome.
+function isHome(){return state.view==='browse';}
+function isSearchDiscovery(){return state.view==='search'&&!state.q&&!state.genre&&!state.audience&&!state.type&&!state.all;}
+// Every primary destination — Asosiy's #home, search's #searchDiscovery/#grid, and Profil/Davra/
+// Mutolaaxonam's own containers — is a peer area swapped in-place here.
 function showArea(area){
-  const forBooks=area==='home'||area==='grid';
+  const forBooks=area==='home'||area==='search';
+  const discovery=area==='search'&&isSearchDiscovery();
+  $('#homeHeader').style.display=area==='home'?'block':'none';
+  $('#searchHeader').style.display=area==='search'?'flex':'none';
   // Icon-only search on home (mutolaa-style) — the real input only appears once you're actually
-  // browsing/searching (#grid), so it never competes with the home page's own content for space.
-  $('.searchbar').style.display=area==='grid'?'flex':'none';
+  // in search, so it never competes with the home page's own content for space.
+  $('.searchbar').style.display=area==='search'?'flex':'none';
   $('#btnSearchIcon').style.display=area==='home'?'inline':'none';
   $('.liveHeaderRow').style.display=forBooks?'block':'none';
   $('#btnGlobe').style.display=forBooks?'flex':'none';
-  $('#genres').style.display=area==='grid'?'flex':'none';
-  $('#filters').style.display=area==='grid'?'flex':'none';
+  if(area!=='search')toggleFilterPanel(false);
   $('#home').style.display=area==='home'?'block':'none';
-  $('#grid').style.display=area==='grid'?'grid':'none';
-  $('.bar').style.display=area==='grid'?'flex':'none';
+  $('#searchDiscovery').style.display=discovery?'block':'none';
+  $('#grid').style.display=(area==='search'&&!discovery)?'grid':'none';
+  $('.bar').style.display=(area==='search'&&!discovery)?'flex':'none';
   $('#profileView').style.display=area==='profile'?'block':'none';
   $('#davraView').style.display=area==='davra'?'block':'none';
   $('#readingView').style.display=area==='reading'?'block':'none';
-  if(area!=='grid'){$('#more').style.display='none';$('#empty').style.display='none';}
+  if(area!=='search'||discovery){$('#more').style.display='none';$('#empty').style.display='none';}
 }
 function run(){
   if(state.view==='profile'){showArea('profile');loadProfile();return;}
   if(state.view==='davra'){showArea('davra');loadDavraFeed(true);return;}
   if(state.view==='reading'){showArea('reading');renderReading();return;}
   if(isHome()){renderHome();showArea('home');}
-  else{compute();render();showArea('grid');}
+  else if(isSearchDiscovery()){renderSearchDiscovery();showArea('search');}
+  else{compute();render();showArea('search');}
 }
 
 function toggleFav(id){
@@ -1255,7 +1388,7 @@ function openDetail(id){
   $('#dShare').onclick=()=>{const txt=`📚 ${b.t}${b.a?' — '+b.a:''}`;const s=`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(txt)}`;tg?.openTelegramLink?tg.openTelegramLink(s):navigator.share?.({title:b.t,url});};
   const dBackGlobe=$('#dBackGlobe');
   if(dBackGlobe)dBackGlobe.onclick=()=>closeSheet();
-  c.querySelectorAll('[data-sub]').forEach(el=>el.onclick=()=>{closeSheet();$('#q').value=el.dataset.sub;state.q=el.dataset.sub;$('#clr').style.display='block';if(state.view!=='browse'){state.view='browse';setTabs();}run();window.scrollTo(0,0);});
+  c.querySelectorAll('[data-sub]').forEach(el=>el.onclick=()=>{closeSheet();$('#q').value=el.dataset.sub;state.q=el.dataset.sub;$('#clr').style.display='block';state.all=false;if(state.view!=='search'){state.view='search';setTabs();}run();window.scrollTo(0,0);});
   c.querySelectorAll('.si').forEach(el=>el.onclick=()=>openDetail(el.dataset.id));
   _wireFmtButtons(c);
   loadRating(b.i);
@@ -1559,7 +1692,7 @@ function loadProfile(){
 }
 function goToView(v){state.view=v;state.all=false;setTabs();run();window.scrollTo(0,0);}
 $('#btnProfile').onclick=()=>{haptic();goToView('profile');};
-$('#btnSearchIcon').onclick=()=>{haptic();state.view='browse';state.all=true;setTabs();run();window.scrollTo(0,0);setTimeout(()=>$('#q').focus(),80);};
+$('#btnSearchIcon').onclick=()=>{haptic();state.view='search';setTabs();run();window.scrollTo(0,0);setTimeout(()=>$('#q').focus(),80);};
 $('#sheetClose').onclick=()=>closeSheet();
 
 // ---- ratings (Play-Store-style 1-5 stars + optional review; flat, not repliable; other
@@ -1640,14 +1773,28 @@ function loadRating(bookId){
 }
 
 // events
-let deb;
-$('#q').addEventListener('input',e=>{state.q=e.target.value.trim();state.all=false;$('#clr').style.display=state.q?'block':'none';clearTimeout(deb);deb=setTimeout(()=>{if(state.view!=='browse'){state.view='browse';setTabs();}run();if(state.q)api('/api/track/search',{method:'POST'}).catch(()=>{});},200);});
+// Two separate debounces on purpose: the 200ms one drives local filtering/rendering (needs to
+// feel instant), the 1200ms one is when a search actually gets "recorded" — tracking every
+// keystroke's partial term (h/ha/har/harr/harry…) would turn the aggregate stats into single-
+// letter noise, so recording only fires once typing has genuinely paused.
+let deb,trackDeb;
+$('#q').addEventListener('input',e=>{
+  state.q=e.target.value.trim();state.all=false;$('#clr').style.display=state.q?'block':'none';
+  clearTimeout(deb);
+  deb=setTimeout(()=>{if(state.view!=='search'){state.view='search';setTabs();}run();},200);
+  clearTimeout(trackDeb);
+  const term=state.q;
+  if(term)trackDeb=setTimeout(()=>{
+    pushRecentSearch(term);
+    api('/api/track/search',{method:'POST',body:JSON.stringify({term})}).catch(()=>{});
+  },1200);
+});
 $('#clr').onclick=()=>{$('#q').value='';state.q='';state.all=false;$('#clr').style.display='none';run();};
 $('#sort').onchange=e=>{state.sort=e.target.value;run();};
 $('#more').onclick=()=>{state.shown+=PAGE;render();};
 $('#sheet').onclick=e=>{if(e.target.id==='sheet')closeSheet();};
 function setTabs(){
-  $('#navAsosiy').classList.toggle('on',state.view==='browse');
+  $('#navAsosiy').classList.toggle('on',state.view==='browse'||state.view==='search');
   $('#navMutolaa').classList.toggle('on',state.view==='reading');
   $('#navDavra').classList.toggle('on',state.view==='davra');
   $('#navSahifam').classList.toggle('on',state.view==='profile');
@@ -1662,7 +1809,7 @@ $('#navAsosiy').onclick=()=>{haptic();state.view='browse';state.q='';$('#q').val
 $('#navMutolaa').onclick=()=>{haptic();goToView('reading');};
 $('#navDavra').onclick=()=>{haptic();goToView('davra');};
 $('#navSahifam').onclick=()=>{haptic();goToView('profile');};
-window.addEventListener('scroll',()=>{if(isHome())return;if(window.innerHeight+window.scrollY>=document.body.offsetHeight-500&&state.result.length>state.shown){state.shown+=PAGE;render();}});
+window.addEventListener('scroll',()=>{if(isHome()||isSearchDiscovery())return;if(window.innerHeight+window.scrollY>=document.body.offsetHeight-500&&state.result.length>state.shown){state.shown+=PAGE;render();}});
 
 // ---- theme: day / night / system (manual choice always wins; "system" follows Telegram's
 // own light/dark setting, or the OS preference outside Telegram) ----
@@ -1739,6 +1886,7 @@ async function boot(){
   renderChips();run();
   loadContinueReading();
   loadTrending();
+  loadTopSearchTerms();
   trackEvent('app_open');
   liveRefreshPublicStats();
   setInterval(liveRefreshPublicStats,6000);
