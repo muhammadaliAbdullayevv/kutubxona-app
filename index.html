@@ -422,15 +422,31 @@
   .pField input[type=text],.pField input[type=tel],.pField input[type=email],.pField input[type=date],.pField textarea{width:100%; background:var(--card); border:1px solid var(--line); border-radius:10px; color:var(--text); padding:10px; font:inherit; box-sizing:border-box}
   .pField textarea{resize:vertical; min-height:70px}
   .pField .cnt{text-align:right; font-size:11.5px; color:var(--muted); margin-top:3px}
-  .tahRow{position:relative}
-  .tahRow .at{position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--muted); font-weight:700; pointer-events:none}
-  .tahRow input{padding-left:24px !important}
+  .pField input:focus,.pField textarea:focus,.feCard input:focus{border-color:var(--accent); outline:none; box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent)}
   .tStatus{font-size:12px; margin-top:5px; font-weight:600}
   .tStatus.ok{color:#2fbf6f}
   .tStatus.bad{color:var(--danger)}
   .genderPick{display:flex; gap:8px}
   .genderPick .chip{flex:1; text-align:center; padding:10px}
-  #profileSaveBtn{width:100%; margin-top:6px}
+  /* ---- settings rows grouped into cards ("Shaxsiy ma'lumotlar"/"Aloqa ma'lumotlari"),
+     each row drilling into openFieldEdit()/openBirthPicker() rather than an inline input ---- */
+  .pCard{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:2px 14px; margin-bottom:16px}
+  .pCard h4{font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; font-weight:700; padding:12px 0 4px; margin:0}
+  .pRow{display:flex; align-items:center; justify-content:space-between; padding:13px 0; border-top:1px solid var(--line); cursor:pointer; gap:10px}
+  .pRow:first-of-type{border-top:0}
+  .pRowLabel{color:var(--muted); font-size:14px; flex-shrink:0}
+  .pRowRight{display:flex; align-items:center; gap:6px; min-width:0}
+  .pRowValue{font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:170px}
+  .pRowValue.empty{color:var(--muted); font-weight:400}
+  .pRowChev{color:var(--muted); font-size:20px; flex-shrink:0}
+  /* ---- generic single-field edit modal (#fieldEditSheet) ---- */
+  .feCard{width:100%; background:var(--card); border-radius:20px 20px 0 0; padding:20px 20px calc(20px + env(safe-area-inset-bottom)); box-sizing:border-box; position:relative; text-align:center}
+  .feClose{position:absolute; top:14px; right:14px; width:32px; height:32px; border-radius:50%; background:var(--chip); display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:14px; color:var(--muted)}
+  .feIcon{font-size:44px; margin:6px 0 10px}
+  .feTitle{font-size:19px; font-weight:800}
+  .feSubtitle{font-size:13px; color:var(--muted); margin:6px 0 20px; line-height:1.4}
+  .feCard .pField{margin-bottom:4px}
+  #feConfirmBtn:disabled{opacity:.4; cursor:default}
   /* ---- avatar crop tool (#avatarCropSheet) ---- */
   .cropWrap{position:relative; width:300px; height:300px; max-width:80vw; max-height:80vw; border-radius:12px; overflow:hidden; background:#111; touch-action:none; margin:6px 0 16px}
   #cropCanvas{width:100%; height:100%; display:block}
@@ -438,14 +454,30 @@
   #cropZoom{width:100%; max-width:320px; margin:4px 0 18px}
   .cropActions{display:flex; gap:10px; width:100%; max-width:320px}
   .cropActions .btn{flex:1}
-  .pcard{display:flex; align-items:center; gap:12px; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px 14px; margin:14px 0; cursor:pointer}
-  .pcard .avWrap{position:relative; flex-shrink:0}
-  .pcard .avImg{position:absolute; top:0; left:0; border-radius:50%; object-fit:cover}
-  .pcard .avInitials{border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:800; color:#fff}
-  .pcardInfo{flex:1; min-width:0}
-  .pcardName{font-weight:800; font-size:15px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-  .pcardSub{font-size:12.5px; color:var(--muted); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-  .pcardChev{font-size:22px; color:var(--muted)}
+  /* ---- birth-date wheel picker (#birthPickerSheet) ---- */
+  .wheelPicker{width:100%; background:var(--card); border-radius:20px 20px 0 0; padding:16px 16px calc(16px + env(safe-area-inset-bottom)); box-sizing:border-box}
+  .wheelCols{position:relative; display:flex; height:220px}
+  .wheelHighlight{position:absolute; left:0; right:0; top:50%; transform:translateY(-50%); height:44px; background:var(--chip); border-radius:10px; pointer-events:none; z-index:0}
+  .wheelCol{flex:1; overflow-y:scroll; scroll-snap-type:y mandatory; scrollbar-width:none; position:relative; z-index:1; padding:88px 0}
+  .wheelCol::-webkit-scrollbar{display:none}
+  .wheelItem{height:44px; display:flex; align-items:center; justify-content:center; scroll-snap-align:center; font-size:16.5px; color:var(--muted); font-weight:600}
+  .wheelItem.sel{color:var(--text); font-weight:800}
+  /* ---- profile header: banner + large avatar, matching mutolaa's proportions instead of the
+     small flat row this used to be. The banner is a computed per-user gradient (same coverFor()
+     used for book covers elsewhere), not an uploadable cover photo — that stays out of scope. ---- */
+  .pHero{position:relative; margin:0 0 18px; border-radius:16px; overflow:hidden; background:var(--card); border:1px solid var(--line)}
+  .pHeroBanner{height:76px; width:100%}
+  .pHeroTop{display:flex; align-items:flex-end; justify-content:space-between; padding:0 14px; margin-top:-42px; gap:10px}
+  .pHero .avWrap{position:relative; flex-shrink:0; border-radius:50%; border:3px solid var(--card); box-shadow:0 0 0 2px var(--accent)}
+  .pHero .avImg{position:absolute; top:0; left:0; border-radius:50%; object-fit:cover}
+  .pHero .avInitials{border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:800; color:#fff}
+  /* Deliberately NOT .btn.ghost — that class hardcodes width:52px for the small square icon
+     buttons used elsewhere, and (.btn.ghost's two-class selector beats a single-class override
+     here no matter the source order) fighting that specificity was the wrong approach; a fresh,
+     self-contained style for a button that needs to fit a text label is simpler and correct. */
+  .pHeroEditBtn{flex:0 1 auto; min-width:0; margin-bottom:8px; padding:8px 12px; border-radius:13px; background:var(--card); border:1px solid var(--line); color:var(--text); font-weight:800; font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer}
+  .pHeroName{font-weight:800; font-size:19px; padding:12px 14px 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .pHeroSub{font-size:13px; color:var(--muted); padding:3px 14px 16px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer}
   /* ---- Profil screen tabs: Javonlar / Yutuqlar / Sertifikatlar ---- */
   .ptabs{display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; margin:18px 0 4px; border-bottom:1px solid var(--line)}
   .ptabs::-webkit-scrollbar{display:none}
@@ -624,6 +656,37 @@
       <button class="btn ghost" id="cropCancelBtn">Bekor qilish</button>
       <button class="btn primary" id="cropConfirmBtn">Saqlash</button>
     </div>
+  </div>
+</div>
+<!-- Native <input type=date> renders wildly inconsistently (a bare, ugly text box with no
+     picker chrome at all on Telegram Desktop's embedded Chromium) — a real, custom wheel picker
+     (day/month/year scroll-snap columns, like every native mobile date picker) looks the same
+     everywhere instead of however the host happens to render form controls. Uses the .sheet
+     base class's own default bottom-anchored-modal styling (align-items:flex-end + dim backdrop)
+     unmodified — every OTHER sheet in this file overrides that to a full page; this is the one
+     that's deliberately a small bottom sheet. -->
+<div class="sheet" id="birthPickerSheet" style="z-index:55">
+  <div class="wheelPicker" id="wheelPicker">
+    <div class="wheelCols">
+      <div class="wheelHighlight"></div>
+      <div class="wheelCol" id="wcDay"></div>
+      <div class="wheelCol" id="wcMonth"></div>
+      <div class="wheelCol" id="wcYear"></div>
+    </div>
+    <button class="btn primary" id="birthConfirmBtn" style="width:100%; margin-top:14px">Tasdiqlash</button>
+    <button class="btn ghost" id="birthCancelBtn" style="width:100%; margin-top:8px">Bekor qilish</button>
+  </div>
+</div>
+<!-- Generic single-field edit modal (name/tahallus/phone/email) — see openFieldEdit() -->
+<div class="sheet" id="fieldEditSheet" style="z-index:56">
+  <div class="feCard">
+    <div class="feClose" id="fieldEditClose">✕</div>
+    <div class="feIcon" id="feIcon">✍️</div>
+    <div class="feTitle" id="feTitle"></div>
+    <div class="feSubtitle" id="feSubtitle"></div>
+    <div class="pField" style="text-align:left"><label id="feLabel"></label><input type="text" id="feInput"></div>
+    <div class="tStatus" id="feStatus"></div>
+    <button class="btn primary" id="feConfirmBtn" style="width:100%; margin-top:10px">Tasdiqlash</button>
   </div>
 </div>
 
@@ -2036,22 +2099,129 @@ function renderProfileCard(){
   api('/api/profile/settings').then(p=>{
     myProfileCache=p;
     const name=p.display_name||'Foydalanuvchi';
-    const sub=p.tahallus?('@'+p.tahallus):'Profilni to\'ldirish →';
+    const sub=p.tahallus?('@'+p.tahallus):'Profilni to\'ldirish uchun bosing';
     const[c1,c2]=coverFor(String(uid||'u'));
+    const avSize=84;
     // Initials+gradient always renders as the base layer; a real photo (if any) is an absolutely
     // positioned sibling on top that removes itself on load failure — same layering trick already
     // used for book covers (.ci/.ini), so a missing/broken avatar file degrades to initials
     // instead of showing a broken-image icon.
-    const img=p.avatar_version?`<img class="avImg" style="width:52px;height:52px" src="${avatarUrl(uid,p.avatar_version)}" onerror="this.remove()">`:'';
-    card.innerHTML=`<div class="pcard" id="pProfileCardBtn">
-      <div class="avWrap" style="width:52px;height:52px"><div class="avInitials" style="width:52px;height:52px;font-size:18px;background:linear-gradient(135deg,${c1},${c2})">${esc(initials(name))}</div>${img}</div>
-      <div class="pcardInfo"><div class="pcardName">${esc(name)}</div><div class="pcardSub">${esc(sub)}</div></div>
-      <span class="pcardChev">›</span>
+    const img=p.avatar_version?`<img class="avImg" style="width:${avSize}px;height:${avSize}px" src="${avatarUrl(uid,p.avatar_version)}" onerror="this.remove()">`:'';
+    card.innerHTML=`<div class="pHero">
+      <div class="pHeroBanner" style="background:linear-gradient(135deg,${c1},${c2})"></div>
+      <div class="pHeroTop">
+        <div class="avWrap" style="width:${avSize}px;height:${avSize}px"><div class="avInitials" style="width:${avSize}px;height:${avSize}px;font-size:30px;background:linear-gradient(135deg,${c1},${c2})">${esc(initials(name))}</div>${img}</div>
+        <button class="pHeroEditBtn" id="pProfileCardBtn">✏️ Profilni tahrirlash</button>
+      </div>
+      <div class="pHeroName">${esc(name)}</div>
+      <div class="pHeroSub" id="pHeroSubBtn">${esc(sub)}</div>
     </div>`;
     $('#pProfileCardBtn').onclick=()=>openProfileEdit();
+    $('#pHeroSubBtn').onclick=()=>openProfileEdit();
   }).catch(()=>{card.innerHTML='';});
 }
+// ---- birth-date wheel picker: 3 independent scroll-snap columns (day/month/year), matching the
+// native-feeling picker every mobile OS has — a plain <input type=date> was the actual bug here,
+// rendering as a bare unstyled text box with no picker UI at all on some hosts. ----
+const UZ_MONTHS=['Yanvar','Fevral','Mart','Aprel','May','Iyun','Iyul','Avgust','Sentabr','Oktabr','Noyabr','Dekabr'];
+function formatBirthDisplay(iso){
+  const parts=iso.split('-').map(Number);
+  return `${parts[2]} ${UZ_MONTHS[parts[1]-1]} ${parts[0]}`;
+}
+const WHEEL_ITEM_H=44;
+function buildWheelCol(el,items,selectedIndex){
+  el.innerHTML=items.map((label,i)=>`<div class="wheelItem${i===selectedIndex?' sel':''}">${esc(String(label))}</div>`).join('');
+  // scrollTo({behavior:'instant'}) instead of a plain scrollTop= assignment — belt-and-suspenders
+  // against any inherited/ancestor scroll-behavior:smooth turning this initial jump-to-position
+  // into a slow animation that a screenshot or a fast re-open could catch mid-transition.
+  el.scrollTo({top:selectedIndex*WHEEL_ITEM_H,behavior:'instant'});
+}
+function markWheelSelected(el){
+  const idx=Math.max(0,Math.min(el.querySelectorAll('.wheelItem').length-1,Math.round(el.scrollTop/WHEEL_ITEM_H)));
+  el.querySelectorAll('.wheelItem').forEach((it,i)=>it.classList.toggle('sel',i===idx));
+  return idx;
+}
+function wireWheelCol(el){
+  let t;
+  el.onscroll=()=>{clearTimeout(t);t=setTimeout(()=>{haptic();markWheelSelected(el);},100);};
+}
+let birthPickerOnConfirm=null,birthYears=[];
+function openBirthPicker(currentIso,onConfirm){
+  haptic();
+  birthPickerOnConfirm=onConfirm;
+  const nowY=new Date().getFullYear();
+  birthYears=[];for(let y=nowY-100;y<=nowY;y++)birthYears.push(y);
+  let selY=nowY-20,selM=1,selD=1;
+  if(currentIso){
+    const parts=currentIso.split('-').map(Number);
+    selY=parts[0];selM=parts[1];selD=parts[2];
+  }
+  const days=[];for(let i=1;i<=31;i++)days.push(i);
+  // Setting scrollTop on a column has no effect while the sheet is still display:none — same
+  // "must open before anything reads/sets scroll-dependent layout" trap already hit once with
+  // the Books Planet globe canvas and again with the avatar crop canvas. Open the sheet FIRST,
+  // then build/scroll the columns on the next frame once they actually have real layout.
+  $('#birthPickerSheet').classList.add('open');
+  tg?.BackButton?.show();
+  requestAnimationFrame(()=>{
+    buildWheelCol($('#wcDay'),days,selD-1);
+    buildWheelCol($('#wcMonth'),UZ_MONTHS,selM-1);
+    buildWheelCol($('#wcYear'),birthYears,Math.max(0,birthYears.indexOf(selY)));
+    wireWheelCol($('#wcDay'));wireWheelCol($('#wcMonth'));wireWheelCol($('#wcYear'));
+  });
+}
+function closeBirthPicker(){$('#birthPickerSheet').classList.remove('open');tg?.BackButton?.hide();}
+$('#birthCancelBtn').onclick=closeBirthPicker;
+$('#birthPickerSheet').onclick=e=>{if(e.target.id==='birthPickerSheet')closeBirthPicker();};
+$('#birthConfirmBtn').onclick=()=>{
+  const dIdx=markWheelSelected($('#wcDay'));
+  const mIdx=markWheelSelected($('#wcMonth'));
+  const yIdx=markWheelSelected($('#wcYear'));
+  const day=dIdx+1,month=mIdx+1,year=birthYears[yIdx];
+  // Clamp instead of producing an invalid date (e.g. picking day 31 while Month is on February).
+  const maxDay=new Date(year,month,0).getDate();
+  const iso=`${year}-${String(month).padStart(2,'0')}-${String(Math.min(day,maxDay)).padStart(2,'0')}`;
+  haptic('medium');
+  closeBirthPicker();
+  if(birthPickerOnConfirm)birthPickerOnConfirm(iso);
+};
+
 let myProfileCache=null;
+// Generic single-field edit modal — mutolaa edits To'liq ism/Tahallus/Telefon/E-pochta each
+// through their own small bottom-sheet dialog (icon+title+subtitle+one input+Tasdiqlash), not one
+// giant flat form. One reusable sheet parametrized per-field beats four near-identical bespoke
+// ones — all four share the exact same layout, only the copy and validation differ.
+let feOnConfirm=null,feTahDeb=null;
+function openFieldEdit(opts){
+  haptic();
+  $('#feIcon').textContent=opts.icon;
+  $('#feTitle').textContent=opts.title;
+  $('#feSubtitle').textContent=opts.subtitle;
+  $('#feLabel').textContent=opts.label;
+  const input=$('#feInput');
+  input.type=opts.type||'text';
+  input.value=opts.value||'';
+  input.placeholder=opts.placeholder||'';
+  input.maxLength=opts.maxLength||200;
+  const status=$('#feStatus');status.textContent='';status.className='tStatus';
+  feOnConfirm=opts.onConfirm;
+  const btn=$('#feConfirmBtn');
+  const updateBtn=()=>{btn.disabled=!input.value.trim();};
+  updateBtn();
+  input.oninput=()=>{updateBtn();if(opts.onInput)opts.onInput(input.value.trim());};
+  $('#fieldEditSheet').classList.add('open');
+  tg?.BackButton?.show();
+  setTimeout(()=>input.focus(),300);
+}
+function closeFieldEdit(){$('#fieldEditSheet').classList.remove('open');tg?.BackButton?.hide();clearTimeout(feTahDeb);}
+$('#fieldEditClose').onclick=closeFieldEdit;
+$('#fieldEditSheet').onclick=e=>{if(e.target.id==='fieldEditSheet')closeFieldEdit();};
+$('#feConfirmBtn').onclick=()=>{
+  const v=$('#feInput').value.trim();
+  if(!v)return;
+  if(feOnConfirm)feOnConfirm(v);
+};
+
 function openProfileEdit(){
   haptic();
   $('#profileEditSheetc').innerHTML='Yuklanmoqda...';
@@ -2060,29 +2230,47 @@ function openProfileEdit(){
   const uid=myUid();
   api('/api/profile/settings').then(p=>{
     myProfileCache=p;
-    let gender=p.gender||null;
+    let name=p.display_name||'', tahallus=p.tahallus||'', gender=p.gender||null,
+        birthDate=p.birth_date||null, phone=p.phone_number||'', email=p.email||'';
     const[c1,c2]=coverFor(String(uid||'u'));
     // Same base-layer-initials + on-top-photo-that-self-removes-on-error pattern as the compact
     // profile card and book covers elsewhere — a missing/broken avatar file degrades to initials
     // instead of a broken-image icon.
     const avatarHtml=()=>`<div class="avInitials" style="background:linear-gradient(135deg,${c1},${c2})">${esc(initials(p.display_name||'?'))}</div>${p.avatar_version?`<img class="avImg" id="avPreview" src="${avatarUrl(uid,p.avatar_version)}" onerror="this.remove()">`:''}`;
+    const rowHtml=(id,label,value,placeholder)=>`<div class="pRow" id="${id}"><span class="pRowLabel">${esc(label)}</span><span class="pRowRight"><span class="pRowValue${value?'':' empty'}">${esc(value||placeholder)}</span><span class="pRowChev">›</span></span></div>`;
     $('#profileEditSheetc').innerHTML=`
       <div class="avatarEdit">
         <div class="avWrap" id="avWrap">${avatarHtml()}<div class="avCam" id="avCamBtn">📷</div></div>
         <input type="file" accept="image/*" id="avFile" style="display:none">
         ${p.avatar_version?'<button class="avDel" id="avDelBtn">Rasmni o\'chirish</button>':''}
       </div>
-      <div class="pField"><label>Qisqacha men haqimda</label><textarea id="pfBio" maxlength="500" placeholder="O'zingiz haqingizda qisqacha yozing...">${esc(p.bio||'')}</textarea><div class="cnt" id="pfBioCnt">0/500</div></div>
-      <div class="pField"><label>To'liq ism</label><input type="text" id="pfName" maxlength="80" value="${esc(p.display_name||'')}" placeholder="Ismingiz Familiyangiz"></div>
-      <div class="pField"><label>Tahallus (username)</label><div class="tahRow"><span class="at">@</span><input type="text" id="pfTahallus" maxlength="32" value="${esc(p.tahallus||'')}" placeholder="foydalanuvchi_nomi"></div><div class="tStatus" id="pfTahallusStatus"></div></div>
-      <div class="pField"><label>Tug'ilgan sana</label><input type="date" id="pfBirth" value="${esc(p.birth_date||'')}"></div>
-      <div class="pField"><label>Jins</label><div class="genderPick" id="pfGender">
-        <span class="chip${gender==='male'?' on':''}" data-g="male">👨 Erkak</span>
-        <span class="chip${gender==='female'?' on':''}" data-g="female">👩 Ayol</span>
-      </div></div>
-      <div class="pField"><label>Telefon raqam</label><input type="tel" id="pfPhone" maxlength="32" value="${esc(p.phone_number||'')}" placeholder="+998 XX XXX XX XX"></div>
-      <div class="pField"><label>E-pochta</label><input type="email" id="pfEmail" maxlength="120" value="${esc(p.email||'')}" placeholder="siz@misol.com"></div>
-      <button class="btn primary" id="profileSaveBtn">Saqlash</button>`;
+      <div class="pField"><label>Qisqacha men haqimda</label><textarea id="pfBio" maxlength="500" placeholder="O'zingiz haqingizda qisqacha yozing...">${esc(p.bio||'')}</textarea><div class="cnt" id="pfBioCnt">0/500</div><button class="btn ghost" id="bioSaveBtn" style="width:100%; margin-top:8px">Bioni saqlash</button></div>
+      <div class="pCard">
+        <h4>Shaxsiy ma'lumotlar</h4>
+        ${rowHtml('rowName',"To'liq ism",name,'Kiritilmagan')}
+        ${rowHtml('rowTahallus','Tahallus',tahallus?('@'+tahallus):'','Kiritilmagan')}
+        <div class="pRow" id="rowBirth"><span class="pRowLabel">Tug'ilgan sana</span><span class="pRowRight"><span class="pRowValue${birthDate?'':' empty'}" id="rowBirthValue">${birthDate?formatBirthDisplay(birthDate):'Kiritilmagan'}</span><span class="pRowChev">›</span></span></div>
+        <div class="pField" style="padding:12px 0 6px; border-top:1px solid var(--line); margin:0"><label>Jins</label><div class="genderPick" id="pfGender">
+          <span class="chip${gender==='male'?' on':''}" data-g="male">👨 Erkak</span>
+          <span class="chip${gender==='female'?' on':''}" data-g="female">👩 Ayol</span>
+        </div></div>
+      </div>
+      <div class="pCard">
+        <h4>Aloqa ma'lumotlari</h4>
+        ${rowHtml('rowPhone','Telefon raqam',phone,'Kiritilmagan')}
+        ${rowHtml('rowEmail','E-pochta',email,'Kiritilmagan')}
+      </div>`;
+    const bioEl=$('#pfBio'),bioCnt=$('#pfBioCnt');
+    // Auto-saves the FULL current state on every field's own confirm — /api/profile/settings is
+    // a full-replace upsert (see db.upsert_user_profile), not a per-field PATCH, so every call
+    // here must resend everything or it would null out the fields not being edited right now.
+    function persist(){
+      api('/api/profile/settings',{method:'POST',body:JSON.stringify({
+        display_name:name||null, tahallus:tahallus||null, birth_date:birthDate,
+        gender, phone_number:phone||null, email:email||null, bio:bioEl.value.trim()||null,
+      })}).then(()=>{toast('Saqlandi');renderProfileCard();})
+        .catch(()=>toast('Saqlashda xatolik — tahallus band bo\'lishi mumkin'));
+    }
     // --- avatar upload/delete ---
     // The file input itself stays a plain <input type=file accept=image/*> with no `capture`
     // attribute — that's deliberate: adding capture would force camera-only on many mobile
@@ -2098,52 +2286,84 @@ function openProfileEdit(){
       haptic();
       api('/api/profile/avatar/delete',{method:'POST'}).then(r=>{p.avatar_version=r.avatar_version;toast('Rasm o\'chirildi');openProfileEdit();}).catch(()=>{});
     };
-    // --- bio counter ---
-    const bioEl=$('#pfBio'),bioCnt=$('#pfBioCnt');
+    // --- bio: still inline (mutolaa's own bio field is an in-place editable card, not a
+    // drill-in modal like the rows below) ---
     const updBioCnt=()=>bioCnt.textContent=bioEl.value.length+'/500';
     updBioCnt();bioEl.oninput=updBioCnt;
-    // --- gender pills ---
+    $('#bioSaveBtn').onclick=persist;
+    // --- gender pills: auto-save on tap, consistent with the rows around it now all
+    // saving immediately rather than waiting on one global Saqlash button ---
     $('#pfGender').querySelectorAll('.chip').forEach(el=>el.onclick=()=>{
       gender=(gender===el.dataset.g)?null:el.dataset.g; // tap again to clear
       $('#pfGender').querySelectorAll('.chip').forEach(c=>c.classList.toggle('on',c.dataset.g===gender));
+      persist();
     });
-    // --- tahallus live availability check, debounced ---
-    let tahDeb;
-    const tahEl=$('#pfTahallus'),tahStatus=$('#pfTahallusStatus');
-    tahEl.oninput=()=>{
-      clearTimeout(tahDeb);
-      const v=tahEl.value.trim();
-      if(!v){tahStatus.textContent='';tahStatus.className='tStatus';return;}
-      if(!/^[A-Za-z0-9_]{3,32}$/.test(v)){tahStatus.textContent='3-32 ta harf/raqam/_ (probel va maxsus belgilarsiz)';tahStatus.className='tStatus bad';return;}
-      tahStatus.textContent='Tekshirilmoqda...';tahStatus.className='tStatus';
-      tahDeb=setTimeout(()=>{
-        api('/api/profile/tahallus-available?value='+encodeURIComponent(v)).then(r=>{
-          if(tahEl.value.trim()!==v)return; // stale response, user kept typing
-          tahStatus.textContent=r.available?'✓ Mavjud':'✗ Band, boshqasini tanlang';
-          tahStatus.className='tStatus '+(r.available?'ok':'bad');
-        }).catch(()=>{});
-      },450);
-    };
-    // --- save ---
-    $('#profileSaveBtn').onclick=()=>{
-      const tv=tahEl.value.trim();
-      if(tv&&!/^[A-Za-z0-9_]{3,32}$/.test(tv)){toast('Tahallus formati noto\'g\'ri');return;}
-      haptic('medium');
-      const btn=$('#profileSaveBtn');btn.disabled=true;btn.textContent='Saqlanmoqda...';
-      api('/api/profile/settings',{method:'POST',body:JSON.stringify({
-        display_name:$('#pfName').value.trim()||null,
-        tahallus:tv||null,
-        birth_date:$('#pfBirth').value||null,
-        gender:gender,
-        phone_number:$('#pfPhone').value.trim()||null,
-        email:$('#pfEmail').value.trim()||null,
-        bio:bioEl.value.trim()||null,
-      })}).then(()=>{
-        toast('Profil saqlandi');
-        closeProfileEdit();
-        renderProfileCard();
-      }).catch(()=>{toast('Saqlashda xatolik — tahallus band bo\'lishi mumkin');btn.disabled=false;btn.textContent='Saqlash';});
-    };
+    // --- birth date: the custom wheel picker built above, not the native <input type=date>
+    // (rendered as a bare, inconsistent text box with no picker UI at all on some hosts, e.g.
+    // Telegram Desktop's embedded Chromium) ---
+    $('#rowBirth').onclick=()=>openBirthPicker(birthDate,iso=>{
+      birthDate=iso;
+      const el=$('#rowBirthValue');
+      el.textContent=formatBirthDisplay(iso);
+      el.classList.remove('empty');
+      persist();
+    });
+    // --- To'liq ism ---
+    $('#rowName').onclick=()=>openFieldEdit({
+      icon:'✍️', title:"To'liq ism", subtitle:"Ism sharifingizni o'zgartiring",
+      label:"To'liq ism", type:'text', value:name, placeholder:'Ismingiz Familiyangiz', maxLength:80,
+      onConfirm:v=>{
+        name=v;
+        const el=$('#rowName .pRowValue');el.textContent=v;el.classList.remove('empty');
+        closeFieldEdit();persist();
+      },
+    });
+    // --- Tahallus, with the same live-availability debounce the old inline field had ---
+    $('#rowTahallus').onclick=()=>openFieldEdit({
+      icon:'🎯', title:'Tahallus', subtitle:"O'zingizga mos va esda qoladigan tahallus tanlang",
+      label:'Tahallus', type:'text', value:tahallus, placeholder:'foydalanuvchi_nomi', maxLength:32,
+      onInput:v=>{
+        const st=$('#feStatus');
+        clearTimeout(feTahDeb);
+        if(!v){st.textContent='';st.className='tStatus';return;}
+        if(!/^[A-Za-z0-9_]{3,32}$/.test(v)){st.textContent='3-32 ta harf/raqam/_';st.className='tStatus bad';return;}
+        st.textContent='Tekshirilmoqda...';st.className='tStatus';
+        feTahDeb=setTimeout(()=>{
+          api('/api/profile/tahallus-available?value='+encodeURIComponent(v)).then(r=>{
+            if($('#feInput').value.trim()!==v)return; // stale response, user kept typing
+            st.textContent=r.available?'✓ Mavjud':'✗ Band, boshqasini tanlang';
+            st.className='tStatus '+(r.available?'ok':'bad');
+          }).catch(()=>{});
+        },450);
+      },
+      onConfirm:v=>{
+        if(!/^[A-Za-z0-9_]{3,32}$/.test(v)){toast('Tahallus 3-32 ta harf/raqam/_ dan iborat bo\'lishi kerak');return;}
+        tahallus=v;
+        const el=$('#rowTahallus .pRowValue');el.textContent='@'+v;el.classList.remove('empty');
+        closeFieldEdit();persist();
+      },
+    });
+    // --- Telefon raqam ---
+    $('#rowPhone').onclick=()=>openFieldEdit({
+      icon:'📞', title:'Telefon raqam', subtitle:'Aloqa uchun telefon raqamingizni kiriting',
+      label:'Telefon raqam', type:'tel', value:phone, placeholder:'+998 XX XXX XX XX', maxLength:32,
+      onConfirm:v=>{
+        phone=v;
+        const el=$('#rowPhone .pRowValue');el.textContent=v;el.classList.remove('empty');
+        closeFieldEdit();persist();
+      },
+    });
+    // --- E-pochta ---
+    $('#rowEmail').onclick=()=>openFieldEdit({
+      icon:'📬', title:'E-pochta', subtitle:'Aloqa uchun elektron pochtangizni kiriting',
+      label:'E-pochta', type:'email', value:email, placeholder:'siz@misol.com', maxLength:120,
+      onConfirm:v=>{
+        if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)){toast('E-pochta formati noto\'g\'ri');return;}
+        email=v;
+        const el=$('#rowEmail .pRowValue');el.textContent=v;el.classList.remove('empty');
+        closeFieldEdit();persist();
+      },
+    });
   }).catch(()=>{$('#profileEditSheetc').innerHTML='<p class="hint">Yuklanmadi.</p>';});
 }
 function closeProfileEdit(){$('#profileEditSheet').classList.remove('open');tg?.BackButton?.hide();}
@@ -2587,7 +2807,7 @@ document.querySelectorAll('.viewThemeBtn').forEach(el=>el.onclick=toggleThemeQui
 
 function skeletonShelf(){return `<div class="section"><div class="shead"><h2 class="skel" style="width:140px;height:16px;border-radius:6px"></h2></div><div class="shelf">${Array(4).fill('<div class="si"><div class="skel" style="height:170px;border-radius:14px"></div></div>').join('')}</div></div>`;}
 async function boot(){
-  if(tg){tg.ready();tg.expand();tg.disableVerticalSwipes?.();tg.BackButton?.onClick(()=>{if($('#pdfSheet').classList.contains('open'))closePdfReader();else if($('#avatarCropSheet').classList.contains('open'))closeAvatarCrop();else if($('#writeReviewSheet').classList.contains('open'))closeWriteReview();else if($('#reviewsSheet').classList.contains('open'))closeReviewsSheet();else if($('#profileEditSheet').classList.contains('open'))closeProfileEdit();else if($('#shelvesSheet').classList.contains('open'))closeShelvesSheet();else if($('#listSheet').classList.contains('open'))closeListSheet();else if($('#sheet').classList.contains('open'))closeSheet();else if($('#globe').classList.contains('open'))closeGlobe();});applyThemeMode();tg.onEvent?.('themeChanged',()=>{if(themeMode==='system')applyThemeMode();});}
+  if(tg){tg.ready();tg.expand();tg.disableVerticalSwipes?.();tg.BackButton?.onClick(()=>{if($('#pdfSheet').classList.contains('open'))closePdfReader();else if($('#fieldEditSheet').classList.contains('open'))closeFieldEdit();else if($('#birthPickerSheet').classList.contains('open'))closeBirthPicker();else if($('#avatarCropSheet').classList.contains('open'))closeAvatarCrop();else if($('#writeReviewSheet').classList.contains('open'))closeWriteReview();else if($('#reviewsSheet').classList.contains('open'))closeReviewsSheet();else if($('#profileEditSheet').classList.contains('open'))closeProfileEdit();else if($('#shelvesSheet').classList.contains('open'))closeShelvesSheet();else if($('#listSheet').classList.contains('open'))closeListSheet();else if($('#sheet').classList.contains('open'))closeSheet();else if($('#globe').classList.contains('open'))closeGlobe();});applyThemeMode();tg.onEvent?.('themeChanged',()=>{if(themeMode==='system')applyThemeMode();});}
   if('serviceWorker' in navigator)window.addEventListener('load',()=>{
     navigator.serviceWorker.register('./sw.js').then(reg=>{
       // A long-lived, never-navigated Mini App session (Telegram keeps the WebView warm across
