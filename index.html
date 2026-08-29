@@ -439,6 +439,28 @@
   .pcardName{font-weight:800; font-size:15px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
   .pcardSub{font-size:12.5px; color:var(--muted); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
   .pcardChev{font-size:22px; color:var(--muted)}
+  /* ---- Profil screen tabs: Javonlar / Yutuqlar / Sertifikatlar ---- */
+  .ptabs{display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; margin:18px 0 4px; border-bottom:1px solid var(--line)}
+  .ptabs::-webkit-scrollbar{display:none}
+  .ptab{flex:0 0 auto; padding:10px 4px; font-size:13.5px; font-weight:700; color:var(--muted); cursor:pointer; white-space:nowrap; border-bottom:2px solid transparent; margin-right:14px}
+  .ptab.on{color:var(--accent); border-bottom-color:var(--accent)}
+  #pTabContent{padding:14px 0 6px}
+  .badgeGrid{display:grid; grid-template-columns:repeat(3,1fr); gap:10px}
+  .badgeCard{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px 8px; text-align:center}
+  .badgeCard.locked{opacity:.35}
+  .badgeEmoji{font-size:26px; margin-bottom:6px}
+  .badgeLabel{font-size:12px; font-weight:700}
+  .certList{display:flex; flex-direction:column; gap:10px}
+  .certCard{display:flex; gap:12px; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px 14px; align-items:center}
+  .certCard.locked{opacity:.55}
+  .certIcon{font-size:26px; flex-shrink:0}
+  .certBody{flex:1; min-width:0}
+  .certTitle{font-weight:800; font-size:14px}
+  .certDesc{font-size:12.5px; color:var(--muted); margin-top:2px}
+  .certEarned{font-size:12px; color:#2fbf6f; font-weight:700; margin-top:6px}
+  .certProg{height:5px; border-radius:3px; background:var(--line); margin-top:8px; overflow:hidden}
+  .certProgBar{height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2)); border-radius:3px}
+  .certProgText{font-size:11px; color:var(--muted); margin-top:3px}
   .rrow{padding:10px 0; border-top:1px solid var(--line)}
   .rrow:first-child{border-top:0}
   .rrow .rstars{color:#ffb100; font-size:13px}
@@ -533,6 +555,12 @@
     <div id="pProfileCard"></div>
     <div class="sec"><h3>Mavzu</h3><div class="row" id="themeChips" style="padding:2px 0; margin:0"></div></div>
     <div id="pBody">Yuklanmoqda...</div>
+    <div class="ptabs" id="pTabs">
+      <span class="ptab on" data-pt="javon">📚 Javonlar</span>
+      <span class="ptab" data-pt="yutuq">🏆 Yutuqlar</span>
+      <span class="ptab" data-pt="cert">🎓 Sertifikatlar</span>
+    </div>
+    <div id="pTabContent"></div>
   </div>
   <div id="davraView" style="display:none">
     <div class="viewHead"><h2 class="dtitle">💬 Davra</h2><span class="viewThemeBtn" id="btnThemeDavra">🌙</span></div>
@@ -1192,7 +1220,7 @@ async function loadShelvesList(){
     const items=r.items||[];
     const rows=items.map(s=>`<div class="lrow" data-shelf="${s.id}"><span class="lrowIcon">📚</span><div class="lrowBody"><div class="lrowT">${esc(s.name)}</div><div class="lrowN">${s.count} ta kitob</div></div><span class="lrowChev">›</span></div>`).join('');
     c.innerHTML=`<button class="btn primary" id="shelfNewBtn" style="width:100%; margin-bottom:6px">+ Yangi javon</button>${items.length?rows:'<p class="hint">Hali javon yo\'q — birinchisini yarating</p>'}`;
-    $('#shelfNewBtn').onclick=createShelfPrompt;
+    $('#shelfNewBtn').onclick=()=>createShelfPrompt();
     c.querySelectorAll('[data-shelf]').forEach(el=>el.onclick=()=>{
       const id=el.dataset.shelf;
       const shelf=items.find(s=>String(s.id)===String(id));
@@ -1201,12 +1229,13 @@ async function loadShelvesList(){
     });
   }catch(e){c.innerHTML='<p class="hint">Yuklab bo\'lmadi</p>';}
 }
-function createShelfPrompt(){
+function createShelfPrompt(onDone){
+  onDone=(typeof onDone==='function')?onDone:loadShelvesList;
   const name=(window.prompt('Javon nomi:')||'').trim();
   if(!name)return;
   api('/api/profile/shelves',{method:'POST',body:JSON.stringify({name})}).then(()=>{
     toast('✅ Javon yaratildi');
-    loadShelvesList();
+    onDone();
   }).catch(()=>toast('Xatolik yuz berdi'));
 }
 function addBookToShelf(shelfId,shelfName){
@@ -2103,16 +2132,18 @@ function openProfileEdit(){
 function closeProfileEdit(){$('#profileEditSheet').classList.remove('open');tg?.BackButton?.hide();}
 $('#profileEditClose').onclick=closeProfileEdit;
 $('#profileEditSheet').onclick=e=>{if(e.target.id==='profileEditSheet')closeProfileEdit();};
+let myBadgesCache=null;
 function loadProfile(){
   renderThemeChips();
   renderProfileCard();
   const body=$('#pBody');if(!body)return;
-  if(!canAct()){body.innerHTML='<p class="hint">Profilingizni ko\'rish uchun botda oching.</p>';return;}
+  $('#pTabs').style.display=canAct()?'flex':'none';
+  if(!canAct()){body.innerHTML='<p class="hint">Profilingizni ko\'rish uchun botda oching.</p>';$('#pTabContent').innerHTML='';return;}
   api('/api/profile/me').then(r=>{
+    myBadgesCache=r.badges;
     const s=r.streak,st=r.stats,rt=r.reading_time||{total_seconds:0,last_7_days_seconds:0};
     const toMin=sec=>Math.round((sec||0)/60);
     const rankText=r.rank?`#${fmtNum(r.rank.position)} / ${fmtNum(r.rank.total_users)}`:'—';
-    const badges=r.badges.map(b=>{const m=_BADGE_META[b.code]||{emoji:'🏅',label:b.code};return `<span class="pill${b.achieved?'':' locked'}">${m.emoji} <b>${esc(m.label)}</b></span>`;}).join('');
     body.innerHTML=`
       <div class="streakbig"><span class="n">${s.current_streak}</span><span class="u">kunlik seriya${s.active_today?' · bugun faol 🔥':''}</span></div>
       <div class="statgrid">
@@ -2126,9 +2157,70 @@ function loadProfile(){
         <div class="st"><div class="sv">${st.favorites}</div><div class="sl">sevimlilar</div></div>
         <div class="st"><div class="sv">${st.comments}</div><div class="sl">izohlar</div></div>
         <div class="st"><div class="sv">${s.best_streak}</div><div class="sl">eng uzun seriya</div></div>
-      </div>
-      <div class="sec"><h3>Nishonlar</h3><div class="pills">${badges}</div></div>`;
+      </div>`;
+    // Badges are already fetched above (myBadgesCache) — the Yutuqlar tab renders from that
+    // cache instead of a second round trip, unless it's opened before this resolves.
+    if(document.querySelector('.ptab[data-pt="yutuq"]')?.classList.contains('on'))renderYutuqlarTab();
   }).catch(()=>{body.innerHTML='<p class="hint">Ma\'lumot yuklanmadi.</p>';});
+  switchProfileTab(document.querySelector('.ptab.on')?.dataset.pt||'javon');
+}
+// ---- Profil screen tabs: Javonlar / Yutuqlar / Sertifikatlar ----
+$('#pTabs').querySelectorAll('.ptab').forEach(el=>el.onclick=()=>{haptic();switchProfileTab(el.dataset.pt);});
+function switchProfileTab(tab){
+  $('#pTabs').querySelectorAll('.ptab').forEach(el=>el.classList.toggle('on',el.dataset.pt===tab));
+  if(tab==='javon')renderJavonlarTab();
+  else if(tab==='yutuq')renderYutuqlarTab();
+  else if(tab==='cert')renderCertificatesTab();
+}
+// Top-level shelf list, inline in the profile tab (mirrors loadShelvesList's markup/behavior,
+// but targets #pTabContent and — since we're not inside #shelvesSheet — drilling into one
+// shelf's actual books still reuses the existing full-page Javon sheet, which already has its
+// own back/close handling; only the "which shelves do I have" list needed its own inline copy).
+function renderJavonlarTab(){
+  const c=$('#pTabContent');
+  c.innerHTML='Yuklanmoqda...';
+  api('/api/profile/shelves').then(r=>{
+    const items=r.items||[];
+    const rows=items.map(s=>`<div class="lrow" data-shelf="${s.id}"><span class="lrowIcon">📚</span><div class="lrowBody"><div class="lrowT">${esc(s.name)}</div><div class="lrowN">${s.count} ta kitob</div></div><span class="lrowChev">›</span></div>`).join('');
+    c.innerHTML=`<button class="btn primary" id="pShelfNewBtn" style="width:100%; margin-bottom:6px">+ Yangi javon</button>${items.length?rows:'<p class="hint">Hali javon yo\'q — birinchisini yarating</p>'}`;
+    $('#pShelfNewBtn').onclick=()=>createShelfPrompt(renderJavonlarTab);
+    c.querySelectorAll('[data-shelf]').forEach(el=>el.onclick=()=>{
+      const id=el.dataset.shelf;
+      const shelf=items.find(s=>String(s.id)===String(id));
+      shelvesPickBookId=null;
+      $('#shelvesSheet').classList.add('open');
+      tg?.BackButton?.show();
+      openShelfContents(id,shelf?.name);
+    });
+  }).catch(()=>{c.innerHTML='<p class="hint">Yuklab bo\'lmadi</p>';});
+}
+function renderYutuqlarTab(){
+  const c=$('#pTabContent');
+  if(!myBadgesCache){c.innerHTML='Yuklanmoqda...';return;}
+  c.innerHTML=`<div class="badgeGrid">${myBadgesCache.map(b=>{
+    const m=_BADGE_META[b.code]||{emoji:'🏅',label:b.code};
+    return `<div class="badgeCard${b.achieved?'':' locked'}"><div class="badgeEmoji">${m.emoji}</div><div class="badgeLabel">${esc(m.label)}</div></div>`;
+  }).join('')}</div>`;
+}
+function renderCertificatesTab(){
+  const c=$('#pTabContent');
+  c.innerHTML='Yuklanmoqda...';
+  api('/api/profile/certificates').then(r=>{
+    const items=r.items||[];
+    c.innerHTML=`<div class="certList">${items.map(cert=>{
+      const pct=Math.min(100,Math.round((cert.progress/cert.threshold)*100));
+      return `<div class="certCard${cert.achieved?'':' locked'}">
+        <div class="certIcon">${cert.achieved?'🎓':'🔒'}</div>
+        <div class="certBody">
+          <div class="certTitle">${esc(cert.title)}</div>
+          <div class="certDesc">${esc(cert.description)}</div>
+          ${cert.achieved
+            ?`<div class="certEarned">✅ ${new Date(cert.earned_at).toLocaleDateString('uz-UZ',{day:'numeric',month:'short',year:'numeric'})}</div>`
+            :`<div class="certProg"><div class="certProgBar" style="width:${pct}%"></div></div><div class="certProgText">${fmtNum(cert.progress)}/${fmtNum(cert.threshold)}</div>`}
+        </div>
+      </div>`;
+    }).join('')}</div>`;
+  }).catch(()=>{c.innerHTML='<p class="hint">Yuklab bo\'lmadi</p>';});
 }
 function goToView(v){state.view=v;state.all=false;setTabs();run();window.scrollTo(0,0);}
 $('#btnProfile').onclick=()=>{haptic();goToView('profile');};
