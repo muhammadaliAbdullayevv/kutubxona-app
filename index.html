@@ -41,6 +41,10 @@
   .wrap{max-width:760px; margin:0 auto; padding:12px 14px calc(90px + var(--bottomnav-h))}
   header{position:sticky; top:0; z-index:20; background:linear-gradient(180deg,var(--bg) 72%,transparent); padding:8px 14px 10px; margin:0 -14px 4px}
   h1{font-size:20px; font-weight:700; margin:2px 0 10px; letter-spacing:.2px}
+  /* Qur'on / Statistika / Kitoblar xaritasi: hidden per the mutolaa-style decluttered home —
+     kept in the DOM (not deleted) so the underlying pages/panels still work if re-exposed later,
+     just no entry point on the main screen right now. */
+  #btnQuran,.liveHeaderRow,.mapbtn{display:none!important}
   .searchbar{display:flex; align-items:center; gap:8px; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:10px 12px}
   .searchbar svg{flex:0 0 auto; opacity:.7}
   .searchbar input{flex:1; background:none; border:0; outline:none; color:var(--text); font-size:15px}
@@ -95,10 +99,12 @@
   .si .sa{font-size:11px; color:var(--muted); margin:0 1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
   .si .sr{font-size:11px; color:var(--muted); margin:2px 1px 0; font-variant-numeric:tabular-nums}
   .si .sr b{color:var(--text)}
+  .si .sfmt{display:flex; gap:6px; margin:6px 1px 0}
+  .si .fmtbtn{flex:1; text-align:center; background:var(--chip); border:1px solid var(--line); border-radius:8px; padding:5px 0; font-size:13px; cursor:pointer}
   .si .kind{position:absolute; top:7px; left:7px; background:rgba(0,0,0,.35); border-radius:7px; padding:2px 6px; font-size:11px}
   .si .prog,.book .prog{height:4px; border-radius:3px; background:var(--line); margin:8px 1px 0; overflow:hidden}
   .si .prog .progbar,.book .prog .progbar{height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2)); border-radius:3px}
-  .book .resume{display:block; width:100%; margin-top:6px; border:0; border-radius:10px; padding:7px; font-size:12px; font-weight:800; color:#fff; background:linear-gradient(135deg,var(--accent),var(--accent2)); cursor:pointer; font-family:inherit}
+  .book .resume,.si .resume{display:block; width:100%; margin-top:6px; border:0; border-radius:10px; padding:7px; font-size:12px; font-weight:800; color:#fff; background:linear-gradient(135deg,var(--accent),var(--accent2)); cursor:pointer; font-family:inherit}
   /* Home hero — single most-recent in-progress book, replaces the old multi-item shelf */
   .hero{position:relative; border-radius:20px; padding:20px; margin:4px 0 18px; box-shadow:var(--shadow); display:flex; gap:16px; align-items:center; cursor:pointer}
   .heroCover{width:76px; height:106px; border-radius:10px; flex-shrink:0; background:rgba(0,0,0,.15); display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative; box-shadow:0 6px 16px rgba(0,0,0,.35)}
@@ -224,17 +230,27 @@
   .liveBadgeRight{display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700; opacity:.92}
   /* The panel is a full page (like the PDF reader), not a bottom drawer — a "footer" card reads
      as a minor add-on; a whole page reads as what it actually is, the app's stats dashboard. */
-  #liveSheet{flex-direction:column}
-  #liveTopbar{flex-shrink:0; display:flex; align-items:center; justify-content:space-between; gap:12px;
+  #liveSheet,#listSheet,#shelvesSheet{flex-direction:column}
+  /* Generalized from the Statistika panel's own topbar so new full-page sheets (Reading Room's
+     drill-in lists, Javon) get the same "whole page, not a bottom drawer" treatment for free. */
+  #liveTopbar,.stopbar{flex-shrink:0; display:flex; align-items:center; justify-content:space-between; gap:12px;
     padding:calc(env(safe-area-inset-top) + 14px) 18px 14px; border-bottom:1px solid var(--line)}
-  #liveTopbarTitle{font-size:18px; font-weight:800; color:var(--text)}
-  #liveTopbar .gclose{position:static; box-shadow:none; flex-shrink:0}
-  #liveSheetc{flex:1; overflow-y:auto; padding:20px 18px calc(20px + env(safe-area-inset-bottom)); max-width:760px; width:100%; margin:0 auto}
+  #liveTopbarTitle,.stopbarTitle{font-size:18px; font-weight:800; color:var(--text)}
+  #liveTopbar .gclose,.stopbar .gclose{position:static; box-shadow:none; flex-shrink:0}
+  #liveSheetc,.ssheetc{flex:1; overflow-y:auto; padding:20px 18px calc(20px + env(safe-area-inset-bottom)); max-width:760px; width:100%; margin:0 auto}
+  /* Reading Room's drill-in rows (Rejamdagi/Mutolaa qilingan/Saqlangan/Javon) — tappable summary
+     rows, not shelves, since each opens a full list rather than scrolling inline. */
+  .lrow{display:flex; align-items:center; gap:12px; padding:14px 4px; border-top:1px solid var(--line); cursor:pointer}
+  .lrow:first-of-type{border-top:1px solid var(--line); margin-top:8px}
+  .lrowIcon{font-size:20px; width:28px; text-align:center; flex-shrink:0}
+  .lrowBody{flex:1; min-width:0}
+  .lrowT{font-size:14.5px; font-weight:700}
+  .lrowN{font-size:12.5px; color:var(--muted); margin-top:2px}
+  .lrowChev{color:var(--muted); font-size:18px; flex-shrink:0}
   /* Profile/Davra are primary tab destinations, not overlays — they render in-place as peers
      of #home/#grid (see #profileView/#davraView in the markup), so they only need the same top
      breathing room #home's shelves already get, not a dedicated topbar/scroll-area treatment. */
   #profileView,#davraView,#readingView{padding-top:6px}
-  #readingTabs{padding-top:0}
   .fitem{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:10px}
   .fitem .fmeta{display:flex; align-items:center; gap:8px; margin-bottom:6px}
   .fitem .falias{font-size:12.5px; font-weight:700; color:var(--muted)}
@@ -309,7 +325,7 @@
 <body>
 <div class="wrap">
   <header>
-    <h1>📚 Kutubxona <a href="quran.html" style="float:right; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle">📖 Qur'on</a><a id="btnProfile" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer">👤</a><a id="btnTheme" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer">☀️</a></h1>
+    <h1>📚 Kutubxona <a href="quran.html" id="btnQuran" style="float:right; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle">📖 Qur'on</a><a id="btnProfile" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer">👤</a><a id="btnTheme" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer">☀️</a><a id="btnSearchIcon" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer">🔍</a></h1>
     <div class="liveHeaderRow"><a id="btnLive" class="liveBadge">📊 Statistika<span class="liveBadgeRight"><span class="liveDot"></span><span id="btnLiveN">–</span> onlayn</span></a></div>
     <div class="searchbar">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
@@ -354,13 +370,25 @@
   </div>
   <div id="readingView" style="display:none">
     <h2 class="dtitle">📖 Mutolaaxonam</h2>
-    <div class="row" id="readingTabs">
-      <span class="chip on" data-rt="continue">▶️ Davom eting</span>
-      <span class="chip" data-rt="favorites">❤️ Saqlangan</span>
+    <div id="rrCurrent"></div>
+    <div class="section" id="rrShelfSec" style="display:none">
+      <div class="shead"><h2>📑 O'qilayotgan kitoblar</h2><span class="see" id="rrSeeAll">Barchasi →</span></div>
+      <div class="shelf" id="rrShelf"></div>
     </div>
-    <div class="grid" id="readingGrid"></div>
-    <div class="empty" id="readingEmpty" style="display:none"></div>
+    <div class="lrow" id="rrWants"><span class="lrowIcon">📌</span><div class="lrowBody"><div class="lrowT">Rejamdagi kitoblar</div><div class="lrowN" id="rrWantsN">…</div></div><span class="lrowChev">›</span></div>
+    <div class="lrow" id="rrCompleted"><span class="lrowIcon">🏁</span><div class="lrowBody"><div class="lrowT">Mutolaa qilingan kitoblar</div><div class="lrowN" id="rrCompletedN">…</div></div><span class="lrowChev">›</span></div>
+    <div class="lrow" id="rrFav"><span class="lrowIcon">❤️</span><div class="lrowBody"><div class="lrowT">Saqlangan kitoblar</div><div class="lrowN" id="rrFavN">…</div></div><span class="lrowChev">›</span></div>
+    <div class="lrow" id="rrShelves"><span class="lrowIcon">📚</span><div class="lrowBody"><div class="lrowT">Javon</div><div class="lrowN" id="rrShelvesN">…</div></div><span class="lrowChev">›</span></div>
   </div>
+</div>
+
+<div class="sheet" id="listSheet" style="z-index:52; align-items:stretch; background:var(--bg)">
+  <div class="stopbar"><div class="stopbarTitle" id="listTitle">📖</div><div class="gclose" id="listClose">✕</div></div>
+  <div class="ssheetc" id="listSheetc"></div>
+</div>
+<div class="sheet" id="shelvesSheet" style="z-index:52; align-items:stretch; background:var(--bg)">
+  <div class="stopbar"><div class="stopbarTitle" id="shelvesTitle">📚 Javon</div><div class="gclose" id="shelvesClose">✕</div></div>
+  <div class="ssheetc" id="shelvesSheetc"></div>
 </div>
 
 <div class="sheet" id="sheet"><div class="sheetc" id="sheetc"></div><div class="gclose" id="sheetClose">✕</div></div>
@@ -750,35 +778,206 @@ function render(){
   $('#more').style.display=state.result.length>state.shown?'block':'none';
   $('#count').textContent=state.result.length?`${state.result.length} ta kitob`:'';
 }
-// Reading Room (Mutolaaxonam) — a dedicated peer view, not another state of the browse grid: its
-// own two client-side sub-tabs (Davom eting / Saqlangan) so it never needs the search/genre/filter
-// chrome that #grid carries. readingTab state is local (not persisted) since it's cheap to recompute.
-let readingTab='continue';
-function renderReading(){
-  const grid=$('#readingGrid');
-  const isContinue=readingTab==='continue';
-  const items=isContinue
-    ?HOME.continue.map(it=>({...it.book,_kind:it.kind,_percent:it.percent}))
-    :[...favs].map(id=>byId[id]).filter(Boolean);
-  grid.innerHTML=items.map((b,i)=>isContinue?continueCardHtml(b,i):cardHtml(b,i)).join('');
-  grid.querySelectorAll('.book').forEach(el=>el.onclick=e=>{if(e.target.closest('[data-fav]')||e.target.closest('[data-resume]'))return;openDetail(el.dataset.id);});
-  grid.querySelectorAll('[data-fav]').forEach(el=>el.onclick=e=>{e.stopPropagation();toggleFav(el.dataset.fav);});
-  grid.querySelectorAll('[data-resume]').forEach(el=>el.onclick=e=>{
+// Reading Room (Mutolaaxonam) — a dedicated peer view matching the reference app's layout: the
+// single most-recent in-progress book big and prominent, a horizontal shelf of every other
+// in-progress book, then four tappable summary rows (Rejamdagi/Mutolaa qilingan/Saqlangan/Javon)
+// that each open a full-page sheet on tap rather than living inline — mirrors how the reference
+// app treats these as drill-in lists, not shelves you scroll past.
+function continueSiHtml(b,i){
+  const[c1,c2]=coverFor(b.i);
+  return `<div class="si" data-id="${esc(b.i)}" style="--d:${Math.min(i||0,12)*30}ms">
+    <div class="sc" style="background:linear-gradient(135deg,${c1},${c2})">${b.hc?`<img class="ci" src="covers/${encodeURIComponent(b.i)}.jpg" loading="lazy" onerror="this.remove()">`:''}<span class="ini">${esc(initials(b.t))}</span></div>
+    <div class="st">${esc(b.t)}</div>
+    <div class="sa">${esc(b.a||'')}</div>
+    <div class="prog"><div class="progbar" style="width:${b._percent||0}%"></div></div>
+    <button class="resume" data-resume="${esc(b.i)}" data-kind="${b._kind}">${b._kind==='listen'?'🎧 Tinglash':'📄 O\'qish'} ›</button>
+  </div>`;
+}
+function _wireResumeButtons(scope){
+  scope.querySelectorAll('[data-resume]').forEach(el=>el.onclick=e=>{
     e.stopPropagation();
     const id=el.dataset.resume,b=byId[id];
     if(el.dataset.kind==='listen')openAudioPlayer(id,b?.t);else openPdfReader(id,b?.t);
   });
-  const empty=$('#readingEmpty');
-  empty.style.display=items.length?'none':'block';
-  if(!items.length)empty.innerHTML=isContinue
-    ?(canAct()?'<span class="em">📖</span>Hozircha o\'qilayotgan kitob yo\'q — birortasini boshlang':'<span class="em">🔒</span>Kuzatish uchun botni Telegram ichida oching')
-    :'<span class="em">🤍</span>Hali hech narsa saqlanmagan';
 }
-$('#readingTabs').querySelectorAll('.chip').forEach(el=>el.onclick=()=>{
-  haptic();readingTab=el.dataset.rt;
-  $('#readingTabs').querySelectorAll('.chip').forEach(c=>c.classList.toggle('on',c===el));
-  renderReading();
-});
+function renderReading(){
+  const cur=$('#rrCurrent');
+  if(!canAct()){
+    cur.innerHTML='<p class="hint">Kuzatish uchun botni Telegram ichida oching</p>';
+  }else if(!HOME.continue.length){
+    cur.innerHTML='<p class="hint">Hozircha o\'qilayotgan kitob yo\'q — birortasini boshlang</p>';
+  }else{
+    cur.innerHTML=`<div class="section"><div class="shead"><h2>📖 Hozir o'qiyotgan kitobim</h2></div>${heroHtml(HOME.continue[0])}</div>`;
+    cur.querySelectorAll('.hero').forEach(el=>el.onclick=e=>{if(e.target.closest('[data-resume]'))return;openDetail(el.dataset.id);});
+    _wireResumeButtons(cur);
+  }
+
+  const shelfSec=$('#rrShelfSec');
+  if(HOME.continue.length){
+    shelfSec.style.display='block';
+    const items=HOME.continue.map(it=>({...it.book,_kind:it.kind,_percent:it.percent}));
+    const shelf=$('#rrShelf');
+    shelf.innerHTML=items.map((b,i)=>continueSiHtml(b,i)).join('');
+    shelf.querySelectorAll('.si').forEach(el=>el.onclick=e=>{if(e.target.closest('[data-resume]'))return;openDetail(el.dataset.id);});
+    _wireResumeButtons(shelf);
+  }else{
+    shelfSec.style.display='none';
+  }
+
+  $('#rrFavN').textContent=`${favs.size} ta kitob`;
+  if(canAct())loadReadingRoomExtras();
+  else{$('#rrWantsN').textContent='—';$('#rrCompletedN').textContent='—';$('#rrShelvesN').textContent='—';}
+}
+let RR={wants:null,completed:null,shelvesCount:null};
+async function loadReadingRoomExtras(){
+  try{
+    const r=await api('/api/profile/wants');
+    RR.wants=(r.items||[]).map(it=>it.id);
+    if(state.view==='reading')$('#rrWantsN').textContent=`${RR.wants.length} ta kitob`;
+  }catch(e){}
+  try{
+    const r=await api('/api/profile/completed');
+    RR.completed=r.items||[];
+    if(state.view==='reading')$('#rrCompletedN').textContent=`${RR.completed.length} ta kitob`;
+  }catch(e){}
+  try{
+    const r=await api('/api/profile/shelves');
+    RR.shelvesCount=(r.items||[]).length;
+    if(state.view==='reading')$('#rrShelvesN').textContent=`${RR.shelvesCount} ta javon`;
+  }catch(e){}
+}
+$('#rrSeeAll').onclick=()=>{
+  haptic();
+  const items=HOME.continue.map(it=>({...it.book,_kind:it.kind,_percent:it.percent}));
+  openListSheet("📑 O'qilayotgan kitoblar",items,'progress');
+};
+$('#rrWants').onclick=async()=>{
+  if(!canAct()){toast('Botni Telegram ichida oching');return;}
+  haptic();
+  if(RR.wants==null){try{const r=await api('/api/profile/wants');RR.wants=(r.items||[]).map(it=>it.id);}catch(e){RR.wants=[];}}
+  openListSheet('📌 Rejamdagi kitoblar',RR.wants.map(id=>byId[id]).filter(Boolean),'plain');
+};
+$('#rrCompleted').onclick=async()=>{
+  if(!canAct()){toast('Botni Telegram ichida oching');return;}
+  haptic();
+  if(RR.completed==null){try{const r=await api('/api/profile/completed');RR.completed=r.items||[];}catch(e){RR.completed=[];}}
+  openListSheet('🏁 Mutolaa qilingan kitoblar',RR.completed.map(it=>byId[it.id]).filter(Boolean),'plain');
+};
+$('#rrFav').onclick=()=>{
+  haptic();
+  openListSheet('❤️ Saqlangan kitoblar',[...favs].map(id=>byId[id]).filter(Boolean),'plain');
+};
+$('#rrShelves').onclick=()=>{
+  if(!canAct()){toast('Botni Telegram ichida oching');return;}
+  haptic();
+  openShelvesSheet(null);
+};
+
+// ---- generic full-page "list of books" sheet — powers every Reading Room drill-in row above.
+// kind 'progress' uses continueCardHtml (resume button + percent), 'plain' uses the ordinary
+// cardHtml (tap opens detail) since want-to-read/completed/favorited books have no in-progress
+// percent to show.
+function openListSheet(title,items,kind){
+  $('#listTitle').textContent=title;
+  const wrap=$('#listSheetc');
+  wrap.innerHTML=items.length
+    ?`<div class="grid">${items.map((b,i)=>kind==='progress'?continueCardHtml(b,i):cardHtml(b,i)).join('')}</div>`
+    :'<p class="hint">Bu yerda hali hech narsa yo\'q</p>';
+  $('#listSheet').classList.add('open');
+  tg?.BackButton?.show();
+  wrap.querySelectorAll('.book').forEach(el=>el.onclick=e=>{if(e.target.closest('[data-fav]')||e.target.closest('[data-resume]'))return;closeListSheet();openDetail(el.dataset.id);});
+  wrap.querySelectorAll('[data-fav]').forEach(el=>el.onclick=e=>{e.stopPropagation();toggleFav(el.dataset.fav);});
+  if(kind==='progress')_wireResumeButtons(wrap);
+}
+function closeListSheet(){$('#listSheet').classList.remove('open');tg?.BackButton?.hide();}
+$('#listClose').onclick=closeListSheet;
+$('#listSheet').onclick=e=>{if(e.target.id==='listSheet')closeListSheet();};
+
+// ---- Javon (bookshelves) — user-made personal shelves. Opened two ways: from Mutolaaxonam's
+// "Javon" row to browse them (pickBookId=null), or from a book's detail sheet's 📚 button to add
+// THAT book to a shelf (pickBookId set — tapping a shelf row adds instead of drilling in).
+let shelvesPickBookId=null;
+function openShelvesSheet(pickBookId){
+  shelvesPickBookId=pickBookId||null;
+  haptic();
+  $('#shelvesSheet').classList.add('open');
+  tg?.BackButton?.show();
+  loadShelvesList();
+}
+function closeShelvesSheet(){
+  $('#shelvesSheet').classList.remove('open');
+  tg?.BackButton?.hide();
+  shelvesPickBookId=null;
+}
+async function loadShelvesList(){
+  $('#shelvesTitle').textContent=shelvesPickBookId?'📚 Qaysi javonga qo\'shamiz?':'📚 Javon';
+  const c=$('#shelvesSheetc');
+  c.innerHTML='Yuklanmoqda...';
+  try{
+    const r=await api('/api/profile/shelves');
+    const items=r.items||[];
+    const rows=items.map(s=>`<div class="lrow" data-shelf="${s.id}"><span class="lrowIcon">📚</span><div class="lrowBody"><div class="lrowT">${esc(s.name)}</div><div class="lrowN">${s.count} ta kitob</div></div><span class="lrowChev">›</span></div>`).join('');
+    c.innerHTML=`<button class="btn primary" id="shelfNewBtn" style="width:100%; margin-bottom:6px">+ Yangi javon</button>${items.length?rows:'<p class="hint">Hali javon yo\'q — birinchisini yarating</p>'}`;
+    $('#shelfNewBtn').onclick=createShelfPrompt;
+    c.querySelectorAll('[data-shelf]').forEach(el=>el.onclick=()=>{
+      const id=el.dataset.shelf;
+      const shelf=items.find(s=>String(s.id)===String(id));
+      if(shelvesPickBookId)addBookToShelf(id,shelf?.name);
+      else openShelfContents(id,shelf?.name);
+    });
+  }catch(e){c.innerHTML='<p class="hint">Yuklab bo\'lmadi</p>';}
+}
+function createShelfPrompt(){
+  const name=(window.prompt('Javon nomi:')||'').trim();
+  if(!name)return;
+  api('/api/profile/shelves',{method:'POST',body:JSON.stringify({name})}).then(()=>{
+    toast('✅ Javon yaratildi');
+    loadShelvesList();
+  }).catch(()=>toast('Xatolik yuz berdi'));
+}
+function addBookToShelf(shelfId,shelfName){
+  const bid=shelvesPickBookId;
+  api(`/api/profile/shelves/${shelfId}/items`,{method:'POST',body:JSON.stringify({book_id:bid})}).then(()=>{
+    toast(`✅ ${shelfName||'Javon'}ga qo'shildi`);
+    closeShelvesSheet();
+  }).catch(()=>toast('Xatolik yuz berdi'));
+}
+async function openShelfContents(shelfId,shelfName){
+  $('#shelvesTitle').textContent='📚 '+(shelfName||'Javon');
+  const c=$('#shelvesSheetc');
+  c.innerHTML='Yuklanmoqda...';
+  try{
+    const r=await api(`/api/profile/shelves/${shelfId}`);
+    const books=(r.items||[]).map(id=>byId[id]).filter(Boolean);
+    c.innerHTML=`<button class="btn ghost" id="shelfBackBtn" style="margin-bottom:10px">‹ Javonlar</button>`+
+      (books.length?`<div class="grid">${books.map(b=>shelfCardHtml(b)).join('')}</div>`:'<p class="hint">Bu javon hali bo\'sh</p>');
+    $('#shelfBackBtn').onclick=loadShelvesList;
+    c.querySelectorAll('.book').forEach(el=>el.onclick=e=>{if(e.target.closest('[data-unshelve]'))return;closeShelvesSheet();openDetail(el.dataset.id);});
+    c.querySelectorAll('[data-unshelve]').forEach(el=>el.onclick=e=>{
+      e.stopPropagation();
+      api(`/api/profile/shelves/${shelfId}/items/${encodeURIComponent(el.dataset.unshelve)}`,{method:'DELETE'}).then(()=>{
+        toast('Olib tashlandi');
+        openShelfContents(shelfId,shelfName);
+      }).catch(()=>toast('Xatolik yuz berdi'));
+    });
+  }catch(e){
+    c.innerHTML=`<button class="btn ghost" id="shelfBackBtn">‹ Javonlar</button><p class="hint">Yuklab bo'lmadi</p>`;
+    $('#shelfBackBtn').onclick=loadShelvesList;
+  }
+}
+function shelfCardHtml(b){
+  const[c1,c2]=coverFor(b.i);
+  return `<div class="book" data-id="${esc(b.i)}">
+    <div class="cover" style="background:linear-gradient(135deg,${c1},${c2})">
+      ${b.hc?`<img class="ci" src="covers/${encodeURIComponent(b.i)}.jpg" loading="lazy" onerror="this.remove()">`:''}
+      <span class="fav" data-unshelve="${esc(b.i)}" title="Javondan olib tashlash">🗑</span>
+      <span class="ini">${esc(initials(b.t))}</span>
+    </div>
+    <div class="meta"><div class="t">${esc(b.t)}</div><div class="a">${esc(b.a||'')}</div></div>
+  </div>`;
+}
+$('#shelvesClose').onclick=closeShelvesSheet;
+$('#shelvesSheet').onclick=e=>{if(e.target.id==='shelvesSheet')closeShelvesSheet();};
 // ---- discovery homepage (shown when browsing with no query/filter) ----
 function buildHome(){
   HOME.newest=DB.books.slice(0,18);
@@ -793,7 +992,14 @@ function buildHome(){
   for(const b of DB.books)for(const t of (b.s||[])){const k=(t||'').trim();if(k)tc[k]=(tc[k]||0)+1;}
   HOME.topics=Object.entries(tc).filter(([t,c])=>c>=15).sort((x,y)=>y[1]-x[1]).slice(0,12).map(([t])=>t);
 }
-function siHtml(b,i){const[c1,c2]=coverFor(b.i);return `<div class="si" data-id="${esc(b.i)}" style="--d:${Math.min(i||0,12)*30}ms"><div class="sc" style="background:linear-gradient(135deg,${c1},${c2})">${b.hc?`<img class="ci" src="covers/${encodeURIComponent(b.i)}.jpg" loading="lazy" onerror="this.remove()">`:''}${b.ha?'<span class="aud">🎧</span>':''}<span class="ini">${esc(initials(b.t))}</span></div><div class="st">${esc(b.t)}</div><div class="sa">${esc(b.a||'')}</div>${b.rc?`<div class="sr">⭐ <b>${b.rt}</b> (${b.rc})</div>`:''}</div>`;}
+// Format-icon-button row (📖 read, 🎧 listen when available) replaces the old inline star-rating
+// line on shelf cards — ratings are still visible in the full detail sheet, this row is purely
+// a one-tap "open the right reader" shortcut, matching the reference app's card layout.
+function siHtml(b,i){const[c1,c2]=coverFor(b.i);return `<div class="si" data-id="${esc(b.i)}" style="--d:${Math.min(i||0,12)*30}ms"><div class="sc" style="background:linear-gradient(135deg,${c1},${c2})">${b.hc?`<img class="ci" src="covers/${encodeURIComponent(b.i)}.jpg" loading="lazy" onerror="this.remove()">`:''}${b.ha?'<span class="aud">🎧</span>':''}<span class="ini">${esc(initials(b.t))}</span></div><div class="st">${esc(b.t)}</div><div class="sa">${esc(b.a||'')}</div><div class="sfmt"><span class="fmtbtn" data-read="${esc(b.i)}">📖</span>${b.ha?`<span class="fmtbtn" data-listen="${esc(b.i)}">🎧</span>`:''}</div></div>`;}
+function _wireFmtButtons(scope){
+  scope.querySelectorAll('[data-read]').forEach(el=>el.onclick=e=>{e.stopPropagation();haptic();openPdfReader(el.dataset.read,byId[el.dataset.read]?.t);});
+  scope.querySelectorAll('[data-listen]').forEach(el=>el.onclick=e=>{e.stopPropagation();haptic();openAudioPlayer(el.dataset.listen,byId[el.dataset.listen]?.t);});
+}
 function shelf(title,books,see){return `<div class="section"><div class="shead"><h2>${esc(title)}</h2>${see?`<span class="see" ${see}>Barchasi →</span>`:''}</div><div class="shelf">${books.map((b,i)=>siHtml(b,i)).join('')}</div></div>`;}
 // Fetched separately (not blocking initial paint like books.json is) and merged in after the
 // fact — auth + a DB round trip on top of the static catalog load, so the home screen shows its
@@ -883,6 +1089,7 @@ function renderHome(){
   html+=trendingShelf(HOME.trending);
   h.innerHTML=html;
   h.querySelectorAll('.si').forEach(el=>el.onclick=()=>openDetail(el.dataset.id));
+  _wireFmtButtons(h);
   h.querySelectorAll('.hero').forEach(el=>el.onclick=e=>{if(e.target.closest('[data-resume]'))return;openDetail(el.dataset.id);});
   h.querySelectorAll('.hero [data-resume]').forEach(el=>el.onclick=e=>{
     e.stopPropagation();
@@ -952,7 +1159,10 @@ function isHome(){return state.view==='browse'&&!state.q&&!state.genre&&!state.a
 // once), so they're scoped to 'grid' only here.
 function showArea(area){
   const forBooks=area==='home'||area==='grid';
-  $('.searchbar').style.display=forBooks?'flex':'none';
+  // Icon-only search on home (mutolaa-style) — the real input only appears once you're actually
+  // browsing/searching (#grid), so it never competes with the home page's own content for space.
+  $('.searchbar').style.display=area==='grid'?'flex':'none';
+  $('#btnSearchIcon').style.display=area==='home'?'inline':'none';
   $('.liveHeaderRow').style.display=forBooks?'block':'none';
   $('#btnGlobe').style.display=forBooks?'flex':'none';
   $('#genres').style.display=area==='grid'?'flex':'none';
@@ -979,6 +1189,7 @@ function toggleFav(id){
   saveFavs();
   if(state.view==='reading')renderReading();else render();
   if($('#sheet').classList.contains('open')){const el=$('#dFav');if(el){const on=favs.has(id);el.classList.toggle('on',on);el.textContent=on?'❤️':'🤍';}}
+  if($('#listSheet').classList.contains('open')){const el=$(`#listSheetc [data-fav="${CSS.escape(id)}"]`);if(el)el.textContent=favs.has(id)?'❤️':'🤍';}
   toast(favs.has(id)?'❤️ Saqlandi':'Olib tashlandi');
 }
 
@@ -1015,6 +1226,7 @@ function openDetail(id){
       ${b.ha?`<button class="btn ghost" id="dListen">🎧 Tinglash</button>`:''}
       <button class="btn ghost ${fav?'on':''}" id="dFav">${fav?'❤️':'🤍'}</button>
       <button class="btn ghost" id="dWant">📑</button>
+      <button class="btn ghost" id="dShelf">📚</button>
       <button class="btn ghost" id="dShare">↗️</button>
       ${openedFromGlobe?'<button class="btn ghost" id="dBackGlobe">🌐</button>':''}
     </div>`;
@@ -1039,11 +1251,13 @@ function openDetail(id){
   if(dListen)dListen.onclick=()=>openAudioPlayer(b.i,b.t);
   $('#dFav').onclick=()=>toggleFav(b.i);
   $('#dWant').onclick=()=>toggleWantToRead(b.i);
+  $('#dShelf').onclick=()=>{if(!canAct()){toast('Botni Telegram ichida oching');return;}openShelvesSheet(b.i);};
   $('#dShare').onclick=()=>{const txt=`📚 ${b.t}${b.a?' — '+b.a:''}`;const s=`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(txt)}`;tg?.openTelegramLink?tg.openTelegramLink(s):navigator.share?.({title:b.t,url});};
   const dBackGlobe=$('#dBackGlobe');
   if(dBackGlobe)dBackGlobe.onclick=()=>closeSheet();
   c.querySelectorAll('[data-sub]').forEach(el=>el.onclick=()=>{closeSheet();$('#q').value=el.dataset.sub;state.q=el.dataset.sub;$('#clr').style.display='block';if(state.view!=='browse'){state.view='browse';setTabs();}run();window.scrollTo(0,0);});
   c.querySelectorAll('.si').forEach(el=>el.onclick=()=>openDetail(el.dataset.id));
+  _wireFmtButtons(c);
   loadRating(b.i);
   loadBookExtras(b.i);
   c.scrollTop=0;
@@ -1345,6 +1559,7 @@ function loadProfile(){
 }
 function goToView(v){state.view=v;state.all=false;setTabs();run();window.scrollTo(0,0);}
 $('#btnProfile').onclick=()=>{haptic();goToView('profile');};
+$('#btnSearchIcon').onclick=()=>{haptic();state.view='browse';state.all=true;setTabs();run();window.scrollTo(0,0);setTimeout(()=>$('#q').focus(),80);};
 $('#sheetClose').onclick=()=>closeSheet();
 
 // ---- ratings (Play-Store-style 1-5 stars + optional review; flat, not repliable; other
@@ -1482,7 +1697,7 @@ $('#btnTheme').onclick=()=>{
 
 function skeletonShelf(){return `<div class="section"><div class="shead"><h2 class="skel" style="width:140px;height:16px;border-radius:6px"></h2></div><div class="shelf">${Array(4).fill('<div class="si"><div class="skel" style="height:170px;border-radius:14px"></div></div>').join('')}</div></div>`;}
 async function boot(){
-  if(tg){tg.ready();tg.expand();tg.disableVerticalSwipes?.();tg.BackButton?.onClick(()=>{if($('#pdfSheet').classList.contains('open'))closePdfReader();else if($('#sheet').classList.contains('open'))closeSheet();else if($('#globe').classList.contains('open'))closeGlobe();});applyThemeMode();tg.onEvent?.('themeChanged',()=>{if(themeMode==='system')applyThemeMode();});}
+  if(tg){tg.ready();tg.expand();tg.disableVerticalSwipes?.();tg.BackButton?.onClick(()=>{if($('#pdfSheet').classList.contains('open'))closePdfReader();else if($('#shelvesSheet').classList.contains('open'))closeShelvesSheet();else if($('#listSheet').classList.contains('open'))closeListSheet();else if($('#sheet').classList.contains('open'))closeSheet();else if($('#globe').classList.contains('open'))closeGlobe();});applyThemeMode();tg.onEvent?.('themeChanged',()=>{if(themeMode==='system')applyThemeMode();});}
   if('serviceWorker' in navigator)window.addEventListener('load',()=>{
     navigator.serviceWorker.register('./sw.js').then(reg=>{
       // A long-lived, never-navigated Mini App session (Telegram keeps the WebView warm across
