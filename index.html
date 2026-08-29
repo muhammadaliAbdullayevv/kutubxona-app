@@ -155,6 +155,13 @@
   .sheet{position:fixed; inset:0; z-index:50; background:rgba(0,0,0,.5); display:none; align-items:flex-end}
   .sheet.open{display:flex}
   .sheetc{background:var(--bg); width:100%; max-width:760px; margin:0 auto; max-height:92vh; border-radius:22px 22px 0 0; overflow-y:auto; padding:0 0 24px; animation:up .28s cubic-bezier(.2,.8,.2,1)}
+  /* Book detail was the one sheet still using the semi-transparent "drawer over a dimmed page"
+     look — its translucent backdrop let the home/search header bleed through at the top no
+     matter which screen a book was opened from. Promoted to a real full-screen page (the same
+     opaque, edge-to-edge treatment #pdfSheet/#liveSheet/#listSheet already use) — it already has
+     its own back arrow, so a see-through backdrop wasn't doing useful work here anyway. */
+  #sheet{background:var(--bg); align-items:stretch}
+  #sheet .sheetc{max-height:none; height:100%; border-radius:0}
   @keyframes up{from{transform:translateY(40px); opacity:.6}to{transform:none; opacity:1}}
   .dhero{height:150px; display:flex; align-items:flex-end; padding:16px; position:relative}
   .dgrip{position:absolute; top:8px; left:50%; transform:translateX(-50%); width:38px; height:4px; border-radius:2px; background:rgba(255,255,255,.4)}
