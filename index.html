@@ -225,9 +225,16 @@
      zoom, drag-to-pan-when-zoomed, swipe-to-turn-page) instead of fighting the browser's native
      scroll/pinch, which is what the manual translate+scale transform on #pdfCanvas needs. */
   #pdfCanvasWrap{position:absolute; inset:0; overflow:hidden; touch-action:none; display:flex; align-items:flex-start; justify-content:center; padding:78px 0 20px}
-  #pdfCanvas{max-width:100%; box-shadow:var(--shadow); background:#fff; touch-action:none}
-  #pdfLoading{position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); color:var(--muted); font-size:14px; display:none}
-  #pdfLoading.show{display:block}
+  #pdfCanvas{max-width:100%; box-shadow:var(--shadow); background:#fff; touch-action:none; opacity:1; transition:opacity .25s}
+  /* Loading state: the real page fades in once rendered — before that, an untouched <canvas>'s
+     own default white background at an arbitrary un-set size (the "blank white box floating in
+     nowhere" this replaces) is hidden entirely in favor of a book-shaped shimmer skeleton,
+     properly centered in the wrap rather than absolutely-positioned adrift from it. */
+  #pdfCanvasWrap.loading #pdfCanvas{opacity:0}
+  #pdfLoading{position:absolute; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:78px 20px 20px}
+  #pdfLoading.show{display:flex}
+  .pdfSkelPage{width:min(70vw,300px); height:auto; aspect-ratio:3/4.2; border-radius:12px; box-shadow:var(--shadow)}
+  .pdfLoadingText{color:var(--muted); font-size:13.5px; font-weight:600}
   /* Above every sheet (including #pdfSheet at 60) — this is a persistent mini-player meant to
      stay visible and usable no matter what else is open, the same way a real music app's
      mini-player does. It used to sit at z-index 48, BELOW the book detail sheet (50) that's
@@ -486,7 +493,7 @@
     <button id="pdfNext" type="button">▶</button>
   </div>
   <div id="pdfProgressTrack"><div id="pdfProgressFill"></div></div>
-  <div id="pdfCanvasWrap"><canvas id="pdfCanvas"></canvas><div id="pdfLoading">Yuklanmoqda...</div></div>
+  <div id="pdfCanvasWrap"><canvas id="pdfCanvas"></canvas><div id="pdfLoading"><div class="pdfSkelPage skel"></div><div class="pdfLoadingText">Sahifa tayyorlanmoqda...</div></div></div>
 </div>
 <div class="sheet" id="liveSheet" style="z-index:47; align-items:stretch; background:var(--bg)">
   <div id="liveTopbar"><div id="liveTopbarTitle">📊 Statistika</div><div class="gclose" id="liveClose">✕</div></div>
@@ -1502,7 +1509,7 @@ function getStreamToken(scope){
 
 // ---- PDF reader ----
 let pdfDoc=null,pdfPageNum=1,pdfPageCount=0,pdfRendering=false,pdfLib=null,pdfBookId=null;
-function pdfSetLoading(on){$('#pdfLoading').classList.toggle('show',on);}
+function pdfSetLoading(on){$('#pdfLoading').classList.toggle('show',on);$('#pdfCanvasWrap').classList.toggle('loading',on);}
 function pdfUpdateProgressBar(){
   const bar=$('#pdfProgressFill');
   if(bar)bar.style.width=(pdfPageCount?Math.min(100,pdfPageNum/pdfPageCount*100):0)+'%';
