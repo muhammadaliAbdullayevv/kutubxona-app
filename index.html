@@ -405,23 +405,34 @@
   .starpick{font-size:26px; letter-spacing:4px; cursor:pointer; user-select:none}
   .starpick span{opacity:.3}
   .starpick span.on{opacity:1}
+  .wrOverall{display:flex; align-items:center; gap:6px; font-size:13px; color:var(--muted); margin:2px 0 14px}
+  .wrOverall .ratestars{color:#ffb100; font-size:13px}
+  .wrOverall b{color:var(--text); font-size:14px}
   #writeReviewSheetc textarea{width:100%; background:var(--card); border:1px solid var(--line); border-radius:10px; color:var(--text); padding:9px; font:inherit; resize:vertical; min-height:90px; margin-top:14px; box-sizing:border-box}
   .rdel{background:none; color:var(--danger); border:0; font-weight:700; cursor:pointer; padding:8px 4px}
   .rrow{padding:10px 0; border-top:1px solid var(--line)}
   .rrow:first-child{border-top:0}
   .rrow .rstars{color:#ffb100; font-size:13px}
   .rrow .rtext{font-size:14px; margin:4px 0 6px; white-space:pre-wrap}
-  .rrow .rvote{display:flex; gap:14px; font-size:12.5px; color:var(--muted)}
+  .rrow .rvote{display:flex; align-items:center; gap:14px; font-size:12.5px; color:var(--muted)}
   .rrow .rvote span{cursor:pointer}
   .rrow .rvote span.on{color:var(--accent)}
+  /* Own review: pinned first by the backend, highlighted + tappable here so it's never lost in
+     the list — the whole point of pinning it is fast edit/delete access. */
+  .rrow.mine{background:color-mix(in srgb, var(--accent) 8%, transparent); border-radius:12px; padding:10px 10px; margin:0 -10px 4px; cursor:pointer}
+  .rrow.mine .cmeta{color:var(--accent)}
+  .rMineEdit{margin-left:auto; color:var(--accent); font-weight:700; cursor:pointer}
   /* Compact horizontal preview cards for the book page's own "Reyting" section — the full .rrow
      list (with helpful-vote buttons) is reserved for the dedicated "Barcha izohlar" page now. */
   .rshelf{display:flex; gap:10px; overflow-x:auto; scrollbar-width:none; margin:0 -18px; padding:2px 18px 4px}
   .rshelf::-webkit-scrollbar{display:none}
   .rcard{flex:0 0 190px; background:var(--card2); border:1px solid var(--line); border-radius:14px; padding:12px}
+  .rcard.mine{border-color:var(--accent); cursor:pointer}
   .rcard .rcStars{color:#ffb100; font-size:12.5px}
   .rcard .rcText{font-size:13px; margin:6px 0; display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden}
+  .rcard .rcText.hint{margin:6px 0; font-size:13px}
   .rcard .rcMeta{font-size:11.5px; color:var(--muted); font-weight:700}
+  .rcard.mine .rcMeta{color:var(--accent)}
 </style>
 </head>
 <body>
@@ -1551,6 +1562,7 @@ $('#sheetMenu').addEventListener('click',e=>{
 document.addEventListener('click',e=>{if(!e.target.closest('#sheetMenu'))$('#sheetMenuPanel').style.display='none';});
 
 // ---- reading stats (currently-reading / want-to-read counts) + want-to-read toggle ----
+function setWantIcon(on){const ic=$('#sheetWantIcon');if(ic)ic.textContent=on?'✓':'+';}
 function loadBookExtras(id){
   api('/api/books/'+encodeURIComponent(id)+'/stats').then(r=>{
     const el=$('#dStatReading');
@@ -1565,6 +1577,7 @@ function loadBookExtras(id){
     const el=$('#sheetWant');
     if(!el||!$('#sheet').classList.contains('open'))return;
     el.classList.toggle('on',!!r.want_to_read);
+    setWantIcon(!!r.want_to_read);
   }).catch(()=>{});
 }
 function toggleWantToRead(id){
@@ -1573,6 +1586,7 @@ function toggleWantToRead(id){
   api('/api/books/'+encodeURIComponent(id)+'/want-to-read',{method:'POST'}).then(r=>{
     const el=$('#sheetWant');
     if(el)el.classList.toggle('on',r.want_to_read);
+    setWantIcon(r.want_to_read);
     toast(r.want_to_read?"📌 Albatta o'qiyman ro'yxatiga qo'shildi":"Ro'yxatdan olib tashlandi");
     loadBookExtras(id);
   }).catch(()=>toast('Xatolik yuz berdi'));
@@ -1968,22 +1982,24 @@ $('#sheetClose').onclick=()=>closeSheet();
 let myRatingStars=0;
 function starsHtml(n,cls){cls=cls||'ratestars';let s='';for(let i=1;i<=5;i++)s+=i<=Math.round(n)?'★':'☆';return `<span class="${cls}">${s}</span>`;}
 function ratingRowHtml(r){
-  const voted=r.my_vote;
-  return `<div class="rrow" data-id="${esc(r.id)}">
+  const voted=r.my_vote,mine=r.is_mine;
+  return `<div class="rrow${mine?' mine':''}" data-id="${esc(r.id)}"${mine?' data-mine="1"':''}>
     <div class="rstars">${starsHtml(r.stars)}</div>
     ${r.review_text?`<div class="rtext">${esc(r.review_text)}</div>`:''}
-    <div class="cmeta">${esc(r.alias)}</div>
+    <div class="cmeta">${mine?'Sizning izohingiz':esc(r.alias)}</div>
     <div class="rvote">
       <span class="rhelp${voted===true?' on':''}" data-id="${esc(r.id)}" data-v="1"${canAct()?'':' data-off="1"'}>👍 Foydali (${r.helpful_yes})</span>
       <span class="rhelp${voted===false?' on':''}" data-id="${esc(r.id)}" data-v="0"${canAct()?'':' data-off="1"'}>👎 Foydali emas (${r.helpful_no})</span>
+      ${mine?'<span class="rMineEdit">✏️ Tahrirlash →</span>':''}
     </div>
   </div>`;
 }
 function reviewCardHtml(r){
-  return `<div class="rcard">
+  const mine=r.is_mine;
+  return `<div class="rcard${mine?' mine':''}"${mine?' data-mine="1"':''}>
     <div class="rcStars">${starsHtml(r.stars)}</div>
-    ${r.review_text?`<div class="rcText">${esc(r.review_text)}</div>`:''}
-    <div class="rcMeta">${esc(r.alias)}</div>
+    ${r.review_text?`<div class="rcText">${esc(r.review_text)}</div>`:'<div class="rcText hint">Izoh yozilmagan</div>'}
+    <div class="rcMeta">${mine?'Sizning izohingiz · ✏️':esc(r.alias)}</div>
   </div>`;
 }
 function wireRatingVotes(scope,bookId,onVoted){
@@ -1995,6 +2011,13 @@ function wireRatingVotes(scope,bookId,onVoted){
     };
   });
 }
+// Own review is always pinned first by the backend (list_book_ratings) — this just makes that
+// spot obviously tappable, so finding/editing/deleting your own feedback never means hunting
+// through the list for it.
+function wireMineReview(scope,bookId){
+  const el=scope.querySelector('[data-mine="1"]');
+  if(el)el.onclick=e=>{if(e.target.closest('.rhelp'))return;haptic();openWriteReview(bookId);};
+}
 function loadReviewPreview(bookId,totalCount){
   const wrap=$('#rPreview');if(!wrap)return;
   const seeAll=$('#rSeeAll');
@@ -2002,9 +2025,13 @@ function loadReviewPreview(bookId,totalCount){
   // same set the full list page itself shows), not a separate guess.
   if(seeAll)seeAll.textContent=`Barcha izohlar (${fmtNum(totalCount)}) →`;
   api('/api/books/'+encodeURIComponent(bookId)+'/ratings?limit=8').then(r=>{
-    const reviews=(r.ratings||[]).filter(x=>x.review_text);
+    // Keep a text-less rating too when it's mine — it's still "my feedback" and should stay
+    // reachable/editable from this shelf, even though a normal reviewless rating has nothing worth
+    // previewing here.
+    const reviews=(r.ratings||[]).filter(x=>x.review_text||x.is_mine);
     if(!reviews.length){wrap.innerHTML='';if(seeAll)seeAll.style.display='none';return;}
     wrap.innerHTML=`<div class="rshelf">${reviews.map(reviewCardHtml).join('')}</div>`;
+    wireMineReview(wrap,bookId);
     if(seeAll&&totalCount){seeAll.style.display='inline';seeAll.onclick=()=>openReviewsSheet(bookId);}
   }).catch(()=>{wrap.innerHTML='';});
 }
@@ -2017,7 +2044,7 @@ function loadRating(bookId){
   api('/api/books/'+encodeURIComponent(bookId)+'/rating').then(r=>{
     body.innerHTML=`
       <div id="rPreview"></div>
-      ${canAct()?`<button class="btn primary" id="rWriteBtn" style="width:100%; margin-top:10px">${r.my_rating?"✍️ Bahoni tahrirlash":"Kitob haqida izoh qoldirish"}</button>`:'<p class="hint">Baho berish uchun botda oching.</p>'}`;
+      ${canAct()?`<button class="btn primary" id="rWriteBtn" style="width:100%; margin-top:10px">${r.my_rating?"Izohni tahrirlash":"Kitob haqida izoh qoldirish"}</button>`:'<p class="hint">Baho berish uchun botda oching.</p>'}`;
     const writeBtn=$('#rWriteBtn');
     if(writeBtn)writeBtn.onclick=()=>openWriteReview(bookId);
     loadReviewPreview(bookId,r.count||0);
@@ -2042,10 +2069,14 @@ function loadReviewsPage(reset){
   api(`/api/books/${encodeURIComponent(reviewsBookId)}/ratings?limit=20&offset=${reset?0:reviewsOffset}`).then(r=>{
     const rows=r.ratings||[];
     const html=rows.map(ratingRowHtml).join('');
-    if(reset){list.innerHTML=html||'<p class="hint">Hali baholar yo\'q. Birinchi bo\'ling!</p>';reviewsOffset=0;}
+    if(reset){list.innerHTML=html||'<p class="hint">Hali baholar yo\'q. Birinchi bo\'ling!</p>';}
     else list.insertAdjacentHTML('beforeend',html);
     wireRatingVotes(list,reviewsBookId,()=>loadReviewsPage(true));
-    reviewsOffset+=rows.length;
+    if(reset)wireMineReview(list,reviewsBookId);
+    // next_offset comes from the backend's own unfiltered cursor (see list_book_ratings) — it
+    // already accounts for the pinned "my review" row not shifting anything, so using it here
+    // (instead of rows.length) keeps later pages gapless even when that row got pinned in.
+    reviewsOffset=typeof r.next_offset==='number'?r.next_offset:reviewsOffset+rows.length;
     $('#reviewsMore').style.display=rows.length>=20?'block':'none';
   }).catch(()=>{list.innerHTML='<p class="hint">Yuklanmadi.</p>';});
 }
@@ -2064,6 +2095,7 @@ function openWriteReview(bookId){
     const myText=(r.my_rating&&r.my_rating.review_text)||'';
     $('#writeReviewSheetc').innerHTML=`
       <p class="hint">Kitob haqida reyting qoldiring</p>
+      ${r.count?`<div class="wrOverall">${starsHtml(r.average)} <b>${r.average}</b> · ${fmtNum(r.count)} ta baho</div>`:''}
       <div class="starpick" id="wrPick" style="font-size:34px">${[1,2,3,4,5].map(n=>`<span data-n="${n}" class="${n<=myRatingStars?'on':''}">★</span>`).join('')}</div>
       <textarea id="wrText" maxlength="2000" placeholder="Izohingizni yozing...">${esc(myText)}</textarea>
       <button class="btn primary" id="wrSubmit" style="width:100%; margin-top:14px">${r.my_rating?'Yangilash':'Yuborish'}</button>
