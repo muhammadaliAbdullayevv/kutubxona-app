@@ -1,7 +1,7 @@
 // Kutubxona PWA service worker.
 // Bump CACHE_VERSION on any shell (HTML/CSS/JS) change so old clients pick up the new
 // version instead of serving a stale cached shell forever.
-const CACHE_VERSION = 'v96';
+const CACHE_VERSION = 'v97';
 const SHELL_CACHE = `kutubxona-shell-${CACHE_VERSION}`;
 const DATA_CACHE = `kutubxona-data-${CACHE_VERSION}`;
 const COVER_CACHE = `kutubxona-covers-${CACHE_VERSION}`;
@@ -100,10 +100,20 @@ async function evictForSpace(cache, incomingBytes) {
     i++;
   }
 }
+// A large PDF/audiobook part isn't fetched by pdf.js/the player in one shot — it's read as a
+// sequence of separate Range requests as pages/segments get parsed. Without this guard, EACH of
+// those requests would independently see "not cached yet" and kick off its OWN full-file
+// background download — for a 100MB+ book, that's several redundant full downloads racing each
+// other for bandwidth at once, which is exactly what made a first read feel stuck/slow and (since
+// they were racing rather than one clean download) not reliably finish caching before the user
+// left the page — hence a reopen re-downloading instead of hitting the cache.
+const _inFlightCaching = new Set();
 // Downloads the FULL file (no Range header — the backend returns 200 with the complete body for
 // a rangeless request) and stores it under the token-independent key, so every future open of
 // this same book/part — this session or a later one — is served straight from disk.
 async function cacheFullMediaInBackground(reqUrl, cacheKey, cache) {
+  if (_inFlightCaching.has(cacheKey)) return; // already downloading this one — don't pile on
+  _inFlightCaching.add(cacheKey);
   try {
     const res = await fetch(reqUrl, { headers: {} });
     if (!res.ok) return;
@@ -121,6 +131,8 @@ async function cacheFullMediaInBackground(reqUrl, cacheKey, cache) {
   } catch (e) {
     // Offline, network hiccup, or the book turned out too big to fit even after eviction —
     // nothing to do but let the next open try again.
+  } finally {
+    _inFlightCaching.delete(cacheKey);
   }
 }
 async function handleMediaRequest(event, url) {
@@ -130,7 +142,8 @@ async function handleMediaRequest(event, url) {
   if (cached) return sliceFromCached(cached, event.request.headers.get('range'));
   // Not cached yet — serve THIS request straight from the network (with whatever Range the
   // player/reader actually asked for, so first playback/read isn't stalled on a full download),
-  // and separately populate the cache in the background for next time.
+  // and separately populate the cache in the background for next time (deduplicated above, so
+  // this is a no-op if another request already started the same background download).
   const netRes = await fetch(event.request);
   event.waitUntil(cacheFullMediaInBackground(url.href, cacheKey, cache));
   return netRes;
