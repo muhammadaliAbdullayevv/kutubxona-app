@@ -53,9 +53,6 @@
   .chip .n{opacity:.55; margin-left:4px}
   .chip.on{background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border-color:transparent}
   .chip.on .n{opacity:.85}
-  .tabs{display:flex; gap:6px; margin-top:2px}
-  .tab{flex:1; text-align:center; padding:9px; border-radius:12px; font-weight:700; font-size:14px; color:var(--muted); background:var(--card); border:1px solid var(--line); cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
-  .tab.on{color:#fff; background:linear-gradient(135deg,var(--accent),var(--accent2)); border-color:transparent}
   .bar{display:flex; justify-content:space-between; align-items:center; margin:14px 2px 8px}
   .bar .lbl{font-size:13px; color:var(--muted); font-weight:600}
   .sort{background:var(--card); border:1px solid var(--line); color:var(--text); border-radius:10px; padding:6px 8px; font-size:13px}
@@ -236,7 +233,8 @@
   /* Profile/Davra are primary tab destinations, not overlays — they render in-place as peers
      of #home/#grid (see #profileView/#davraView in the markup), so they only need the same top
      breathing room #home's shelves already get, not a dedicated topbar/scroll-area treatment. */
-  #profileView,#davraView{padding-top:6px}
+  #profileView,#davraView,#readingView{padding-top:6px}
+  #readingTabs{padding-top:0}
   .fitem{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:10px}
   .fitem .fmeta{display:flex; align-items:center; gap:8px; margin-bottom:6px}
   .fitem .falias{font-size:12.5px; font-weight:700; color:var(--muted)}
@@ -319,11 +317,6 @@
       <span class="clr" id="clr">✕</span>
     </div>
     <button class="mapbtn" id="btnGlobe">🌐 Kitoblar xaritasi</button>
-    <div class="tabs">
-      <div class="tab on" id="tabBrowse">Barchasi</div>
-      <div class="tab" id="tabFav">❤️ Saqlanganlar</div>
-      <div class="tab" id="tabContinue">▶️ Davom eting</div>
-    </div>
     <div class="row" id="genres"></div>
     <div class="row" id="filters"></div>
   </header>
@@ -358,6 +351,15 @@
     <div id="davraList"></div>
     <div class="empty" id="davraEmpty" style="display:none"><span class="em">💬</span>Hali hech narsa yo'q</div>
     <button class="more" id="davraMore" style="display:none">Yana yuklash</button>
+  </div>
+  <div id="readingView" style="display:none">
+    <h2 class="dtitle">📖 Mutolaaxonam</h2>
+    <div class="row" id="readingTabs">
+      <span class="chip on" data-rt="continue">▶️ Davom eting</span>
+      <span class="chip" data-rt="favorites">❤️ Saqlangan</span>
+    </div>
+    <div class="grid" id="readingGrid"></div>
+    <div class="empty" id="readingEmpty" style="display:none"></div>
   </div>
 </div>
 
@@ -635,7 +637,7 @@ var byId={};
 // reasoning as DB/byId above) makes them real globals every script on the page can see.
 var openedFromGlobe=false;
 let state={q:'',genre:'',audience:'',type:'',sort:'relevance',view:'browse',shown:24,result:[],all:false};
-let HOME={newest:[],audio:[],authors:[],genres:[],continue:[],topics:[],trending:[]};
+let HOME={newest:[],audio:[],authors:[],continue:[],topics:[],trending:[]};
 let favs=new Set();
 const PAGE=24;
 
@@ -673,10 +675,7 @@ function score(b,terms){
 }
 function compute(){
   const terms=norm(state.q).split(/\s+/).filter(Boolean);
-  let list;
-  if(state.view==='favorites'){list=[...favs].map(id=>byId[id]).filter(Boolean);}
-  else if(state.view==='continue'){list=HOME.continue.map(it=>({...it.book,_kind:it.kind,_percent:it.percent}));}
-  else{list=DB.books;}
+  const list=DB.books;
   let arr=[];
   for(const b of list){
     if(state.genre&&b.g!==state.genre)continue;
@@ -743,8 +742,25 @@ function continueCardHtml(b,i){
 function render(){
   const grid=$('#grid');
   const slice=state.result.slice(0,state.shown);
-  const isContinue=state.view==='continue';
-  grid.innerHTML=slice.map((b,i)=>isContinue?continueCardHtml(b,i):cardHtml(b,i)).join('');
+  grid.innerHTML=slice.map((b,i)=>cardHtml(b,i)).join('');
+  grid.querySelectorAll('.book').forEach(el=>el.onclick=e=>{if(e.target.closest('[data-fav]'))return;openDetail(el.dataset.id);});
+  grid.querySelectorAll('[data-fav]').forEach(el=>el.onclick=e=>{e.stopPropagation();toggleFav(el.dataset.fav);});
+  $('#empty').style.display=state.result.length?'none':'block';
+  $('#empty').innerHTML='<span class="em">🔍</span>Hech narsa topilmadi';
+  $('#more').style.display=state.result.length>state.shown?'block':'none';
+  $('#count').textContent=state.result.length?`${state.result.length} ta kitob`:'';
+}
+// Reading Room (Mutolaaxonam) — a dedicated peer view, not another state of the browse grid: its
+// own two client-side sub-tabs (Davom eting / Saqlangan) so it never needs the search/genre/filter
+// chrome that #grid carries. readingTab state is local (not persisted) since it's cheap to recompute.
+let readingTab='continue';
+function renderReading(){
+  const grid=$('#readingGrid');
+  const isContinue=readingTab==='continue';
+  const items=isContinue
+    ?HOME.continue.map(it=>({...it.book,_kind:it.kind,_percent:it.percent}))
+    :[...favs].map(id=>byId[id]).filter(Boolean);
+  grid.innerHTML=items.map((b,i)=>isContinue?continueCardHtml(b,i):cardHtml(b,i)).join('');
   grid.querySelectorAll('.book').forEach(el=>el.onclick=e=>{if(e.target.closest('[data-fav]')||e.target.closest('[data-resume]'))return;openDetail(el.dataset.id);});
   grid.querySelectorAll('[data-fav]').forEach(el=>el.onclick=e=>{e.stopPropagation();toggleFav(el.dataset.fav);});
   grid.querySelectorAll('[data-resume]').forEach(el=>el.onclick=e=>{
@@ -752,14 +768,17 @@ function render(){
     const id=el.dataset.resume,b=byId[id];
     if(el.dataset.kind==='listen')openAudioPlayer(id,b?.t);else openPdfReader(id,b?.t);
   });
-  $('#sort').style.display=isContinue?'none':'';
-  $('#empty').style.display=state.result.length?'none':'block';
-  if(isContinue)$('#empty').innerHTML=canAct()?'<span class="em">📖</span>Hozircha o\'qilayotgan kitob yo\'q — birortasini boshlang':'<span class="em">🔒</span>Kuzatish uchun botni Telegram ichida oching';
-  else $('#empty').innerHTML='<span class="em">🔍</span>Hech narsa topilmadi';
-  $('#more').style.display=state.result.length>state.shown?'block':'none';
-  const noun=state.view==='favorites'?'saqlangan':state.view==='continue'?"o'qilayotgan":'kitob';
-  $('#count').textContent=state.result.length?`${state.result.length} ta ${noun}`:'';
+  const empty=$('#readingEmpty');
+  empty.style.display=items.length?'none':'block';
+  if(!items.length)empty.innerHTML=isContinue
+    ?(canAct()?'<span class="em">📖</span>Hozircha o\'qilayotgan kitob yo\'q — birortasini boshlang':'<span class="em">🔒</span>Kuzatish uchun botni Telegram ichida oching')
+    :'<span class="em">🤍</span>Hali hech narsa saqlanmagan';
 }
+$('#readingTabs').querySelectorAll('.chip').forEach(el=>el.onclick=()=>{
+  haptic();readingTab=el.dataset.rt;
+  $('#readingTabs').querySelectorAll('.chip').forEach(c=>c.classList.toggle('on',c===el));
+  renderReading();
+});
 // ---- discovery homepage (shown when browsing with no query/filter) ----
 function buildHome(){
   HOME.newest=DB.books.slice(0,18);
@@ -767,7 +786,6 @@ function buildHome(){
   const ac={};
   for(const b of DB.books){const a=(b.a||'').trim();if(a&&a.length>1&&!/noma'?lum/i.test(a))ac[a]=(ac[a]||0)+1;}
   HOME.authors=Object.entries(ac).filter(([a,c])=>c>=2).sort((x,y)=>y[1]-x[1]).slice(0,16).map(([a,c])=>({a,c}));
-  HOME.genres=DB.genres.slice(0,5).map(g=>({v:g.v,c:g.c,books:DB.books.filter(b=>b.g===g.v).slice(0,18)}));
   // Topic chips: real per-book tags (the `s` array — already part of search relevance in
   // score()/indexBook's _subs), not an editorial "collections" feature — no curation needed,
   // just the most common tags across the catalog. Threshold of 15 keeps rare/noisy tags out.
@@ -786,7 +804,7 @@ async function loadContinueReading(){
   try{
     const r=await api('/api/profile/continue');
     const items=(r.items||[]).map(it=>({...it,book:byId[it.id]})).filter(x=>x.book);
-    if(items.length){HOME.continue=items;if(isHome())renderHome();else if(state.view==='continue')run();}
+    if(items.length){HOME.continue=items;if(isHome())renderHome();else if(state.view==='reading')renderReading();}
   }catch(e){}
 }
 // Hero card — the single most-recent in-progress book, big and prominent above everything
@@ -863,7 +881,6 @@ function renderHome(){
   if(HOME.authors.length)html+=`<div class="section"><div class="shead"><h2>✍️ Mashhur mualliflar</h2></div><div class="authchips">${HOME.authors.map(a=>`<div class="authchip" data-auth="${esc(a.a)}"><span class="an">${esc(a.a)}</span><span class="ac">${a.c} ta kitob</span></div>`).join('')}</div></div>`;
   if(HOME.audio.length)html+=shelf("🎧 Audiokitoblar",HOME.audio,'data-see="audio"');
   html+=trendingShelf(HOME.trending);
-  for(const g of HOME.genres)html+=shelf(g.v,g.books,`data-see="genre" data-v="${esc(g.v)}"`);
   h.innerHTML=html;
   h.querySelectorAll('.si').forEach(el=>el.onclick=()=>openDetail(el.dataset.id));
   h.querySelectorAll('.hero').forEach(el=>el.onclick=e=>{if(e.target.closest('[data-resume]'))return;openDetail(el.dataset.id);});
@@ -875,7 +892,7 @@ function renderHome(){
   h.querySelectorAll('[data-topic]').forEach(el=>el.onclick=()=>{state.all=false;$('#q').value=el.dataset.topic;state.q=el.dataset.topic;$('#clr').style.display='block';haptic();run();window.scrollTo(0,0);});
   h.querySelectorAll('#trendWin .tw').forEach(el=>el.onclick=()=>{haptic();trendingWindow=el.dataset.w;loadTrending();});
   h.querySelectorAll('[data-auth]').forEach(el=>el.onclick=()=>{state.all=false;$('#q').value=el.dataset.auth;state.q=el.dataset.auth;$('#clr').style.display='block';haptic();run();window.scrollTo(0,0);});
-  h.querySelectorAll('[data-see]').forEach(el=>el.onclick=()=>{const s=el.dataset.see;if(s==='newest'){state.all=true;state.sort='newest';$('#sort').value='newest';}else if(s==='audio'){state.type='audio';renderChips();}else if(s==='genre'){state.genre=el.dataset.v;renderChips();}haptic();run();window.scrollTo(0,0);});
+  h.querySelectorAll('[data-see]').forEach(el=>el.onclick=()=>{const s=el.dataset.see;if(s==='newest'){state.all=true;state.sort='newest';$('#sort').value='newest';}else if(s==='audio'){state.type='audio';renderChips();}haptic();run();window.scrollTo(0,0);});
 }
 // ---- gentle auto-scroll for the "recently added" ticker, native scroll underneath so a
 // touch/swipe always fully overrides it (pauses the moment a finger touches it, resumes a
@@ -927,28 +944,31 @@ $('#btnGlobe').onclick=()=>{haptic();window.openGlobe?.();};
 $('#globeClose').onclick=()=>window.closeGlobe?.();
 
 function isHome(){return state.view==='browse'&&!state.q&&!state.genre&&!state.audience&&!state.type&&!state.all;}
-// Every primary destination — Barchasi/Saqlanganlar/Davom eting's #home or #grid, and now
-// Profil/Davra's own containers — is a peer area swapped in-place here. Only the browse-book
-// header chrome (search/map button/tabs/genre chips/sort bar) makes sense for the book-list
-// areas, so it hides for profile/davra the same way #home/#grid themselves do.
+// Every primary destination — Asosiy's #home or #grid, and Profil/Davra/Mutolaaxonam's own
+// containers — is a peer area swapped in-place here. The search/map-button chrome makes sense
+// on home too (still want to search from the main page), but the genre/filter chip rows only
+// make sense once actually browsing/searching all books (#grid) — showing them on #home as well
+// was the main source of home-page clutter (genre chips + genre shelves + topic chips, all at
+// once), so they're scoped to 'grid' only here.
 function showArea(area){
   const forBooks=area==='home'||area==='grid';
   $('.searchbar').style.display=forBooks?'flex':'none';
   $('.liveHeaderRow').style.display=forBooks?'block':'none';
   $('#btnGlobe').style.display=forBooks?'flex':'none';
-  $('.tabs').style.display=forBooks?'flex':'none';
-  $('#genres').style.display=forBooks?'flex':'none';
-  $('#filters').style.display=forBooks?'flex':'none';
+  $('#genres').style.display=area==='grid'?'flex':'none';
+  $('#filters').style.display=area==='grid'?'flex':'none';
   $('#home').style.display=area==='home'?'block':'none';
   $('#grid').style.display=area==='grid'?'grid':'none';
   $('.bar').style.display=area==='grid'?'flex':'none';
   $('#profileView').style.display=area==='profile'?'block':'none';
   $('#davraView').style.display=area==='davra'?'block':'none';
+  $('#readingView').style.display=area==='reading'?'block':'none';
   if(area!=='grid'){$('#more').style.display='none';$('#empty').style.display='none';}
 }
 function run(){
   if(state.view==='profile'){showArea('profile');loadProfile();return;}
   if(state.view==='davra'){showArea('davra');loadDavraFeed(true);return;}
+  if(state.view==='reading'){showArea('reading');renderReading();return;}
   if(isHome()){renderHome();showArea('home');}
   else{compute();render();showArea('grid');}
 }
@@ -957,7 +977,7 @@ function toggleFav(id){
   haptic('medium');
   if(favs.has(id))favs.delete(id);else favs.add(id);
   saveFavs();
-  if(state.view==='favorites')run();else render();
+  if(state.view==='reading')renderReading();else render();
   if($('#sheet').classList.contains('open')){const el=$('#dFav');if(el){const on=favs.has(id);el.classList.toggle('on',on);el.textContent=on?'❤️':'🤍';}}
   toast(favs.has(id)?'❤️ Saqlandi':'Olib tashlandi');
 }
@@ -1412,24 +1432,19 @@ $('#sort').onchange=e=>{state.sort=e.target.value;run();};
 $('#more').onclick=()=>{state.shown+=PAGE;render();};
 $('#sheet').onclick=e=>{if(e.target.id==='sheet')closeSheet();};
 function setTabs(){
-  $('#tabBrowse').classList.toggle('on',state.view==='browse');
-  $('#tabFav').classList.toggle('on',state.view==='favorites');
-  $('#tabContinue').classList.toggle('on',state.view==='continue');
-  $('#navAsosiy').classList.toggle('on',state.view==='browse'||state.view==='favorites');
-  $('#navMutolaa').classList.toggle('on',state.view==='continue');
+  $('#navAsosiy').classList.toggle('on',state.view==='browse');
+  $('#navMutolaa').classList.toggle('on',state.view==='reading');
   $('#navDavra').classList.toggle('on',state.view==='davra');
   $('#navSahifam').classList.toggle('on',state.view==='profile');
 }
-$('#tabBrowse').onclick=()=>{state.view='browse';state.q='';$('#q').value='';$('#clr').style.display='none';state.genre='';state.audience='';state.type='';state.all=false;renderChips();setTabs();run();window.scrollTo(0,0);};
-$('#tabFav').onclick=()=>{state.view='favorites';state.all=false;setTabs();run();};
-$('#tabContinue').onclick=()=>{state.view='continue';state.all=false;state.sort='relevance';$('#sort').value='relevance';setTabs();run();window.scrollTo(0,0);};
-// ---- bottom nav: primary app-level navigation. Every destination — including Profil/Davra —
-// is a peer view swapped in-place by run()/showArea(), never an overlay: switching away means
-// tapping another destination, not finding a close button (that's reserved for things opened
-// FROM a screen, like the book detail sheet). Asosiy/Mutolaaxonam proxy the existing top-tab
-// handlers above (one source of truth); Davra/Sahifam go through the same goToView() helper.
-$('#navAsosiy').onclick=()=>{haptic();$('#tabBrowse').click();};
-$('#navMutolaa').onclick=()=>{haptic();$('#tabContinue').click();};
+// ---- bottom nav: the only primary app-level navigation now (the old top tab bar — Barchasi/
+// Saqlanganlar/Davom eting — is gone; Saqlangan/Davom eting live inside Mutolaaxonam below, and
+// Asosiy's own search/genre chips are how you get back to browsing "all books"). Every
+// destination is a peer view swapped in-place by run()/showArea(), never an overlay: switching
+// away means tapping another destination, not finding a close button (that's reserved for things
+// opened FROM a screen, like the book detail sheet).
+$('#navAsosiy').onclick=()=>{haptic();state.view='browse';state.q='';$('#q').value='';$('#clr').style.display='none';state.genre='';state.audience='';state.type='';state.all=false;renderChips();setTabs();run();window.scrollTo(0,0);};
+$('#navMutolaa').onclick=()=>{haptic();goToView('reading');};
 $('#navDavra').onclick=()=>{haptic();goToView('davra');};
 $('#navSahifam').onclick=()=>{haptic();goToView('profile');};
 window.addEventListener('scroll',()=>{if(isHome())return;if(window.innerHeight+window.scrollY>=document.body.offsetHeight-500&&state.result.length>state.shown){state.shown+=PAGE;render();}});
