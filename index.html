@@ -2609,8 +2609,18 @@ async function boot(){
     // few seconds of no touch/scroll (nothing mid-gesture to interrupt).
     let pendingSwReload=false,lastInteractionAt=Date.now();
     ['pointerdown','keydown','scroll'].forEach(evt=>document.addEventListener(evt,()=>{lastInteractionAt=Date.now();},{passive:true,capture:true}));
+    // Every overlay (book detail, PDF reader, write-review, the avatar crop tool, ...) shares
+    // this one class — checking it here caught a real regression: picking a photo for the
+    // avatar (or opening the camera) backgrounds the WebView exactly like switching away from
+    // the app does, which was tripping the visibilitychange path below and force-reloading mid
+    // upload, dumping the user back on the home screen with the crop sheet just gone. A sheet
+    // being open is itself proof the user is mid-task, independent of the interaction-recency
+    // check below (which alone doesn't cover "backgrounded for a while, but still on this
+    // screen when they return").
+    function anySheetOpen(){return !!document.querySelector('.sheet.open');}
     function applyPendingSwReload(force){
       if(!pendingSwReload)return;
+      if(anySheetOpen())return;
       if(!force&&Date.now()-lastInteractionAt<5000)return;
       let last=0;
       try{last=parseInt(sessionStorage.getItem('swReloadedAt')||'0',10);}catch(e){}
