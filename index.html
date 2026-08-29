@@ -1094,10 +1094,18 @@ function loadProfile(){
   const body=$('#pBody');if(!body)return;
   if(!canAct()){body.innerHTML='<p class="hint">Profilingizni ko\'rish uchun botda oching.</p>';return;}
   api('/api/profile/me').then(r=>{
-    const s=r.streak,st=r.stats;
+    const s=r.streak,st=r.stats,rt=r.reading_time||{total_seconds:0,last_7_days_seconds:0};
+    const toMin=sec=>Math.round((sec||0)/60);
+    const rankText=r.rank?`#${fmtNum(r.rank.position)} / ${fmtNum(r.rank.total_users)}`:'—';
     const badges=r.badges.map(b=>{const m=_BADGE_META[b.code]||{emoji:'🏅',label:b.code};return `<span class="pill${b.achieved?'':' locked'}">${m.emoji} <b>${esc(m.label)}</b></span>`;}).join('');
     body.innerHTML=`
       <div class="streakbig"><span class="n">${s.current_streak}</span><span class="u">kunlik seriya${s.active_today?' · bugun faol 🔥':''}</span></div>
+      <div class="statgrid">
+        <div class="st"><div class="sv">🪙 ${fmtNum(r.points||0)}</div><div class="sl">ball hisobi</div></div>
+        <div class="st"><div class="sv">${fmtNum(toMin(rt.total_seconds))}</div><div class="sl">daqiqa o'qildi</div></div>
+        <div class="st"><div class="sv">${rankText}</div><div class="sl">reyting o'rni</div></div>
+        <div class="st"><div class="sv">${fmtNum(toMin(rt.last_7_days_seconds))}</div><div class="sl">so'nggi 7 kun (daq)</div></div>
+      </div>
       <div class="statgrid">
         <div class="st"><div class="sv">${st.total_opens}</div><div class="sl">ochilgan kitoblar</div></div>
         <div class="st"><div class="sv">${st.favorites}</div><div class="sl">sevimlilar</div></div>
