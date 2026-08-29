@@ -96,6 +96,9 @@
   .si .sa{font-size:11px; color:var(--muted); margin:0 1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
   .si .sr{font-size:11px; color:var(--muted); margin:2px 1px 0; font-variant-numeric:tabular-nums}
   .si .sr b{color:var(--text)}
+  .si .kind{position:absolute; top:7px; left:7px; background:rgba(0,0,0,.35); border-radius:7px; padding:2px 6px; font-size:11px}
+  .si .prog{height:4px; border-radius:3px; background:var(--line); margin:8px 1px 0; overflow:hidden}
+  .si .prog .progbar{height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2)); border-radius:3px}
   /* Auto-scrolling "recently added" ticker, top of home */
   .mqwrap{overflow-x:auto; scrollbar-width:none; padding:2px 0 6px; margin:0 -14px}
   .mqwrap::-webkit-scrollbar{display:none}
@@ -498,7 +501,7 @@ var byId={};
 // reasoning as DB/byId above) makes them real globals every script on the page can see.
 var openedFromGlobe=false;
 let state={q:'',genre:'',audience:'',type:'',sort:'relevance',view:'browse',shown:24,result:[],all:false};
-let HOME={newest:[],audio:[],authors:[],genres:[]};
+let HOME={newest:[],audio:[],authors:[],genres:[],continue:[]};
 let favs=new Set();
 const PAGE=24;
 
@@ -606,6 +609,31 @@ function buildHome(){
 }
 function siHtml(b,i){const[c1,c2]=coverFor(b.i);return `<div class="si" data-id="${esc(b.i)}" style="--d:${Math.min(i||0,12)*30}ms"><div class="sc" style="background:linear-gradient(135deg,${c1},${c2})">${b.hc?`<img class="ci" src="covers/${encodeURIComponent(b.i)}.jpg" loading="lazy" onerror="this.remove()">`:''}${b.ha?'<span class="aud">🎧</span>':''}<span class="ini">${esc(initials(b.t))}</span></div><div class="st">${esc(b.t)}</div><div class="sa">${esc(b.a||'')}</div>${b.rc?`<div class="sr">⭐ <b>${b.rt}</b> (${b.rc})</div>`:''}</div>`;}
 function shelf(title,books,see){return `<div class="section"><div class="shead"><h2>${esc(title)}</h2>${see?`<span class="see" ${see}>Barchasi →</span>`:''}</div><div class="shelf">${books.map((b,i)=>siHtml(b,i)).join('')}</div></div>`;}
+// "Continue reading/listening" card — same .si skeleton as siHtml so it shares all existing
+// sizing/animation/click-wiring, plus a kind badge (📖 read vs 🎧 listen, since a book with both
+// unfinished a PDF AND audio progress only ever appears once, keyed to whichever was touched more
+// recently server-side) and a percent-complete bar fed by webapi's /api/profile/continue.
+function continueSiHtml(item,i){
+  const b=item.book,pct=item.percent==null?0:item.percent;
+  const[c1,c2]=coverFor(b.i);
+  return `<div class="si" data-id="${esc(b.i)}" style="--d:${Math.min(i||0,12)*30}ms"><div class="sc" style="background:linear-gradient(135deg,${c1},${c2})">${b.hc?`<img class="ci" src="covers/${encodeURIComponent(b.i)}.jpg" loading="lazy" onerror="this.remove()">`:''}<span class="kind">${item.kind==='listen'?'🎧':'📖'}</span><span class="ini">${esc(initials(b.t))}</span></div><div class="prog"><div class="progbar" style="width:${pct}%"></div></div><div class="st">${esc(b.t)}</div><div class="sa">${pct}% • ${esc(b.a||'')}</div></div>`;
+}
+function continueShelf(items){
+  if(!items.length)return'';
+  return `<div class="section"><div class="shead"><h2>▶️ Davom eting</h2></div><div class="shelf">${items.map((it,i)=>continueSiHtml(it,i)).join('')}</div></div>`;
+}
+// Fetched separately (not blocking initial paint like books.json is) and merged in after the
+// fact — auth + a DB round trip on top of the static catalog load, so the home screen shows its
+// normal shelves immediately and this one fades in a beat later once it resolves. Only ever
+// called when canAct() (real Telegram session), since the endpoint requires auth anyway.
+async function loadContinueReading(){
+  if(!canAct())return;
+  try{
+    const r=await api('/api/profile/continue');
+    const items=(r.items||[]).map(it=>({...it,book:byId[it.id]})).filter(x=>x.book);
+    if(items.length){HOME.continue=items;if(isHome())renderHome();}
+  }catch(e){}
+}
 function marqueeShelf(title,books,see){
   if(!books.length)return '';
   const cards=books.map((b,i)=>siHtml(b,i)).join('');
@@ -615,6 +643,7 @@ function marqueeShelf(title,books,see){
 }
 function renderHome(){
   const h=$('#home');let html='';
+  if(HOME.continue.length)html+=continueShelf(HOME.continue);
   if(HOME.newest.length)html+=marqueeShelf("🆕 Yangi qo'shilgan",HOME.newest,'data-see="newest"');
   if(HOME.authors.length)html+=`<div class="section"><div class="shead"><h2>✍️ Mashhur mualliflar</h2></div><div class="authchips">${HOME.authors.map(a=>`<div class="authchip" data-auth="${esc(a.a)}"><span class="an">${esc(a.a)}</span><span class="ac">${a.c} ta kitob</span></div>`).join('')}</div></div>`;
   if(HOME.audio.length)html+=shelf("🎧 Audiokitoblar",HOME.audio,'data-see="audio"');
@@ -1215,6 +1244,7 @@ async function boot(){
   }catch(e){$('#count').textContent='';$('#grid').innerHTML='';$('#empty').style.display='block';$('#empty').innerHTML='<span class="em">⚠️</span>Ma\'lumot yuklanmadi';return;}
   await loadFavs();
   renderChips();run();
+  loadContinueReading();
   trackEvent('app_open');
   liveRefreshPublicStats();
   setInterval(liveRefreshPublicStats,6000);
