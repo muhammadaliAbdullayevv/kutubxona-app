@@ -178,7 +178,10 @@
   .btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff}
   .btn.ghost{flex:0 0 auto; width:52px; background:var(--card); border:1px solid var(--line); color:var(--text)}
   .btn.ghost.on{color:var(--danger)}
-  .btn.ghost.wanton{color:var(--accent)}
+  /* Yuklab olish / Tinglash are real labeled actions in a row of at most 3 now (not one of six
+     icon-only squares like before) — they need equal-width room for their label, not the narrow
+     52px icon-square sizing every other .btn.ghost still uses. */
+  #openBot,#dListen{width:auto; flex:1}
   .toast{position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(20px); background:var(--card2); border:1px solid var(--line); color:var(--text); padding:11px 18px; border-radius:12px; font-weight:600; font-size:14px; opacity:0; transition:.25s; z-index:99; box-shadow:var(--shadow)}
   .toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
   .hint{color:var(--muted); font-size:13px; margin:6px 0}
@@ -187,6 +190,25 @@
   #globe{align-items:stretch; background:var(--bg)}
   #globeCanvas{width:100%; height:100%; touch-action:none; display:block}
   .gclose{position:fixed; top:calc(env(safe-area-inset-top) + 14px); right:14px; width:36px; height:36px; border-radius:50%; background:var(--chip); border:1px solid var(--line); color:var(--text); display:flex; align-items:center; justify-content:center; font-size:16px; cursor:pointer; z-index:1}
+  /* Book detail sheet's own top row — a back arrow on the LEFT (native-app convention, not a
+     website's top-right X) plus share + a 3-dot overflow menu on the right. #sheetClose is an
+     id selector so it outranks the shared .gclose's right-side positioning without touching any
+     other sheet that still wants a plain top-right close X (globe, Statistika, PDF reader). */
+  #sheetClose{left:14px; right:auto; font-size:24px}
+  .gshare,.gmenu{position:fixed; top:calc(env(safe-area-inset-top) + 14px); width:36px; height:36px; border-radius:50%; background:var(--chip); border:1px solid var(--line); color:var(--text); display:flex; align-items:center; justify-content:center; font-size:16px; cursor:pointer; z-index:2}
+  .gshare{right:58px}
+  .gmenu{right:14px}
+  .menuPanel{position:absolute; top:44px; right:0; background:var(--card); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); min-width:220px; overflow:hidden; text-align:left}
+  .menuItem{padding:13px 16px; font-size:14px; font-weight:600; cursor:pointer; white-space:nowrap; color:var(--text)}
+  .menuItem+.menuItem{border-top:1px solid var(--line)}
+  .menuItem:active{background:var(--chip)}
+  /* Quick-access row under the title — want-to-read promoted from a buried bottom-bar icon to a
+     labeled, prominent button (a heart for favorite sits beside it, same "save for later"
+     family of actions). */
+  .quickActions{display:flex; gap:8px; margin:10px 0 4px}
+  .qaBtn{display:flex; align-items:center; justify-content:center; gap:6px; padding:9px 14px; border-radius:12px; background:var(--chip); border:1px solid var(--line); font-size:13.5px; font-weight:700; cursor:pointer; color:var(--text); font-family:inherit}
+  .qaBtn.on{background:linear-gradient(135deg,var(--accent),var(--accent2)); border-color:transparent; color:#fff}
+  .wantBtn{flex:1}
   .gzoom{position:fixed; right:14px; top:50%; transform:translateY(-50%); display:flex; flex-direction:column; gap:10px; z-index:1}
   .gzoom button{width:42px; height:42px; border-radius:50%; background:var(--chip); border:1px solid var(--line); color:var(--text); font-size:21px; font-weight:700; font-family:inherit; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:var(--shadow); padding:0; line-height:1; transition:transform .15s}
   .gzoom button:active{transform:scale(.9)}
@@ -199,8 +221,11 @@
   #pdfPageInfo{font-size:13px; font-weight:700; color:var(--muted); min-width:70px; text-align:center; font-variant-numeric:tabular-nums}
   #pdfProgressTrack{position:fixed; top:calc(env(safe-area-inset-top) + 62px); left:0; right:0; z-index:2; height:3px; background:var(--line)}
   #pdfProgressFill{height:100%; width:0%; background:linear-gradient(90deg,var(--accent),var(--accent2)); transition:width .25s ease}
-  #pdfCanvasWrap{position:absolute; inset:0; overflow:auto; display:flex; align-items:flex-start; justify-content:center; padding:78px 0 20px}
-  #pdfCanvas{max-width:100%; box-shadow:var(--shadow); background:#fff}
+  /* touch-action:none hands ALL gesture handling to our own pointer-event code below (pinch
+     zoom, drag-to-pan-when-zoomed, swipe-to-turn-page) instead of fighting the browser's native
+     scroll/pinch, which is what the manual translate+scale transform on #pdfCanvas needs. */
+  #pdfCanvasWrap{position:absolute; inset:0; overflow:hidden; touch-action:none; display:flex; align-items:flex-start; justify-content:center; padding:78px 0 20px}
+  #pdfCanvas{max-width:100%; box-shadow:var(--shadow); background:#fff; touch-action:none}
   #pdfLoading{position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); color:var(--muted); font-size:14px; display:none}
   #pdfLoading.show{display:block}
   /* Above every sheet (including #pdfSheet at 60) — this is a persistent mini-player meant to
@@ -440,7 +465,18 @@
   <div class="ssheetc" id="shelvesSheetc"></div>
 </div>
 
-<div class="sheet" id="sheet"><div class="sheetc" id="sheetc"></div><div class="gclose" id="sheetClose">✕</div></div>
+<div class="sheet" id="sheet">
+  <div class="sheetc" id="sheetc"></div>
+  <div class="gclose" id="sheetClose">‹</div>
+  <div class="gshare" id="sheetShare">↗️</div>
+  <div class="gmenu" id="sheetMenu">⋮
+    <div class="menuPanel" id="sheetMenuPanel" style="display:none">
+      <div class="menuItem" id="miShelf">📚 Javonga qo'shish</div>
+      <div class="menuItem" id="miMarkRead">✓ O'qildi deb belgilash</div>
+      <div class="menuItem" id="miMarkListened" style="display:none">🎧 Tinglandi deb belgilash</div>
+    </div>
+  </div>
+</div>
 <div class="sheet" id="globe" style="z-index:45"><canvas id="globeCanvas"></canvas><div class="gclose" id="globeClose">✕</div><div class="gzoom"><button id="globeZoomIn" type="button">+</button><button id="globeZoomOut" type="button">−</button></div><div class="glegend" id="globeLegend"></div></div>
 <div class="sheet" id="pdfSheet" style="z-index:60; align-items:stretch; background:var(--bg)">
   <div class="gclose" id="pdfClose">✕</div>
@@ -1346,6 +1382,10 @@ function openDetail(id){
     <div class="dbody">
       <h2 class="dtitle">${esc(b.t)}</h2>
       <div class="dauthor">${esc(b.a||'Noma\'lum muallif')}</div>
+      <div class="quickActions">
+        <span class="qaBtn ${fav?'on':''}" id="dFav">${fav?'❤️':'🤍'}</span>
+        <span class="qaBtn wantBtn" id="dWant">📌 Albatta o'qiyman</span>
+      </div>
       <div class="pills">${pill('📂',b.g)}${pill('🎯',audLabel)}${pill('🗓',b.y)}${pill('🌐',b.l)}<span class="pill">${b.ha?'🎧':'📄'} <b>${esc(typeTxt)}</b></span>${b.mb?`<span class="pill">💾 <b>${b.mb} MB</b></span>`:''}${b.dl?`<span class="pill">⬇️ <b>${fmtNum(b.dl)}</b></span>`:''}<span class="pill" id="pillReading" style="display:none">👀 <b><span id="pillReadingN">0</span> o'qimoqda</b></span><span class="pill" id="pillWant" style="display:none">🔖 <b><span id="pillWantN">0</span> o'qimoqchi</b></span></div>
       ${b.sm?`<div class="sec"><h3>Qisqacha</h3><p>${esc(b.sm)}</p></div>`:''}
       ${b.d?`<div class="sec"><h3>Tavsif</h3><p>${esc(b.d)}</p></div>`:''}
@@ -1354,13 +1394,9 @@ function openDetail(id){
       ${relatedShelf(b)}
     </div>
     <div class="actions">
-      <button class="btn primary" id="openBot">📖 Botda o'qish</button>
-      <button class="btn ghost" id="dRead">📄 O'qish</button>
+      <button class="btn primary" id="dRead">📖 Kitobni o'qish</button>
+      <button class="btn ghost" id="openBot">⬇️ Yuklab olish</button>
       ${b.ha?`<button class="btn ghost" id="dListen">🎧 Tinglash</button>`:''}
-      <button class="btn ghost ${fav?'on':''}" id="dFav">${fav?'❤️':'🤍'}</button>
-      <button class="btn ghost" id="dWant">📑</button>
-      <button class="btn ghost" id="dShelf">📚</button>
-      <button class="btn ghost" id="dShare">↗️</button>
       ${openedFromGlobe?'<button class="btn ghost" id="dBackGlobe">🌐</button>':''}
     </div>`;
   const url=`https://t.me/${DB.bot}?start=b_${encodeURIComponent(b.i)}`;
@@ -1368,9 +1404,9 @@ function openDetail(id){
   $('#openBot').onclick=()=>{
     haptic('medium');
     const btn=$('#openBot');const label=btn.textContent;
-    btn.textContent='Yuborilmoqda...';btn.disabled=true;
+    btn.textContent='Yuklab olinmoqda...';btn.disabled=true;
     deliverBook(b.i).then(()=>{
-      btn.textContent='✅ Yuborildi — botni tekshiring';
+      btn.textContent='✅ Bot orqali yuborildi';
       setTimeout(()=>{btn.textContent=label;btn.disabled=false;},2500);
     }).catch(()=>{
       // Couldn't deliver in-app (not cached, bot not started yet, etc.) — only now does the
@@ -1384,17 +1420,40 @@ function openDetail(id){
   if(dListen)dListen.onclick=()=>openAudioPlayer(b.i,b.t);
   $('#dFav').onclick=()=>toggleFav(b.i);
   $('#dWant').onclick=()=>toggleWantToRead(b.i);
-  $('#dShelf').onclick=()=>{if(!canAct()){toast('Botni Telegram ichida oching');return;}openShelvesSheet(b.i);};
-  $('#dShare').onclick=()=>{const txt=`📚 ${b.t}${b.a?' — '+b.a:''}`;const s=`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(txt)}`;tg?.openTelegramLink?tg.openTelegramLink(s):navigator.share?.({title:b.t,url});};
   const dBackGlobe=$('#dBackGlobe');
   if(dBackGlobe)dBackGlobe.onclick=()=>closeSheet();
   c.querySelectorAll('[data-sub]').forEach(el=>el.onclick=()=>{closeSheet();$('#q').value=el.dataset.sub;state.q=el.dataset.sub;$('#clr').style.display='block';state.all=false;if(state.view!=='search'){state.view='search';setTabs();}run();window.scrollTo(0,0);});
   c.querySelectorAll('.si').forEach(el=>el.onclick=()=>openDetail(el.dataset.id));
   _wireFmtButtons(c);
+  // Share + the 3-dot overflow menu (Javon / mark as read / mark as listened) live outside
+  // #sheetc (fixed chrome, like the back arrow) but their actions depend on which book is open,
+  // so they're rewired fresh on every openDetail() — same as everything above.
+  $('#sheetShare').onclick=()=>{const txt=`📚 ${b.t}${b.a?' — '+b.a:''}`;const s=`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(txt)}`;tg?.openTelegramLink?tg.openTelegramLink(s):navigator.share?.({title:b.t,url});};
+  $('#miMarkListened').style.display=b.ha?'block':'none';
+  $('#miShelf').onclick=()=>{$('#sheetMenuPanel').style.display='none';if(!canAct()){toast('Botni Telegram ichida oching');return;}openShelvesSheet(b.i);};
+  $('#miMarkRead').onclick=()=>{
+    $('#sheetMenuPanel').style.display='none';
+    if(!canAct()){toast('Botni Telegram ichida oching');return;}
+    haptic('medium');
+    api('/api/books/'+encodeURIComponent(b.i)+'/mark-read',{method:'POST'}).then(()=>toast("✅ O'qildi deb belgilandi")).catch(()=>toast('Xatolik yuz berdi'));
+  };
+  $('#miMarkListened').onclick=()=>{
+    $('#sheetMenuPanel').style.display='none';
+    if(!canAct()){toast('Botni Telegram ichida oching');return;}
+    haptic('medium');
+    api('/api/books/'+encodeURIComponent(b.i)+'/mark-listened',{method:'POST'}).then(()=>toast('✅ Tinglandi deb belgilandi')).catch(()=>toast('Xatolik yuz berdi'));
+  };
   loadRating(b.i);
   loadBookExtras(b.i);
   c.scrollTop=0;
 }
+$('#sheetMenu').addEventListener('click',e=>{
+  if(e.target.closest('.menuItem'))return;
+  e.stopPropagation();
+  const p=$('#sheetMenuPanel');
+  p.style.display=p.style.display==='none'?'block':'none';
+});
+document.addEventListener('click',e=>{if(!e.target.closest('#sheetMenu'))$('#sheetMenuPanel').style.display='none';});
 
 // ---- reading stats (currently-reading / want-to-read counts) + want-to-read toggle ----
 function loadBookExtras(id){
@@ -1409,8 +1468,7 @@ function loadBookExtras(id){
   api('/api/books/'+encodeURIComponent(id)+'/progress').then(r=>{
     const el=$('#dWant');
     if(!el||!$('#sheet').classList.contains('open'))return;
-    el.classList.toggle('wanton',!!r.want_to_read);
-    el.textContent=r.want_to_read?'🔖':'📑';
+    el.classList.toggle('on',!!r.want_to_read);
   }).catch(()=>{});
 }
 function toggleWantToRead(id){
@@ -1418,13 +1476,14 @@ function toggleWantToRead(id){
   haptic('medium');
   api('/api/books/'+encodeURIComponent(id)+'/want-to-read',{method:'POST'}).then(r=>{
     const el=$('#dWant');
-    if(el){el.classList.toggle('wanton',r.want_to_read);el.textContent=r.want_to_read?'🔖':'📑';}
-    toast(r.want_to_read?"🔖 O'qimoqchilar ro'yxatiga qo'shildi":"Ro'yxatdan olib tashlandi");
+    if(el)el.classList.toggle('on',r.want_to_read);
+    toast(r.want_to_read?"📌 Albatta o'qiyman ro'yxatiga qo'shildi":"Ro'yxatdan olib tashlandi");
     loadBookExtras(id);
   }).catch(()=>toast('Xatolik yuz berdi'));
 }
 function closeSheet(){
   $('#sheet').classList.remove('open');
+  $('#sheetMenuPanel').style.display='none';
   tg?.BackButton?.hide();
   // Resuming the paused globe belongs here, not just on the explicit "back to map" button —
   // closing via the native/Telegram back button, the backdrop tap, or a swipe all bypass that
@@ -1547,7 +1606,7 @@ async function pdfRenderPage(n){
     pdfPageNum=n;
     $('#pdfPageInfo').textContent=n+' / '+pdfPageCount;
     $('#pdfPrev').disabled=n<=1; $('#pdfNext').disabled=n>=pdfPageCount;
-    $('#pdfCanvasWrap').scrollTop=0;
+    pdfResetZoom();
     pdfUpdateProgressBar();
   }catch(e){/* a single bad page shouldn't kill the whole reader */}
   pdfRendering=false;
@@ -1562,6 +1621,70 @@ function closePdfReader(){
 $('#pdfClose').onclick=()=>closePdfReader();
 $('#pdfPrev').onclick=()=>{if(pdfPageNum>1)pdfRenderPage(pdfPageNum-1);};
 $('#pdfNext').onclick=()=>{if(pdfPageNum<pdfPageCount)pdfRenderPage(pdfPageNum+1);};
+
+// ---- reader gestures: pinch to zoom, drag to pan once zoomed, swipe to turn the page when not
+// zoomed, double-tap to toggle zoom — "not only by buttons on top" (the prev/next buttons stay,
+// for anyone who doesn't think to swipe, but they're no longer the only way to move). Zoom/pan
+// is a plain CSS transform on the canvas (not a PDF.js re-render at a new scale) — simple and
+// fast; the tradeoff is it can look soft at high zoom, which is an acceptable v1 limit.
+let pdfZoom=1,pdfPanX=0,pdfPanY=0;
+const pdfPointers=new Map();
+let pdfPinchStartDist=0,pdfPinchStartZoom=1;
+let pdfDragStart=null;
+function pdfApplyTransform(){
+  const c=$('#pdfCanvas');
+  c.style.transform=`translate(${pdfPanX}px,${pdfPanY}px) scale(${pdfZoom})`;
+  c.style.transformOrigin='center center';
+}
+function pdfResetZoom(){pdfZoom=1;pdfPanX=0;pdfPanY=0;pdfApplyTransform();}
+function pdfDist(p1,p2){return Math.hypot(p1.x-p2.x,p1.y-p2.y);}
+const pdfWrap=$('#pdfCanvasWrap');
+pdfWrap.addEventListener('pointerdown',e=>{
+  pdfPointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(pdfPointers.size===1){
+    pdfDragStart={x:e.clientX,y:e.clientY,panX:pdfPanX,panY:pdfPanY};
+  }else if(pdfPointers.size===2){
+    const pts=[...pdfPointers.values()];
+    pdfPinchStartDist=pdfDist(pts[0],pts[1]);
+    pdfPinchStartZoom=pdfZoom;
+    pdfDragStart=null; // a 2nd finger joining cancels any single-finger swipe/pan in progress
+  }
+});
+pdfWrap.addEventListener('pointermove',e=>{
+  if(!pdfPointers.has(e.pointerId))return;
+  pdfPointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(pdfPointers.size===2&&pdfPinchStartDist>0){
+    const pts=[...pdfPointers.values()];
+    pdfZoom=Math.max(1,Math.min(3,pdfPinchStartZoom*(pdfDist(pts[0],pts[1])/pdfPinchStartDist)));
+    pdfApplyTransform();
+  }else if(pdfPointers.size===1&&pdfDragStart&&pdfZoom>1){
+    pdfPanX=pdfDragStart.panX+(e.clientX-pdfDragStart.x);
+    pdfPanY=pdfDragStart.panY+(e.clientY-pdfDragStart.y);
+    pdfApplyTransform();
+  }
+});
+function pdfPointerEnd(e){
+  if(pdfPointers.size===1&&pdfZoom<=1&&pdfDragStart){
+    const dx=e.clientX-pdfDragStart.x,dy=e.clientY-pdfDragStart.y;
+    if(Math.abs(dx)>60&&Math.abs(dx)>Math.abs(dy)*1.5){
+      haptic();
+      if(dx<0&&pdfPageNum<pdfPageCount)pdfRenderPage(pdfPageNum+1);
+      else if(dx>0&&pdfPageNum>1)pdfRenderPage(pdfPageNum-1);
+    }
+  }
+  pdfPointers.delete(e.pointerId);
+  if(pdfPointers.size<2)pdfPinchStartDist=0;
+  if(pdfPointers.size===0)pdfDragStart=null;
+}
+pdfWrap.addEventListener('pointerup',pdfPointerEnd);
+pdfWrap.addEventListener('pointercancel',pdfPointerEnd);
+let pdfLastTapAt=0;
+pdfWrap.addEventListener('pointerup',()=>{
+  if(pdfPointers.size>0)return;
+  const now=Date.now();
+  if(now-pdfLastTapAt<300){pdfZoom=pdfZoom>1?1:2;pdfPanX=0;pdfPanY=0;pdfApplyTransform();haptic();}
+  pdfLastTapAt=now;
+});
 
 // ---- audio player ----
 const AP={audio:new Audio(),bookId:null,audioBookId:null,parts:[],partIdx:0,speeds:[1,1.25,1.5,1.75,2,0.75]};
