@@ -217,23 +217,19 @@
      id selector so it outranks the shared .gclose's right-side positioning without touching any
      other sheet that still wants a plain top-right close X (globe, Statistika, PDF reader). */
   #sheetClose,#pdfClose{left:14px; right:auto; font-size:24px}
-  .gshare,.gmenu{position:fixed; top:calc(env(safe-area-inset-top) + 14px); width:36px; height:36px; border-radius:50%; background:var(--chip); border:1px solid var(--line); color:var(--text); display:flex; align-items:center; justify-content:center; font-size:16px; cursor:pointer; z-index:2}
-  /* #sheetWant reuses .gshare's circle but needs its own filled "active" state (same "Albatta
-     o'qiyman" toggle that used to be the labeled .quickActions button, now promoted to the top
-     row) — the plain .gshare/.gmenu styling has no notion of an on/off state to build on. */
-  #sheetWant.on{background:linear-gradient(135deg,var(--accent),var(--accent2)); border-color:transparent; color:#fff}
-  .gshare{right:58px}
-  .gmenu{right:14px}
+  .gmenu{position:fixed; top:calc(env(safe-area-inset-top) + 14px); right:14px; width:36px; height:36px; border-radius:50%; background:var(--chip); border:1px solid var(--line); color:var(--text); display:flex; align-items:center; justify-content:center; font-size:16px; cursor:pointer; z-index:2}
+  /* Want-to-read as a wide, labeled top-bar pill (not a small icon crowded next to the tag
+     chips below it, and not a circle matching the close/menu buttons' own generic shape) — the
+     reference for this is a real "+ Albatta, o'qiyman" button that fills with color once tapped;
+     the label text stays the same in both states, only the fill communicates "added". Favorite
+     moved into the 3-dot menu (as #miFav) — a lone heart on its own row read as an accidental
+     leftover once this pill took over the "primary save action" spot. */
+  .sheetWantBtn{position:fixed; top:calc(env(safe-area-inset-top) + 14px); left:58px; right:58px; height:36px; border-radius:999px; background:var(--chip); border:1px solid var(--line); color:var(--text); display:flex; align-items:center; justify-content:center; gap:6px; font-size:13.5px; font-weight:700; cursor:pointer; z-index:2; padding:0 10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .sheetWantBtn.on{background:linear-gradient(135deg,var(--accent),var(--accent2)); border-color:transparent; color:#fff}
   .menuPanel{position:absolute; top:44px; right:0; background:var(--card); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); min-width:220px; overflow:hidden; text-align:left}
   .menuItem{padding:13px 16px; font-size:14px; font-weight:600; cursor:pointer; white-space:nowrap; color:var(--text)}
   .menuItem+.menuItem{border-top:1px solid var(--line)}
   .menuItem:active{background:var(--chip)}
-  /* Quick-access row under the title — want-to-read promoted from a buried bottom-bar icon to a
-     labeled, prominent button (a heart for favorite sits beside it, same "save for later"
-     family of actions). */
-  .quickActions{display:flex; gap:8px; margin:10px 0 4px}
-  .qaBtn{display:flex; align-items:center; justify-content:center; gap:6px; padding:9px 14px; border-radius:12px; background:var(--chip); border:1px solid var(--line); font-size:13.5px; font-weight:700; cursor:pointer; color:var(--text); font-family:inherit}
-  .qaBtn.on{background:linear-gradient(135deg,var(--accent),var(--accent2)); border-color:transparent; color:#fff}
   .gzoom{position:fixed; right:14px; top:50%; transform:translateY(-50%); display:flex; flex-direction:column; gap:10px; z-index:1}
   .gzoom button{width:42px; height:42px; border-radius:50%; background:var(--chip); border:1px solid var(--line); color:var(--text); font-size:21px; font-weight:700; font-family:inherit; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:var(--shadow); padding:0; line-height:1; transition:transform .15s}
   .gzoom button:active{transform:scale(.9)}
@@ -316,7 +312,7 @@
   .liveBadgeRight{display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700; opacity:.92}
   /* The panel is a full page (like the PDF reader), not a bottom drawer — a "footer" card reads
      as a minor add-on; a whole page reads as what it actually is, the app's stats dashboard. */
-  #liveSheet,#listSheet,#shelvesSheet{flex-direction:column}
+  #liveSheet,#listSheet,#shelvesSheet,#reviewsSheet,#writeReviewSheet{flex-direction:column}
   /* Generalized from the Statistika panel's own topbar so new full-page sheets (Reading Room's
      drill-in lists, Javon) get the same "whole page, not a bottom drawer" treatment for free. */
   #liveTopbar,.stopbar{flex-shrink:0; display:flex; align-items:center; justify-content:space-between; gap:12px;
@@ -395,10 +391,8 @@
   .starpick{font-size:26px; letter-spacing:4px; cursor:pointer; user-select:none}
   .starpick span{opacity:.3}
   .starpick span.on{opacity:1}
-  #rForm{margin-top:10px}
-  #rForm textarea{width:100%; background:var(--card); border:1px solid var(--line); border-radius:10px; color:var(--text); padding:9px; font:inherit; resize:vertical; min-height:50px; margin-top:8px; box-sizing:border-box}
-  #rForm button{margin-top:6px; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border:0; border-radius:10px; padding:8px 14px; font-weight:700; cursor:pointer}
-  #rForm .rdel{margin-left:10px; background:none; color:var(--danger); border:0; font-weight:700; cursor:pointer; padding:8px 4px}
+  #writeReviewSheetc textarea{width:100%; background:var(--card); border:1px solid var(--line); border-radius:10px; color:var(--text); padding:9px; font:inherit; resize:vertical; min-height:90px; margin-top:14px; box-sizing:border-box}
+  .rdel{background:none; color:var(--danger); border:0; font-weight:700; cursor:pointer; padding:8px 4px}
   .rrow{padding:10px 0; border-top:1px solid var(--line)}
   .rrow:first-child{border-top:0}
   .rrow .rstars{color:#ffb100; font-size:13px}
@@ -406,6 +400,14 @@
   .rrow .rvote{display:flex; gap:14px; font-size:12.5px; color:var(--muted)}
   .rrow .rvote span{cursor:pointer}
   .rrow .rvote span.on{color:var(--accent)}
+  /* Compact horizontal preview cards for the book page's own "Reyting" section — the full .rrow
+     list (with helpful-vote buttons) is reserved for the dedicated "Barcha izohlar" page now. */
+  .rshelf{display:flex; gap:10px; overflow-x:auto; scrollbar-width:none; margin:0 -18px; padding:2px 18px 4px}
+  .rshelf::-webkit-scrollbar{display:none}
+  .rcard{flex:0 0 190px; background:var(--card2); border:1px solid var(--line); border-radius:14px; padding:12px}
+  .rcard .rcStars{color:#ffb100; font-size:12.5px}
+  .rcard .rcText{font-size:13px; margin:6px 0; display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden}
+  .rcard .rcMeta{font-size:11.5px; color:var(--muted); font-weight:700}
 </style>
 </head>
 <body>
@@ -505,14 +507,28 @@
   <div class="stopbar"><div class="stopbarTitle" id="shelvesTitle">📚 Javon</div><div class="gclose" id="shelvesClose">✕</div></div>
   <div class="ssheetc" id="shelvesSheetc"></div>
 </div>
+<!-- Reviews used to be a single inline vertical list capped at 20, with the write-a-review form
+     also inline in the same scroll — a real full "all reviews" page (with its own pagination)
+     plus a dedicated "write a review" page match how a reviews section that might actually grow
+     large should work, and give a rating its own uninterrupted moment instead of being squeezed
+     between the book's description and a related-books shelf. -->
+<div class="sheet" id="reviewsSheet" style="z-index:53; align-items:stretch; background:var(--bg)">
+  <div class="stopbar"><div class="stopbarTitle">⭐ Barcha izohlar</div><div class="gclose" id="reviewsClose">✕</div></div>
+  <div class="ssheetc" id="reviewsSheetc"></div>
+</div>
+<div class="sheet" id="writeReviewSheet" style="z-index:53; align-items:stretch; background:var(--bg)">
+  <div class="stopbar"><div class="stopbarTitle">✍️ Izoh qoldirish</div><div class="gclose" id="writeReviewClose">✕</div></div>
+  <div class="ssheetc" id="writeReviewSheetc"></div>
+</div>
 
 <div class="sheet" id="sheet">
   <div class="sheetc" id="sheetc"></div>
   <div class="gclose" id="sheetClose">‹</div>
-  <div class="gshare" id="sheetWant">📌</div>
+  <div class="sheetWantBtn" id="sheetWant"><span id="sheetWantIcon">+</span> Albatta, o'qiyman</div>
   <div class="gmenu" id="sheetMenu">⋮
     <div class="menuPanel" id="sheetMenuPanel" style="display:none">
       <div class="menuItem" id="miShare">↗️ Ulashish</div>
+      <div class="menuItem" id="miFav">🤍 Sevimlilarga qo'shish</div>
       <div class="menuItem" id="miShelf">📚 Javonga qo'shish</div>
       <div class="menuItem" id="miMarkRead">✓ O'qildi deb belgilash</div>
       <div class="menuItem" id="miMarkListened" style="display:none">🎧 Tinglandi deb belgilash</div>
@@ -1399,7 +1415,7 @@ function toggleFav(id){
   if(favs.has(id))favs.delete(id);else favs.add(id);
   saveFavs();
   if(state.view==='reading')renderReading();else render();
-  if($('#sheet').classList.contains('open')){const el=$('#dFav');if(el){const on=favs.has(id);el.classList.toggle('on',on);el.textContent=on?'❤️':'🤍';}}
+  if($('#sheet').classList.contains('open')){const el=$('#miFav');if(el){const on=favs.has(id);el.textContent=on?"❤️ Sevimlilardan olib tashlash":"🤍 Sevimlilarga qo'shish";}}
   if($('#listSheet').classList.contains('open')){const el=$(`#listSheetc [data-fav="${CSS.escape(id)}"]`);if(el)el.textContent=favs.has(id)?'❤️':'🤍';}
   toast(favs.has(id)?'❤️ Saqlandi':'Olib tashlandi');
 }
@@ -1427,14 +1443,11 @@ function openDetail(id){
     <div class="dbody">
       <h2 class="dtitle">${esc(b.t)}</h2>
       <div class="dauthor">${esc(b.a||'Noma\'lum muallif')}</div>
-      <div class="quickActions">
-        <span class="qaBtn ${fav?'on':''}" id="dFav">${fav?'❤️':'🤍'}</span>
-      </div>
       <div class="pills">${pill('📂',b.g)}${pill('🎯',audLabel)}${pill('🗓',b.y)}${pill('🌐',b.l)}<span class="pill">${b.ha?'🎧':'📄'} <b>${esc(typeTxt)}</b></span>${b.mb?`<span class="pill">💾 <b>${b.mb} MB</b></span>`:''}${b.dl?`<span class="pill">⬇️ <b>${fmtNum(b.dl)}</b></span>`:''}<span class="pill" id="pillReading" style="display:none">👀 <b><span id="pillReadingN">0</span> o'qimoqda</b></span><span class="pill" id="pillWant" style="display:none">🔖 <b><span id="pillWantN">0</span> o'qimoqchi</b></span></div>
       ${b.sm?`<div class="sec"><h3>Qisqacha</h3><p>${esc(b.sm)}</p></div>`:''}
       ${b.d?`<div class="sec"><h3>Tavsif</h3><p>${esc(b.d)}</p></div>`:''}
       ${(b.s&&b.s.length)?`<div class="sec"><h3>Mavzular</h3><div class="subs">${b.s.map(s=>`<span class="sub" data-sub="${esc(s)}">${esc(s)}</span>`).join('')}</div></div>`:''}
-      <div class="sec" id="rSec"><h3>⭐ Reyting</h3><div id="rBody">Yuklanmoqda...</div></div>
+      <div class="sec" id="rSec"><div class="shead"><h3>⭐ Reyting</h3><span class="see" id="rSeeAll" style="display:none">Barchasi →</span></div><div id="rBody">Yuklanmoqda...</div></div>
       ${relatedShelf(b)}
     </div>
     <div class="actions">
@@ -1462,7 +1475,6 @@ function openDetail(id){
   $('#dRead').onclick=()=>openPdfReader(b.i,b.t);
   const dListen=$('#dListen');
   if(dListen)dListen.onclick=()=>openAudioPlayer(b.i,b.t);
-  $('#dFav').onclick=()=>toggleFav(b.i);
   $('#sheetWant').onclick=()=>toggleWantToRead(b.i);
   const dBackGlobe=$('#dBackGlobe');
   if(dBackGlobe)dBackGlobe.onclick=()=>closeSheet();
@@ -1479,6 +1491,8 @@ function openDetail(id){
     tg?.openTelegramLink?tg.openTelegramLink(s):navigator.share?.({title:b.t,url});
   };
   $('#miMarkListened').style.display=b.ha?'block':'none';
+  $('#miFav').textContent=fav?"❤️ Sevimlilardan olib tashlash":"🤍 Sevimlilarga qo'shish";
+  $('#miFav').onclick=()=>{$('#sheetMenuPanel').style.display='none';toggleFav(b.i);};
   $('#miShelf').onclick=()=>{$('#sheetMenuPanel').style.display='none';if(!canAct()){toast('Botni Telegram ichida oching');return;}openShelvesSheet(b.i);};
   $('#miMarkRead').onclick=()=>{
     $('#sheetMenuPanel').style.display='none';
@@ -1912,7 +1926,12 @@ $('#btnSearchIcon').onclick=()=>{haptic();state.view='search';setTabs();run();wi
 $('#sheetClose').onclick=()=>closeSheet();
 
 // ---- ratings (Play-Store-style 1-5 stars + optional review; flat, not repliable; other
-// readers vote a review "helpful" yes/no) ----
+// readers vote a review "helpful" yes/no). The book page itself shows a compact summary + a
+// horizontal preview shelf; the full list (with helpful-vote buttons and pagination) and the
+// write/edit form each get their own dedicated full-screen page — a rating deserves an
+// uninterrupted moment rather than being squeezed between the description and a related shelf.
+// Review author names stay "Reader #N" (anonymized) here — that's an existing, deliberate
+// identity choice this redesign doesn't touch.
 let myRatingStars=0;
 function starsHtml(n,cls){cls=cls||'ratestars';let s='';for(let i=1;i<=5;i++)s+=i<=Math.round(n)?'★':'☆';return `<span class="${cls}">${s}</span>`;}
 function ratingRowHtml(r){
@@ -1927,66 +1946,116 @@ function ratingRowHtml(r){
     </div>
   </div>`;
 }
-function wireRatingVotes(scope,bookId){
+function reviewCardHtml(r){
+  return `<div class="rcard">
+    <div class="rcStars">${starsHtml(r.stars)}</div>
+    ${r.review_text?`<div class="rcText">${esc(r.review_text)}</div>`:''}
+    <div class="rcMeta">${esc(r.alias)}</div>
+  </div>`;
+}
+function wireRatingVotes(scope,bookId,onVoted){
   scope.querySelectorAll('.rhelp').forEach(el=>{
     if(el.dataset.off)return;
     el.onclick=()=>{
       api('/api/ratings/'+encodeURIComponent(el.dataset.id)+'/vote',{method:'POST',body:JSON.stringify({helpful:el.dataset.v==='1'})})
-        .then(()=>loadRatingList(bookId)).catch(()=>{});
+        .then(()=>onVoted()).catch(()=>{});
     };
   });
 }
-function loadRatingList(bookId){
-  const list=$('#rList');if(!list)return;
-  api('/api/books/'+encodeURIComponent(bookId)+'/ratings?limit=20').then(r=>{
-    list.innerHTML=r.ratings.length?r.ratings.map(ratingRowHtml).join(''):'<p class="hint">Hali baholar yo\'q. Birinchi bo\'ling!</p>';
-    wireRatingVotes(list,bookId);
-  }).catch(()=>{list.innerHTML='<p class="hint">Yuklanmadi.</p>';});
+function loadReviewPreview(bookId){
+  const wrap=$('#rPreview');if(!wrap)return;
+  api('/api/books/'+encodeURIComponent(bookId)+'/ratings?limit=8').then(r=>{
+    const reviews=(r.ratings||[]).filter(x=>x.review_text);
+    const seeAll=$('#rSeeAll');
+    if(!reviews.length){wrap.innerHTML='';if(seeAll)seeAll.style.display='none';return;}
+    wrap.innerHTML=`<div class="rshelf">${reviews.map(reviewCardHtml).join('')}</div>`;
+    if(seeAll){seeAll.style.display='inline';seeAll.onclick=()=>openReviewsSheet(bookId);}
+  }).catch(()=>{wrap.innerHTML='';});
 }
 function loadRating(bookId){
   const body=$('#rBody');if(!body)return;
   api('/api/books/'+encodeURIComponent(bookId)+'/rating').then(r=>{
     const pct=n=>r.count?Math.round((r.distribution[n]||0)/r.count*100):0;
     const dist=[5,4,3,2,1].map(n=>`<div class="drow"><span>${n}</span><div class="dbar"><i style="width:${pct(n)}%"></i></div></div>`).join('');
-    myRatingStars=r.my_rating?r.my_rating.stars:0;
-    const myText=(r.my_rating&&r.my_rating.review_text)||'';
-    const myPicker=`<div class="starpick" id="rPick">${[1,2,3,4,5].map(n=>`<span data-n="${n}" class="${n<=myRatingStars?'on':''}">★</span>`).join('')}</div>`;
     body.innerHTML=`
       <div class="ratehead">
         <div><div class="ratebig">${r.count?r.average:'–'}<span class="of5">/5</span></div>${starsHtml(r.average)}<div class="ratecount">${r.count} ta baho</div></div>
         <div class="ratedist">${dist}</div>
       </div>
-      ${canAct()?`<div class="sec"><h3>Sizning bahoyingiz</h3>${myPicker}
-        <form id="rForm">
-          <textarea id="rText" maxlength="2000" placeholder="Fikringiz (ixtiyoriy)...">${esc(myText)}</textarea>
-          <button type="submit">${r.my_rating?'Yangilash':'Yuborish'}</button>
-          ${r.my_rating?'<button type="button" class="rdel" id="rDel">O\'chirish</button>':''}
-        </form>
-      </div>`:'<p class="hint">Baho berish uchun botda oching.</p>'}
-      <div id="rList">Yuklanmoqda...</div>`;
-    if(canAct()){
-      $('#rPick').querySelectorAll('span').forEach(el=>el.onclick=()=>{
-        myRatingStars=parseInt(el.dataset.n,10);
-        $('#rPick').querySelectorAll('span').forEach(s=>s.classList.toggle('on',parseInt(s.dataset.n,10)<=myRatingStars));
-      });
-      $('#rForm').addEventListener('submit',e=>{
-        e.preventDefault();
-        if(!myRatingStars){toast('Yulduz tanlang');return;}
-        const text=$('#rText').value.trim();
-        api('/api/books/'+encodeURIComponent(bookId)+'/rating',{method:'POST',body:JSON.stringify({stars:myRatingStars,review_text:text||null})}).then(()=>{
-          toast('Baho saqlandi');loadRating(bookId);
-        }).catch(()=>toast('Xatolik yuz berdi'));
-      });
-      const delBtn=$('#rDel');
-      if(delBtn)delBtn.onclick=()=>{
-        api('/api/books/'+encodeURIComponent(bookId)+'/rating/delete',{method:'POST'}).then(()=>{
-          toast('Baho o\'chirildi');loadRating(bookId);
-        }).catch(()=>{});
-      };
-    }
-    loadRatingList(bookId);
+      ${canAct()?`<button class="btn primary" id="rWriteBtn" style="width:100%; margin:12px 0 4px">${r.my_rating?"✍️ Bahoni tahrirlash":"✍️ Baho qoldirish"}</button>`:'<p class="hint">Baho berish uchun botda oching.</p>'}
+      <div id="rPreview"></div>`;
+    const writeBtn=$('#rWriteBtn');
+    if(writeBtn)writeBtn.onclick=()=>openWriteReview(bookId);
+    loadReviewPreview(bookId);
   }).catch(()=>{body.innerHTML='<p class="hint">Yuklanmadi.</p>';});
 }
+
+// ---- dedicated "Barcha izohlar" page — the full paginated list + helpful-vote buttons ----
+let reviewsBookId=null,reviewsOffset=0;
+function openReviewsSheet(bookId){
+  haptic();
+  reviewsBookId=bookId;reviewsOffset=0;
+  $('#reviewsSheetc').innerHTML='<div id="reviewsList">Yuklanmoqda...</div><button class="more" id="reviewsMore" style="display:none">Yana yuklash</button>';
+  $('#reviewsMore').onclick=()=>loadReviewsPage(false);
+  $('#reviewsSheet').classList.add('open');
+  tg?.BackButton?.show();
+  loadReviewsPage(true);
+}
+function closeReviewsSheet(){$('#reviewsSheet').classList.remove('open');tg?.BackButton?.hide();}
+function loadReviewsPage(reset){
+  const list=$('#reviewsList');
+  if(reset)list.innerHTML='Yuklanmoqda...';
+  api(`/api/books/${encodeURIComponent(reviewsBookId)}/ratings?limit=20&offset=${reset?0:reviewsOffset}`).then(r=>{
+    const rows=r.ratings||[];
+    const html=rows.map(ratingRowHtml).join('');
+    if(reset){list.innerHTML=html||'<p class="hint">Hali baholar yo\'q. Birinchi bo\'ling!</p>';reviewsOffset=0;}
+    else list.insertAdjacentHTML('beforeend',html);
+    wireRatingVotes(list,reviewsBookId,()=>loadReviewsPage(true));
+    reviewsOffset+=rows.length;
+    $('#reviewsMore').style.display=rows.length>=20?'block':'none';
+  }).catch(()=>{list.innerHTML='<p class="hint">Yuklanmadi.</p>';});
+}
+$('#reviewsClose').onclick=closeReviewsSheet;
+$('#reviewsSheet').onclick=e=>{if(e.target.id==='reviewsSheet')closeReviewsSheet();};
+
+// ---- dedicated "Izoh qoldirish" page — the write/edit form, its own full screen instead of
+// being inline in the book page's own scroll ----
+function openWriteReview(bookId){
+  haptic();
+  $('#writeReviewSheetc').innerHTML='Yuklanmoqda...';
+  $('#writeReviewSheet').classList.add('open');
+  tg?.BackButton?.show();
+  api('/api/books/'+encodeURIComponent(bookId)+'/rating').then(r=>{
+    myRatingStars=r.my_rating?r.my_rating.stars:0;
+    const myText=(r.my_rating&&r.my_rating.review_text)||'';
+    $('#writeReviewSheetc').innerHTML=`
+      <p class="hint">Kitob haqida reyting qoldiring</p>
+      <div class="starpick" id="wrPick" style="font-size:34px">${[1,2,3,4,5].map(n=>`<span data-n="${n}" class="${n<=myRatingStars?'on':''}">★</span>`).join('')}</div>
+      <textarea id="wrText" maxlength="2000" placeholder="Izohingizni yozing...">${esc(myText)}</textarea>
+      <button class="btn primary" id="wrSubmit" style="width:100%; margin-top:14px">${r.my_rating?'Yangilash':'Yuborish'}</button>
+      ${r.my_rating?'<button class="rdel" id="wrDel" style="display:block; width:100%; margin-top:10px; text-align:center">O\'chirish</button>':''}`;
+    $('#wrPick').querySelectorAll('span').forEach(el=>el.onclick=()=>{
+      myRatingStars=parseInt(el.dataset.n,10);
+      $('#wrPick').querySelectorAll('span').forEach(s=>s.classList.toggle('on',parseInt(s.dataset.n,10)<=myRatingStars));
+    });
+    $('#wrSubmit').onclick=()=>{
+      if(!myRatingStars){toast('Yulduz tanlang');return;}
+      const text=$('#wrText').value.trim();
+      api('/api/books/'+encodeURIComponent(bookId)+'/rating',{method:'POST',body:JSON.stringify({stars:myRatingStars,review_text:text||null})}).then(()=>{
+        toast('Baho saqlandi');closeWriteReview();loadRating(bookId);
+      }).catch(()=>toast('Xatolik yuz berdi'));
+    };
+    const delBtn=$('#wrDel');
+    if(delBtn)delBtn.onclick=()=>{
+      api('/api/books/'+encodeURIComponent(bookId)+'/rating/delete',{method:'POST'}).then(()=>{
+        toast('Baho o\'chirildi');closeWriteReview();loadRating(bookId);
+      }).catch(()=>{});
+    };
+  }).catch(()=>{$('#writeReviewSheetc').innerHTML='<p class="hint">Yuklanmadi.</p>';});
+}
+function closeWriteReview(){$('#writeReviewSheet').classList.remove('open');tg?.BackButton?.hide();}
+$('#writeReviewClose').onclick=closeWriteReview;
+$('#writeReviewSheet').onclick=e=>{if(e.target.id==='writeReviewSheet')closeWriteReview();};
 
 // events
 // Two separate debounces on purpose: the 200ms one drives local filtering/rendering (needs to
@@ -2064,7 +2133,7 @@ document.querySelectorAll('.viewThemeBtn').forEach(el=>el.onclick=toggleThemeQui
 
 function skeletonShelf(){return `<div class="section"><div class="shead"><h2 class="skel" style="width:140px;height:16px;border-radius:6px"></h2></div><div class="shelf">${Array(4).fill('<div class="si"><div class="skel" style="height:170px;border-radius:14px"></div></div>').join('')}</div></div>`;}
 async function boot(){
-  if(tg){tg.ready();tg.expand();tg.disableVerticalSwipes?.();tg.BackButton?.onClick(()=>{if($('#pdfSheet').classList.contains('open'))closePdfReader();else if($('#shelvesSheet').classList.contains('open'))closeShelvesSheet();else if($('#listSheet').classList.contains('open'))closeListSheet();else if($('#sheet').classList.contains('open'))closeSheet();else if($('#globe').classList.contains('open'))closeGlobe();});applyThemeMode();tg.onEvent?.('themeChanged',()=>{if(themeMode==='system')applyThemeMode();});}
+  if(tg){tg.ready();tg.expand();tg.disableVerticalSwipes?.();tg.BackButton?.onClick(()=>{if($('#pdfSheet').classList.contains('open'))closePdfReader();else if($('#writeReviewSheet').classList.contains('open'))closeWriteReview();else if($('#reviewsSheet').classList.contains('open'))closeReviewsSheet();else if($('#shelvesSheet').classList.contains('open'))closeShelvesSheet();else if($('#listSheet').classList.contains('open'))closeListSheet();else if($('#sheet').classList.contains('open'))closeSheet();else if($('#globe').classList.contains('open'))closeGlobe();});applyThemeMode();tg.onEvent?.('themeChanged',()=>{if(themeMode==='system')applyThemeMode();});}
   if('serviceWorker' in navigator)window.addEventListener('load',()=>{
     navigator.serviceWorker.register('./sw.js').then(reg=>{
       // A long-lived, never-navigated Mini App session (Telegram keeps the WebView warm across
