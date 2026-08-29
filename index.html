@@ -145,8 +145,6 @@
   .toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
   .hint{color:var(--muted); font-size:13px; margin:6px 0}
   .cmeta{font-size:12px; color:var(--muted); font-weight:700}
-  /* Profile overlay (streaks/badges) */
-  #sheet2{z-index:55}
   /* Book globe */
   #globe{align-items:stretch; background:var(--bg)}
   #globeCanvas{width:100%; height:100%; touch-action:none; display:block}
@@ -220,15 +218,10 @@
   #liveTopbarTitle{font-size:18px; font-weight:800; color:var(--text)}
   #liveTopbar .gclose{position:static; box-shadow:none; flex-shrink:0}
   #liveSheetc{flex:1; overflow-y:auto; padding:20px 18px calc(20px + env(safe-area-inset-bottom)); max-width:760px; width:100%; margin:0 auto}
-  /* Davra feed — same "whole page, not a drawer" treatment as #liveSheet (own topbar/scroll
-     area), but a distinct class rather than reusing #liveTopbar's ids since both sheets can
-     exist in the DOM at once. */
-  #davraSheet{flex-direction:column}
-  .dtopbar{flex-shrink:0; display:flex; align-items:center; justify-content:space-between; gap:12px;
-    padding:calc(env(safe-area-inset-top) + 14px) 18px 14px; border-bottom:1px solid var(--line)}
-  .dtopbarTitle{font-size:18px; font-weight:800; color:var(--text)}
-  .dtopbar .gclose{position:static; box-shadow:none; flex-shrink:0}
-  #davraSheetc{flex:1; overflow-y:auto; padding:16px 14px calc(16px + env(safe-area-inset-bottom)); max-width:760px; width:100%; margin:0 auto}
+  /* Profile/Davra are primary tab destinations, not overlays — they render in-place as peers
+     of #home/#grid (see #profileView/#davraView in the markup), so they only need the same top
+     breathing room #home's shelves already get, not a dedicated topbar/scroll-area treatment. */
+  #profileView,#davraView{padding-top:6px}
   .fitem{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:10px}
   .fitem .fmeta{display:flex; align-items:center; gap:8px; margin-bottom:6px}
   .fitem .falias{font-size:12.5px; font-weight:700; color:var(--muted)}
@@ -334,10 +327,26 @@
   <div class="grid" id="grid"></div>
   <button class="more" id="more" style="display:none">Yana yuklash</button>
   <div class="empty" id="empty" style="display:none"><span class="em">🔍</span>Hech narsa topilmadi</div>
+
+  <!-- Primary tab destinations (reached only via the bottom nav / top tab bar) render in-place
+       here, as peers of #home/#grid — never as a closeable overlay. A close/X button belongs on
+       something opened FROM a screen (a comment reply, the book detail sheet below, the
+       Statistika dashboard) not on a screen you navigate to directly; switching away is done by
+       tapping another destination, same as #home/#grid already work. -->
+  <div id="profileView" style="display:none">
+    <h2 class="dtitle">👤 Profil</h2>
+    <div class="sec"><h3>Mavzu</h3><div class="row" id="themeChips" style="padding:2px 0; margin:0"></div></div>
+    <div id="pBody">Yuklanmoqda...</div>
+  </div>
+  <div id="davraView" style="display:none">
+    <h2 class="dtitle">💬 Davra</h2>
+    <div id="davraList"></div>
+    <div class="empty" id="davraEmpty" style="display:none"><span class="em">💬</span>Hali hech narsa yo'q</div>
+    <button class="more" id="davraMore" style="display:none">Yana yuklash</button>
+  </div>
 </div>
 
 <div class="sheet" id="sheet"><div class="sheetc" id="sheetc"></div><div class="gclose" id="sheetClose">✕</div></div>
-<div class="sheet" id="sheet2"><div class="sheetc" id="sheet2c"></div><div class="gclose" id="sheet2Close">✕</div></div>
 <div class="sheet" id="globe" style="z-index:45"><canvas id="globeCanvas"></canvas><div class="gclose" id="globeClose">✕</div><div class="gzoom"><button id="globeZoomIn" type="button">+</button><button id="globeZoomOut" type="button">−</button></div><div class="glegend" id="globeLegend"></div></div>
 <div class="sheet" id="pdfSheet" style="z-index:60; align-items:stretch; background:var(--bg)">
   <div class="gclose" id="pdfClose">✕</div>
@@ -381,14 +390,6 @@
       </div>
       <div id="liveFeed" style="margin-top:8px"></div>
     </div>
-  </div>
-</div>
-<div class="sheet" id="davraSheet" style="z-index:47; align-items:stretch; background:var(--bg)">
-  <div class="dtopbar"><div class="dtopbarTitle">💬 Davra</div><div class="gclose" id="davraClose">✕</div></div>
-  <div id="davraSheetc">
-    <div id="davraList"></div>
-    <div class="empty" id="davraEmpty" style="display:none"><span class="em">💬</span>Hali hech narsa yo'q</div>
-    <button class="more" id="davraMore" style="display:none">Yana yuklash</button>
   </div>
 </div>
 <div id="audioPlayer">
@@ -557,7 +558,7 @@ function fitemHtml(it){
   </div>`;
 }
 function wireDavraItems(scope){
-  scope.querySelectorAll('[data-book]').forEach(el=>el.onclick=()=>{closeDavraSheet();openDetail(el.dataset.book);});
+  scope.querySelectorAll('[data-book]').forEach(el=>el.onclick=()=>openDetail(el.dataset.book));
   scope.querySelectorAll('.flike').forEach(el=>{
     if(el.dataset.wired)return; el.dataset.wired='1';
     el.onclick=()=>{
@@ -592,18 +593,6 @@ function loadDavraFeed(reset){
     $('#davraMore').style.display=davraDone?'none':'block';
   }).catch(()=>{$('#davraEmpty').style.display=$('#davraList').children.length===0?'block':'none';}).finally(()=>{davraLoading=false;});
 }
-function openDavraSheet(){
-  haptic();
-  $('#davraSheet').classList.add('open');
-  tg?.BackButton?.show();
-  loadDavraFeed(true);
-}
-function closeDavraSheet(){
-  $('#davraSheet').classList.remove('open');
-  tg?.BackButton?.hide();
-}
-$('#davraClose').onclick=()=>closeDavraSheet();
-$('#davraSheet').onclick=e=>{if(e.target.id==='davraSheet')closeDavraSheet();};
 $('#davraMore').onclick=()=>loadDavraFeed(false);
 const COVERS=[['#c17a3d','#8c4a24'],['#a8452f','#6b2418'],['#4a6b4a','#2d4530'],['#c99a2e','#8a5c16'],['#5a4a6b','#382d45'],['#8a3a4a','#5c2530'],['#3a6b6b','#254545'],['#b06a2a','#6b3816'],['#6b5a3a','#453825']];
 function coverFor(id){let h=0;const s=String(id||'');for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;return COVERS[h%COVERS.length];}
@@ -861,8 +850,31 @@ $('#btnGlobe').onclick=()=>{haptic();window.openGlobe?.();};
 $('#globeClose').onclick=()=>window.closeGlobe?.();
 
 function isHome(){return state.view==='browse'&&!state.q&&!state.genre&&!state.audience&&!state.type&&!state.all;}
-function showHome(on){$('#home').style.display=on?'block':'none';$('#grid').style.display=on?'none':'grid';$('.bar').style.display=on?'none':'flex';if(on){$('#more').style.display='none';$('#empty').style.display='none';}}
-function run(){if(isHome()){renderHome();showHome(true);}else{compute();render();showHome(false);}}
+// Every primary destination — Barchasi/Saqlanganlar/Davom eting's #home or #grid, and now
+// Profil/Davra's own containers — is a peer area swapped in-place here. Only the browse-book
+// header chrome (search/map button/tabs/genre chips/sort bar) makes sense for the book-list
+// areas, so it hides for profile/davra the same way #home/#grid themselves do.
+function showArea(area){
+  const forBooks=area==='home'||area==='grid';
+  $('.searchbar').style.display=forBooks?'flex':'none';
+  $('.liveHeaderRow').style.display=forBooks?'block':'none';
+  $('#btnGlobe').style.display=forBooks?'flex':'none';
+  $('.tabs').style.display=forBooks?'flex':'none';
+  $('#genres').style.display=forBooks?'flex':'none';
+  $('#filters').style.display=forBooks?'flex':'none';
+  $('#home').style.display=area==='home'?'block':'none';
+  $('#grid').style.display=area==='grid'?'grid':'none';
+  $('.bar').style.display=area==='grid'?'flex':'none';
+  $('#profileView').style.display=area==='profile'?'block':'none';
+  $('#davraView').style.display=area==='davra'?'block':'none';
+  if(area!=='grid'){$('#more').style.display='none';$('#empty').style.display='none';}
+}
+function run(){
+  if(state.view==='profile'){showArea('profile');loadProfile();return;}
+  if(state.view==='davra'){showArea('davra');loadDavraFeed(true);return;}
+  if(isHome()){renderHome();showArea('home');}
+  else{compute();render();showArea('grid');}
+}
 
 function toggleFav(id){
   haptic('medium');
@@ -1191,9 +1203,8 @@ $('#apSpeed').onclick=()=>{
   $('#apSpeed').textContent=next+'x';
 };
 
-// ---- profile overlay (reading streak/badges) ----
-function openSheet2(html){$('#sheet2c').innerHTML=html;$('#sheet2').classList.add('open');tg?.BackButton?.show();}
-function closeSheet2(){$('#sheet2').classList.remove('open');tg?.BackButton?.hide();}
+// ---- profile (Sahifam) — a primary destination rendered into the static #profileView, not an
+// overlay; see run()/showArea() ----
 const _BADGE_META={
   streak_3:{emoji:'🔥',label:"Streak boshlandi"},
   streak_7:{emoji:'🔥',label:"Haftalik o'quvchi"},
@@ -1201,24 +1212,16 @@ const _BADGE_META={
   collector:{emoji:'⭐',label:"To'plovchi"},
   voice:{emoji:'💬',label:"Faol a'zo"},
 };
-function themeChipsHtml(){
+function renderThemeChips(){
   const opt=(m,l)=>`<span class="chip ${themeMode===m?'on':''}" data-m="${m}">${l}</span>`;
-  return `<div class="sec"><h3>Mavzu</h3><div class="row" id="themeChips" style="padding:2px 0; margin:0">${opt('day',"☀️ Kunduzgi")}${opt('night',"🌙 Tungi")}${opt('system',"⚙️ Tizim")}</div></div>`;
-}
-function wireThemeChips(){
+  $('#themeChips').innerHTML=opt('day',"☀️ Kunduzgi")+opt('night',"🌙 Tungi")+opt('system',"⚙️ Tizim");
   $('#themeChips').querySelectorAll('.chip').forEach(el=>el.onclick=()=>{
     haptic();setThemeMode(el.dataset.m);
     $('#themeChips').querySelectorAll('.chip').forEach(c=>c.classList.toggle('on',c.dataset.m===themeMode));
   });
 }
-function profileShellHtml(){
-  return `<div class="dbody" style="padding-top:20px">
-    <h2 class="dtitle">👤 Profil</h2>
-    ${themeChipsHtml()}
-    <div id="pBody">Yuklanmoqda...</div>
-  </div>`;
-}
 function loadProfile(){
+  renderThemeChips();
   const body=$('#pBody');if(!body)return;
   if(!canAct()){body.innerHTML='<p class="hint">Profilingizni ko\'rish uchun botda oching.</p>';return;}
   api('/api/profile/me').then(r=>{
@@ -1243,10 +1246,9 @@ function loadProfile(){
       <div class="sec"><h3>Nishonlar</h3><div class="pills">${badges}</div></div>`;
   }).catch(()=>{body.innerHTML='<p class="hint">Ma\'lumot yuklanmadi.</p>';});
 }
-$('#btnProfile').onclick=()=>{haptic();openSheet2(profileShellHtml());wireThemeChips();loadProfile();};
-$('#sheet2').onclick=e=>{if(e.target.id==='sheet2')closeSheet2();};
+function goToView(v){state.view=v;state.all=false;setTabs();run();window.scrollTo(0,0);}
+$('#btnProfile').onclick=()=>{haptic();goToView('profile');};
 $('#sheetClose').onclick=()=>closeSheet();
-$('#sheet2Close').onclick=()=>closeSheet2();
 
 // ---- ratings (Play-Store-style 1-5 stars + optional review; flat, not repliable; other
 // readers vote a review "helpful" yes/no) ----
@@ -1338,18 +1340,21 @@ function setTabs(){
   $('#tabContinue').classList.toggle('on',state.view==='continue');
   $('#navAsosiy').classList.toggle('on',state.view==='browse'||state.view==='favorites');
   $('#navMutolaa').classList.toggle('on',state.view==='continue');
+  $('#navDavra').classList.toggle('on',state.view==='davra');
+  $('#navSahifam').classList.toggle('on',state.view==='profile');
 }
 $('#tabBrowse').onclick=()=>{state.view='browse';state.q='';$('#q').value='';$('#clr').style.display='none';state.genre='';state.audience='';state.type='';state.all=false;renderChips();setTabs();run();window.scrollTo(0,0);};
 $('#tabFav').onclick=()=>{state.view='favorites';state.all=false;setTabs();run();};
 $('#tabContinue').onclick=()=>{state.view='continue';state.all=false;state.sort='relevance';$('#sort').value='relevance';setTabs();run();window.scrollTo(0,0);};
-// ---- bottom nav: primary app-level navigation, layered on top of the existing top-tab-bar
-// rather than replacing it (Asosiy/Mutolaaxonam just trigger the same handlers as their
-// top-tab equivalents — kept as one source of truth instead of duplicating the state changes).
-// Davra isn't built yet (a later stage), so it's a honest "coming soon" toast, not a dead link.
+// ---- bottom nav: primary app-level navigation. Every destination — including Profil/Davra —
+// is a peer view swapped in-place by run()/showArea(), never an overlay: switching away means
+// tapping another destination, not finding a close button (that's reserved for things opened
+// FROM a screen, like the book detail sheet). Asosiy/Mutolaaxonam proxy the existing top-tab
+// handlers above (one source of truth); Davra/Sahifam go through the same goToView() helper.
 $('#navAsosiy').onclick=()=>{haptic();$('#tabBrowse').click();};
 $('#navMutolaa').onclick=()=>{haptic();$('#tabContinue').click();};
-$('#navDavra').onclick=()=>openDavraSheet();
-$('#navSahifam').onclick=()=>{haptic();$('#btnProfile').click();};
+$('#navDavra').onclick=()=>{haptic();goToView('davra');};
+$('#navSahifam').onclick=()=>{haptic();goToView('profile');};
 window.addEventListener('scroll',()=>{if(isHome())return;if(window.innerHeight+window.scrollY>=document.body.offsetHeight-500&&state.result.length>state.shown){state.shown+=PAGE;render();}});
 
 // ---- theme: day / night / system (manual choice always wins; "system" follows Telegram's
@@ -1385,7 +1390,7 @@ $('#btnTheme').onclick=()=>{
 
 function skeletonShelf(){return `<div class="section"><div class="shead"><h2 class="skel" style="width:140px;height:16px;border-radius:6px"></h2></div><div class="shelf">${Array(4).fill('<div class="si"><div class="skel" style="height:170px;border-radius:14px"></div></div>').join('')}</div></div>`;}
 async function boot(){
-  if(tg){tg.ready();tg.expand();tg.disableVerticalSwipes?.();tg.BackButton?.onClick(()=>{if($('#pdfSheet').classList.contains('open'))closePdfReader();else if($('#sheet2').classList.contains('open'))closeSheet2();else if($('#sheet').classList.contains('open'))closeSheet();else if($('#davraSheet').classList.contains('open'))closeDavraSheet();else if($('#globe').classList.contains('open'))closeGlobe();});applyThemeMode();tg.onEvent?.('themeChanged',()=>{if(themeMode==='system')applyThemeMode();});}
+  if(tg){tg.ready();tg.expand();tg.disableVerticalSwipes?.();tg.BackButton?.onClick(()=>{if($('#pdfSheet').classList.contains('open'))closePdfReader();else if($('#sheet').classList.contains('open'))closeSheet();else if($('#globe').classList.contains('open'))closeGlobe();});applyThemeMode();tg.onEvent?.('themeChanged',()=>{if(themeMode==='system')applyThemeMode();});}
   if('serviceWorker' in navigator)window.addEventListener('load',()=>{
     navigator.serviceWorker.register('./sw.js').then(reg=>{
       // A long-lived, never-navigated Mini App session (Telegram keeps the WebView warm across
