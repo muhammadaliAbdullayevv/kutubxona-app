@@ -184,7 +184,12 @@
   .viewHead .dtitle{margin-bottom:0}
   .viewThemeBtn{flex-shrink:0; width:34px; height:34px; border-radius:50%; background:var(--chip); border:1px solid var(--line); color:var(--text); display:flex; align-items:center; justify-content:center; font-size:15px; cursor:pointer}
   .dauthor{color:var(--muted); font-size:14px; margin-bottom:14px}
-  .pills{display:flex; flex-wrap:wrap; gap:7px; margin-bottom:16px}
+  /* Swipeable, not wrapping — a book with a lot of tag pills (genre/audience/year/lang/format/
+     size/downloads) was stacking into 2-3 lines; a single scrollable line reads cleaner and
+     matches the row pattern already used everywhere else (genre chips, topic chips, etc). */
+  .pills{display:flex; flex-wrap:nowrap; gap:7px; margin:0 -18px 16px; padding:0 18px 2px; overflow-x:auto; scrollbar-width:none}
+  .pills::-webkit-scrollbar{display:none}
+  .pills .pill{flex:0 0 auto}
   .pill{background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:5px 11px; font-size:12px; color:var(--muted); font-weight:600}
   .pill b{color:var(--text); font-weight:700}
   .sec{margin:16px 0}
@@ -224,20 +229,29 @@
   .menuItem:active{background:var(--chip)}
   /* Favorite heart + want-to-read share one row — a fixed-width square next to a button that
      takes whatever width is left, not two separate stacked rows. */
-  .quickActions{display:flex; gap:8px; align-items:stretch; margin:10px 0 0}
-  .qaBtn{display:flex; align-items:center; justify-content:center; gap:5px; flex:0 0 auto; height:38px; padding:0 14px; border-radius:12px; background:var(--chip); border:1px solid var(--line); font-size:13.5px; font-weight:700; cursor:pointer; color:var(--text); white-space:nowrap}
+  .quickActions{display:flex; gap:8px; align-items:stretch; margin:10px 0 16px}
+  .qaBtn{display:flex; align-items:center; justify-content:center; gap:5px; flex:0 0 auto; height:38px; padding:0 14px; border-radius:12px; background:var(--chip); border:1.5px solid var(--accent); font-size:13.5px; font-weight:700; cursor:pointer; color:var(--text); white-space:nowrap}
   .qaBtn.on{background:linear-gradient(135deg,var(--accent),var(--accent2)); border-color:transparent; color:#fff}
   /* Want-to-read fills the rest of the row, in the normal content flow (not fixed chrome
      floating over the cover art — it was overlapping the banner before) — fills with color once
      tapped, label text stays the same in both states, only the fill communicates "added". */
-  .sheetWantBtn{flex:1; display:flex; align-items:center; justify-content:center; gap:6px; height:38px; border-radius:12px; background:var(--chip); border:1px solid var(--line); color:var(--text); font-size:13.5px; font-weight:700; cursor:pointer; box-sizing:border-box; min-width:0}
+  .sheetWantBtn{flex:1; display:flex; align-items:center; justify-content:center; gap:6px; height:38px; border-radius:12px; background:var(--chip); border:1.5px solid var(--accent); color:var(--text); font-size:13.5px; font-weight:700; cursor:pointer; box-sizing:border-box; min-width:0}
   .sheetWantBtn.on{background:linear-gradient(135deg,var(--accent),var(--accent2)); border-color:transparent; color:#fff}
   /* A quick rating readout right under the title/author — the first thing a reader actually
      looks for on a book page — instead of making them scroll to the full "Reyting" section
      further down. Uses the same b.rt/b.rc the catalog cards already carry, so it's instant
      (no async round trip) rather than waiting on the /rating endpoint. */
-  .dRatingLine{display:flex; align-items:center; gap:5px; font-size:14px; font-weight:700; color:var(--text); margin-top:4px}
-  .dRatingCount{font-weight:600; color:var(--muted); font-size:12.5px}
+  /* Label-above-value stat row (Reyting / O'qimoqda / Yuklab olingan), each column divided by a
+     hairline — the reference's Reyting/Davomiyligi/Ovoz row, adapted to stats we actually have
+     rather than duration/narrator data this catalog doesn't carry. Replaces both the old inline
+     "★★★★★ 4.6 (40)" line here AND the 5/4/3/2/1 distribution bar chart further down in the
+     Reyting section — that breakdown graph is gone in favor of this simpler at-a-glance row. */
+  .dStatRow{display:flex; margin:10px 0 4px}
+  .dStat{flex:1; text-align:center; padding:0 6px; min-width:0}
+  .dStat+.dStat{border-left:1px solid var(--line)}
+  .dStatL{font-size:11px; color:var(--muted); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .dStatV{font-size:14.5px; font-weight:800; color:var(--text); margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .subMore{color:var(--muted)}
   .gzoom{position:fixed; right:14px; top:50%; transform:translateY(-50%); display:flex; flex-direction:column; gap:10px; z-index:1}
   .gzoom button{width:42px; height:42px; border-radius:50%; background:var(--chip); border:1px solid var(--line); color:var(--text); font-size:21px; font-weight:700; font-family:inherit; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:var(--shadow); padding:0; line-height:1; transition:transform .15s}
   .gzoom button:active{transform:scale(.9)}
@@ -387,15 +401,7 @@
   .statgrid .st .sl{font-size:11.5px; color:var(--muted); font-weight:600}
   .pill.locked{opacity:.35}
   /* Ratings (Play-Store-style 1-5 stars + review) */
-  .ratehead{display:flex; align-items:center; gap:16px; margin-bottom:12px}
-  .ratebig{font-size:36px; font-weight:800; line-height:1}
-  .ratebig .of5{font-size:15px; color:var(--muted); font-weight:600}
   .ratestars{color:#ffb100; font-size:15px; letter-spacing:1px}
-  .ratecount{font-size:12px; color:var(--muted)}
-  .ratedist{flex:1; display:flex; flex-direction:column; gap:3px}
-  .ratedist .drow{display:flex; align-items:center; gap:6px; font-size:11px; color:var(--muted)}
-  .ratedist .dbar{flex:1; height:6px; border-radius:3px; background:var(--chip); overflow:hidden}
-  .ratedist .dbar i{display:block; height:100%; background:#ffb100; border-radius:3px}
   .starpick{font-size:26px; letter-spacing:4px; cursor:pointer; user-select:none}
   .starpick span{opacity:.3}
   .starpick span.on{opacity:1}
@@ -1434,6 +1440,13 @@ function relatedShelf(b){
   if(!groups.length)return '';
   return groups.map(([label,arr])=>`<div class="sec"><h3>${esc(label)}</h3><div class="shelf" style="margin:0 -18px; padding:2px 18px 4px">${arr.map((b,i)=>siHtml(b,i)).join('')}</div></div>`).join('');
 }
+// Topic tags: show the first 4, a "+N" chip for the rest — tapping it expands to the full list
+// in place instead of the whole page committing to however many tags a given book happens to have.
+function subsHtml(tags){
+  const shown=tags.slice(0,4);
+  const rest=tags.length-shown.length;
+  return shown.map(s=>`<span class="sub" data-sub="${esc(s)}">${esc(s)}</span>`).join('')+(rest>0?`<span class="sub subMore" id="subMore">+${rest}</span>`:'');
+}
 function openDetail(id){
   const b=byId[id];if(!b)return;haptic();
   const sh=$('#sheet'),c=$('#sheetc');sh.classList.add('open');tg?.BackButton?.show();
@@ -1449,15 +1462,19 @@ function openDetail(id){
     <div class="dbody">
       <h2 class="dtitle">${esc(b.t)}</h2>
       <div class="dauthor">${esc(b.a||'Noma\'lum muallif')}</div>
-      ${b.rc?`<div class="dRatingLine">${starsHtml(b.rt)}<b>${b.rt}</b><span class="dRatingCount">(${fmtNum(b.rc)} ta baho)</span></div>`:''}
+      <div class="dStatRow">
+        <div class="dStat"><div class="dStatL">Reyting</div><div class="dStatV">${b.rc?`⭐ ${b.rt}`:'–'}</div></div>
+        <div class="dStat"><div class="dStatL">O'qimoqda</div><div class="dStatV" id="dStatReading">–</div></div>
+        <div class="dStat"><div class="dStatL">Yuklab olingan</div><div class="dStatV">${b.dl?fmtNum(b.dl):'–'}</div></div>
+      </div>
       <div class="quickActions">
         <span class="qaBtn ${fav?'on':''}" id="dFav">${fav?'❤️':'🤍'} Sevimli</span>
         <div class="sheetWantBtn" id="sheetWant"><span id="sheetWantIcon">+</span> Albatta, o'qiyman</div>
       </div>
-      <div class="pills">${pill('📂',b.g)}${pill('🎯',audLabel)}${pill('🗓',b.y)}${pill('🌐',b.l)}<span class="pill">${b.ha?'🎧':'📄'} <b>${esc(typeTxt)}</b></span>${b.mb?`<span class="pill">💾 <b>${b.mb} MB</b></span>`:''}${b.dl?`<span class="pill">⬇️ <b>${fmtNum(b.dl)}</b></span>`:''}<span class="pill" id="pillReading" style="display:none">👀 <b><span id="pillReadingN">0</span> o'qimoqda</b></span><span class="pill" id="pillWant" style="display:none">🔖 <b><span id="pillWantN">0</span> o'qimoqchi</b></span></div>
+      <div class="pills">${pill('📂',b.g)}${pill('🎯',audLabel)}${pill('🗓',b.y)}${pill('🌐',b.l)}<span class="pill">${b.ha?'🎧':'📄'} <b>${esc(typeTxt)}</b></span>${b.mb?`<span class="pill">💾 <b>${b.mb} MB</b></span>`:''}</div>
       ${b.sm?`<div class="sec"><h3>Qisqacha</h3><p>${esc(b.sm)}</p></div>`:''}
       ${b.d?`<div class="sec"><h3>Tavsif</h3><p>${esc(b.d)}</p></div>`:''}
-      ${(b.s&&b.s.length)?`<div class="sec"><h3>Mavzular</h3><div class="subs">${b.s.map(s=>`<span class="sub" data-sub="${esc(s)}">${esc(s)}</span>`).join('')}</div></div>`:''}
+      ${(b.s&&b.s.length)?`<div class="sec"><h3>Mavzular</h3><div class="subs" id="subsWrap">${subsHtml(b.s)}</div></div>`:''}
       <div class="sec" id="rSec"><div class="shead"><h3>⭐ Reyting</h3><span class="see" id="rSeeAll" style="display:none">Barchasi →</span></div><div id="rBody">Yuklanmoqda...</div></div>
       ${relatedShelf(b)}
     </div>
@@ -1490,7 +1507,12 @@ function openDetail(id){
   $('#sheetWant').onclick=()=>toggleWantToRead(b.i);
   const dBackGlobe=$('#dBackGlobe');
   if(dBackGlobe)dBackGlobe.onclick=()=>closeSheet();
-  c.querySelectorAll('[data-sub]').forEach(el=>el.onclick=()=>{closeSheet();$('#q').value=el.dataset.sub;state.q=el.dataset.sub;$('#clr').style.display='block';state.all=false;if(state.view!=='search'){state.view='search';setTabs();}run();window.scrollTo(0,0);});
+  function wireSubTags(){
+    c.querySelectorAll('[data-sub]').forEach(el=>el.onclick=()=>{closeSheet();$('#q').value=el.dataset.sub;state.q=el.dataset.sub;$('#clr').style.display='block';state.all=false;if(state.view!=='search'){state.view='search';setTabs();}run();window.scrollTo(0,0);});
+    const subMore=$('#subMore');
+    if(subMore)subMore.onclick=()=>{$('#subsWrap').innerHTML=b.s.map(s=>`<span class="sub" data-sub="${esc(s)}">${esc(s)}</span>`).join('');wireSubTags();};
+  }
+  wireSubTags();
   c.querySelectorAll('.si').forEach(el=>el.onclick=()=>openDetail(el.dataset.id));
   _wireFmtButtons(c);
   // The top-row want-to-read toggle + the 3-dot overflow menu (share / Javon / mark as read /
@@ -1531,11 +1553,12 @@ document.addEventListener('click',e=>{if(!e.target.closest('#sheetMenu'))$('#she
 // ---- reading stats (currently-reading / want-to-read counts) + want-to-read toggle ----
 function loadBookExtras(id){
   api('/api/books/'+encodeURIComponent(id)+'/stats').then(r=>{
-    if(!$('#sheet').classList.contains('open')||!$('#pillReading'))return;
-    const rc=r.reading_count||0,wc=r.want_to_read_count||0;
-    const pr=$('#pillReading'),pw=$('#pillWant');
-    if(pr){$('#pillReadingN').textContent=fmtNum(rc);pr.style.display=rc>0?'':'none';}
-    if(pw){$('#pillWantN').textContent=fmtNum(wc);pw.style.display=wc>0?'':'none';}
+    const el=$('#dStatReading');
+    if(!el||!$('#sheet').classList.contains('open'))return;
+    // Real count — users with unfinished progress on this book in the last 30 minutes (not a
+    // cumulative "ever opened" tally, and deliberately not blended with want-to-read/favorite
+    // counts, which mean something different — "wants to read" isn't "is reading").
+    el.textContent='👀 '+fmtNum(r.reading_count||0);
   }).catch(()=>{});
   if(!canAct())return;
   api('/api/books/'+encodeURIComponent(id)+'/progress').then(r=>{
@@ -1983,16 +2006,15 @@ function loadReviewPreview(bookId){
   }).catch(()=>{wrap.innerHTML='';});
 }
 function loadRating(bookId){
+  // The big number + stars already show at the top of the page now (in .dStatRow, from the
+  // catalog's own b.rt/b.rc — instant, no round trip) — this section just needs the exact live
+  // count and the write/see-all actions, not a second copy of the same headline number plus a
+  // 5/4/3/2/1 distribution graph most readers never look at.
   const body=$('#rBody');if(!body)return;
   api('/api/books/'+encodeURIComponent(bookId)+'/rating').then(r=>{
-    const pct=n=>r.count?Math.round((r.distribution[n]||0)/r.count*100):0;
-    const dist=[5,4,3,2,1].map(n=>`<div class="drow"><span>${n}</span><div class="dbar"><i style="width:${pct(n)}%"></i></div></div>`).join('');
     body.innerHTML=`
-      <div class="ratehead">
-        <div><div class="ratebig">${r.count?r.average:'–'}<span class="of5">/5</span></div>${starsHtml(r.average)}<div class="ratecount">${r.count} ta baho</div></div>
-        <div class="ratedist">${dist}</div>
-      </div>
-      ${canAct()?`<button class="btn primary" id="rWriteBtn" style="width:100%; margin:12px 0 4px">${r.my_rating?"✍️ Bahoni tahrirlash":"✍️ Baho qoldirish"}</button>`:'<p class="hint">Baho berish uchun botda oching.</p>'}
+      <p class="hint" style="margin:0 0 12px">${r.count?`${starsHtml(r.average)} <b>${r.average}</b>/5 — ${fmtNum(r.count)} ta baho`:"Hali baho yo'q — birinchi bo'ling"}</p>
+      ${canAct()?`<button class="btn primary" id="rWriteBtn" style="width:100%; margin-bottom:4px">${r.my_rating?"✍️ Bahoni tahrirlash":"✍️ Baho qoldirish"}</button>`:'<p class="hint">Baho berish uchun botda oching.</p>'}
       <div id="rPreview"></div>`;
     const writeBtn=$('#rWriteBtn');
     if(writeBtn)writeBtn.onclick=()=>openWriteReview(bookId);
