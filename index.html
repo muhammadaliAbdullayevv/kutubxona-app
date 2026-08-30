@@ -390,6 +390,9 @@
   .flike{border:none; background:none; color:var(--muted); font-size:13px; font-weight:700; cursor:pointer; padding:4px 0; display:flex; align-items:center; gap:5px; font-family:inherit}
   .flike.on{color:var(--danger)}
   .freplyBtn,.freplyCount,.freshareBtn,.fviews{font-size:13px; font-weight:700; color:var(--muted); display:flex; align-items:center; gap:5px}
+  .fEditBtn,.fDelBtn{cursor:pointer; font-size:13px; opacity:.75}
+  .fEditBtn{margin-left:auto}
+  .fDelBtn{color:var(--danger)}
   .freplyBtn,.freshareBtn{cursor:pointer}
   .fitem:not(.fitemFocused){cursor:pointer}
   .fitem:not(.fitemFocused) .ftext{display:-webkit-box; -webkit-line-clamp:5; -webkit-box-orient:vertical; overflow:hidden}
@@ -735,7 +738,7 @@
   <div class="ssheetc" id="writeReviewSheetc"></div>
 </div>
 <div class="sheet" id="davraComposeSheet" style="z-index:53; align-items:stretch; background:var(--bg)">
-  <div class="stopbar"><div class="stopbarTitle">✍️ Yangi post</div><div class="gclose" id="davraComposeClose">✕</div></div>
+  <div class="stopbar"><div class="stopbarTitle" id="davraComposeTitle">✍️ Yangi post</div><div class="gclose" id="davraComposeClose">✕</div></div>
   <div class="ssheetc" id="davraComposeSheetc"></div>
 </div>
 <div class="sheet" id="davraThreadSheet" style="z-index:54; align-items:stretch; background:var(--bg)">
@@ -1046,6 +1049,7 @@ function davraPostHtml(it,focused){
       ${replyBadge}
       <span class="freshareBtn" data-reshare="${esc(it.id)}">🔁 ${it.reshare_count||0}</span>
       <span class="fviews">👁 ${fmtNum(it.view_count||0)}</span>
+      ${it.is_mine?`<span class="fEditBtn" data-edit="${esc(it.id)}" data-text="${esc(it.text||'')}">✏️</span><span class="fDelBtn" data-del="${esc(it.id)}">🗑</span>`:''}
     </div>
   </div>`;
 }
@@ -1075,6 +1079,24 @@ function wireDavraPostItems(scope){
     if(el.dataset.wiredCard)return; el.dataset.wiredCard='1';
     el.onclick=()=>openDavraThread(el.dataset.id);
   });
+  scope.querySelectorAll('[data-edit]').forEach(el=>{
+    if(el.dataset.wired)return; el.dataset.wired='1';
+    el.onclick=e=>{e.stopPropagation();openDavraEditCompose(el.dataset.edit,el.dataset.text||'');};
+  });
+  scope.querySelectorAll('[data-del]').forEach(el=>{
+    if(el.dataset.wired)return; el.dataset.wired='1';
+    el.onclick=e=>{
+      e.stopPropagation();
+      haptic();
+      const id=el.dataset.del;
+      api('/api/davra/posts/'+encodeURIComponent(id)+'/delete',{method:'POST'}).then(()=>{
+        toast('O\'chirildi');
+        if(id===davraFocusedPostId){closeDavraThread();loadDavraFeed(true);}
+        else if($('#davraThreadSheet').classList.contains('open')){loadDavraThread(davraFocusedPostId);}
+        else{loadDavraFeed(true);}
+      }).catch(()=>toast('Xatolik yuz berdi'));
+    };
+  });
 }
 function loadDavraFeed(reset){
   if(davraLoading||(davraDone&&!reset))return;
@@ -1103,6 +1125,7 @@ function openDavraCompose(){
   if(!canAct()){toast('Post yozish uchun botni Telegram ichida oching');return;}
   haptic();
   davraComposeBook=null;
+  $('#davraComposeTitle').textContent="✍️ Yangi post";
   $('#davraComposeSheetc').innerHTML=`
     <p class="hint">Qaysi kitob haqida yozmoqchisiz?</p>
     <div class="dcPicked" id="dcPicked" style="display:none"></div>
@@ -1166,6 +1189,7 @@ let davraQuoteTarget=null;
 function openDavraQuoteCompose(postId){
   haptic();
   davraQuoteTarget=postId;
+  $('#davraComposeTitle').textContent="🔁 Fikr qo'shib ulashish";
   $('#davraComposeSheetc').innerHTML='Yuklanmoqda...';
   $('#davraComposeSheet').classList.add('open');
   tg?.BackButton?.show();
@@ -1185,6 +1209,34 @@ function submitDavraQuote(){
   btn.disabled=true;
   api('/api/davra/posts/'+encodeURIComponent(davraQuoteTarget)+'/reshare',{method:'POST',body:JSON.stringify({text:text||null})}).then(()=>{
     toast('Joylandi');closeDavraCompose();loadDavraFeed(true);
+  }).catch(()=>{toast('Xatolik yuz berdi');btn.disabled=false;});
+}
+
+// ---- Edit: same compose sheet again, prefilled with the post/reply's current text (no book
+// picker — only the text can change, see db.edit_davra_post). ----
+let davraEditTarget=null;
+function openDavraEditCompose(postId,currentText){
+  haptic();
+  davraEditTarget=postId;
+  $('#davraComposeTitle').textContent="✏️ Tahrirlash";
+  $('#davraComposeSheetc').innerHTML=`
+    <textarea id="dcText" maxlength="1500" placeholder="Matningizni tahrirlang...">${esc(currentText)}</textarea>
+    <div class="cnt" id="dcCnt">${currentText.length}/1500</div>
+    <button class="btn primary" id="dcSubmit" style="width:100%; margin-top:14px">Saqlash</button>`;
+  $('#davraComposeSheet').classList.add('open');
+  tg?.BackButton?.show();
+  $('#dcText').oninput=()=>{$('#dcCnt').textContent=`${$('#dcText').value.length}/1500`;};
+  $('#dcSubmit').onclick=submitDavraEdit;
+}
+function submitDavraEdit(){
+  const text=$('#dcText').value.trim();
+  if(!text){toast('Matn kiriting');return;}
+  const btn=$('#dcSubmit');
+  btn.disabled=true;
+  api('/api/davra/posts/'+encodeURIComponent(davraEditTarget)+'/edit',{method:'POST',body:JSON.stringify({text})}).then(()=>{
+    toast('Saqlandi');closeDavraCompose();
+    if($('#davraThreadSheet').classList.contains('open'))loadDavraThread(davraFocusedPostId);
+    else loadDavraFeed(true);
   }).catch(()=>{toast('Xatolik yuz berdi');btn.disabled=false;});
 }
 
@@ -1229,6 +1281,7 @@ function davraReplyItemHtml(it){
       <button class="flike${it.liked?' on':''}" data-id="${esc(it.id)}">${it.liked?'❤️':'🤍'} <span class="fcount">${it.like_count||0}</span></button>
       <span class="dtReplyAction" data-target="${esc(it.id)}" data-name="${esc(it.alias)}">Javob qaytarish</span>
       <span class="freshareBtn" data-reshare="${esc(it.id)}">🔁 ${it.reshare_count||0}</span>
+      ${it.is_mine?`<span class="fEditBtn" data-edit="${esc(it.id)}" data-text="${esc(it.text||'')}">✏️</span><span class="fDelBtn" data-del="${esc(it.id)}">🗑</span>`:''}
     </div>
     ${it.reply_count>0?`<span class="dtExpand" data-expand="${esc(it.id)}" data-count="${it.reply_count}">${it.reply_count} ta javobni ko'rish ↓</span>`:''}
     <div class="dtNested" id="dtNested-${esc(it.id)}"></div>
