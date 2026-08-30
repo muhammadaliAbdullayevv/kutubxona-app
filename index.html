@@ -389,7 +389,8 @@
   .fActions{display:flex; align-items:center; gap:16px; margin-top:10px; flex-wrap:wrap}
   .flike{border:none; background:none; color:var(--muted); font-size:13px; font-weight:700; cursor:pointer; padding:4px 0; display:flex; align-items:center; gap:5px; font-family:inherit}
   .flike.on{color:var(--danger)}
-  .freplyBtn,.freplyCount,.freshareBtn,.fviews{font-size:13px; font-weight:700; color:var(--muted); display:flex; align-items:center; gap:5px}
+  .freplyBtn,.freplyCount,.freshareBtn,.fviews,.freading{font-size:13px; font-weight:700; color:var(--muted); display:flex; align-items:center; gap:5px}
+  .freading{color:var(--accent)}
   .fEditBtn,.fDelBtn{cursor:pointer; font-size:13px; opacity:.75}
   .fEditBtn{margin-left:auto}
   .fDelBtn{color:var(--danger)}
@@ -1020,11 +1021,16 @@ function fmtAgo(iso){
   if(diff<2592000)return Math.round(diff/86400)+' kun oldin';
   return new Date(iso).toLocaleDateString('uz-UZ',{day:'numeric',month:'short'});
 }
-function davraBookCardHtml(bookId,readingCount){
+// inline=true shows the "🔴 N o'qimoqda" badge under the title, right on the card — used for the
+// embedded quoted book inside a reshare, which has no actions row of its own to put it in.
+// inline=false omits it — used on a post's own book card, since davraPostHtml instead places
+// that same count in .fActions, next to 👁 (views), rather than duplicating it on the card.
+function davraBookCardHtml(bookId,readingCount,inline){
   const b=byId[bookId];
   if(!b)return'';
+  if(inline===undefined)inline=true;
   const[c1,c2]=coverFor(b.i);
-  return `<div class="fbook" data-book="${esc(b.i)}"><div class="fbcover" style="background:linear-gradient(135deg,${c1},${c2})">${b.hc?`<img class="ci" src="covers/${encodeURIComponent(b.i)}.jpg" loading="lazy" onerror="this.remove()">`:''}<span class="ini">${esc(initials(b.t))}</span></div><div class="fbinfo"><div class="fbtitle">${esc(b.t)}</div>${readingCount>0?`<span class="fblive">🔴 ${readingCount} o'qimoqda</span>`:''}</div></div>`;
+  return `<div class="fbook" data-book="${esc(b.i)}"><div class="fbcover" style="background:linear-gradient(135deg,${c1},${c2})">${b.hc?`<img class="ci" src="covers/${encodeURIComponent(b.i)}.jpg" loading="lazy" onerror="this.remove()">`:''}<span class="ini">${esc(initials(b.t))}</span></div><div class="fbinfo"><div class="fbtitle">${esc(b.t)}</div>${inline&&readingCount>0?`<span class="fblive">🔴 ${readingCount} o'qimoqda</span>`:''}</div></div>`;
 }
 function davraReshareEmbedHtml(orig){
   return `<div class="fEmbed">
@@ -1043,11 +1049,12 @@ function davraPostHtml(it,focused){
     <div class="fmeta">${authorAvatarHtml(it.user_id,it.avatar_version,it.alias)}<span class="falias">${esc(it.alias)}</span><span class="cmeta">${fmtAgo(it.created_at)}</span></div>
     ${isReshare?'<div class="freshareTag">🔁 qayta ulashdi</div>':''}
     ${it.text?`<div class="ftext">${esc(it.text)}</div>${isLong?'<span class="fReadMore">Batafsil o\'qish</span>':''}`:''}
-    ${isReshare?davraReshareEmbedHtml(it.reshared_post):davraBookCardHtml(it.book_id,it.reading_count)}
+    ${isReshare?davraReshareEmbedHtml(it.reshared_post):davraBookCardHtml(it.book_id,it.reading_count,false)}
     <div class="fActions">
       <button class="flike${it.liked?' on':''}" data-id="${esc(it.id)}">${it.liked?'❤️':'🤍'} <span class="fcount">${it.like_count||0}</span></button>
       ${replyBadge}
       <span class="freshareBtn" data-reshare="${esc(it.id)}">🔁 ${it.reshare_count||0}</span>
+      ${it.reading_count>0?`<span class="freading">🔴 ${it.reading_count}</span>`:''}
       <span class="fviews">👁 ${fmtNum(it.view_count||0)}</span>
       ${it.is_mine?`<span class="fEditBtn" data-edit="${esc(it.id)}" data-text="${esc(it.text||'')}">✏️</span><span class="fDelBtn" data-del="${esc(it.id)}">🗑</span>`:''}
     </div>
@@ -3276,8 +3283,41 @@ $('#btnTheme').onclick=toggleThemeQuick;
 document.querySelectorAll('.viewThemeBtn').forEach(el=>el.onclick=toggleThemeQuick);
 
 function skeletonShelf(){return `<div class="section"><div class="shead"><h2 class="skel" style="width:140px;height:16px;border-radius:6px"></h2></div><div class="shelf">${Array(4).fill('<div class="si"><div class="skel" style="height:170px;border-radius:14px"></div></div>').join('')}</div></div>`;}
+// Every full-screen/bottom overlay in the app shares the .sheet class; this registry maps each
+// one's id to its own close function (which often does more than remove 'open' — clearing
+// timers, resetting focused-item state, etc). Used below so the Telegram BackButton closes
+// WHICHEVER sheet is open, including ones added after this was written — a hand-maintained
+// if/else chain here already caused two real bugs (the reshare menu and the live-stats panel
+// both got added without ever being wired into it): pressing the hardware back button did
+// nothing while either was open, leaving its full-screen overlay silently swallowing every tap
+// underneath it — including the bottom nav — which read as "the app is stuck".
+const SHEET_CLOSERS={
+  pdfSheet:closePdfReader, fieldEditSheet:closeFieldEdit, birthPickerSheet:closeBirthPicker,
+  avatarCropSheet:closeAvatarCrop, writeReviewSheet:closeWriteReview, davraThreadSheet:closeDavraThread,
+  davraComposeSheet:closeDavraCompose, davraReshareMenuSheet:closeDavraReshareMenu,
+  reviewsSheet:closeReviewsSheet, profileEditSheet:closeProfileEdit, shelvesSheet:closeShelvesSheet,
+  listSheet:closeListSheet, liveSheet:closeLiveSheet, sheet:closeSheet,
+  // closeGlobe lives in the separate type="module" script below (Three.js globe) and only
+  // becomes a real global once that deferred module finishes running — referencing it bare HERE
+  // (evaluated immediately, before the module has loaded) throws ReferenceError. Wrapping it in
+  // an arrow function defers the lookup to call time, by which point it's window.closeGlobe (a
+  // module's top-level assignment to window IS a real global, same as any other script's).
+  globe:()=>closeGlobe(),
+};
+function closeTopmostSheet(){
+  const openEls=[...document.querySelectorAll('.sheet.open')];
+  if(!openEls.length)return false;
+  // More than one sheet can be open at once (e.g. fieldEditSheet opened from within
+  // profileEditSheet) — close the visually topmost one (highest z-index), not just whichever
+  // happens to come first in DOM order.
+  openEls.sort((a,b)=>(parseInt(getComputedStyle(b).zIndex,10)||0)-(parseInt(getComputedStyle(a).zIndex,10)||0));
+  const top=openEls[0];
+  const closer=SHEET_CLOSERS[top.id];
+  if(closer)closer();else top.classList.remove('open');
+  return true;
+}
 async function boot(){
-  if(tg){tg.ready();tg.expand();tg.disableVerticalSwipes?.();tg.BackButton?.onClick(()=>{if($('#pdfSheet').classList.contains('open'))closePdfReader();else if($('#fieldEditSheet').classList.contains('open'))closeFieldEdit();else if($('#birthPickerSheet').classList.contains('open'))closeBirthPicker();else if($('#avatarCropSheet').classList.contains('open'))closeAvatarCrop();else if($('#writeReviewSheet').classList.contains('open'))closeWriteReview();else if($('#davraThreadSheet').classList.contains('open'))closeDavraThread();else if($('#davraComposeSheet').classList.contains('open'))closeDavraCompose();else if($('#reviewsSheet').classList.contains('open'))closeReviewsSheet();else if($('#profileEditSheet').classList.contains('open'))closeProfileEdit();else if($('#shelvesSheet').classList.contains('open'))closeShelvesSheet();else if($('#listSheet').classList.contains('open'))closeListSheet();else if($('#sheet').classList.contains('open'))closeSheet();else if($('#globe').classList.contains('open'))closeGlobe();});applyThemeMode();tg.onEvent?.('themeChanged',()=>{if(themeMode==='system')applyThemeMode();});}
+  if(tg){tg.ready();tg.expand();tg.disableVerticalSwipes?.();tg.BackButton?.onClick(()=>{closeTopmostSheet();});applyThemeMode();tg.onEvent?.('themeChanged',()=>{if(themeMode==='system')applyThemeMode();});}
   if('serviceWorker' in navigator)window.addEventListener('load',()=>{
     navigator.serviceWorker.register('./sw.js').then(reg=>{
       // A long-lived, never-navigated Mini App session (Telegram keeps the WebView warm across
