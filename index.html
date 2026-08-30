@@ -487,6 +487,13 @@
   .avatarEdit .avInitials{width:96px; height:96px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:30px; font-weight:800; color:#fff}
   .avatarEdit .avCam{position:absolute; right:-2px; bottom:-2px; width:32px; height:32px; border-radius:50%; background:var(--accent); color:#fff; display:flex; align-items:center; justify-content:center; font-size:15px; border:2px solid var(--bg); cursor:pointer}
   .avatarEdit .avDel{color:var(--danger); font-size:12.5px; font-weight:700; cursor:pointer; background:none; border:0; padding:2px}
+  /* Banner set/delete now lives here in the edit-profile sheet, not on the hero card — matches
+     mutolaa's own settings screen. Same .pHeroBanner strip reused for visual consistency with the
+     real hero, with a camera button and (when a banner exists) a delete pill both anchored to its
+     own corners instead of centered/inline text, mirroring .avCam/.avDel's icon-button treatment. */
+  .bannerEdit{position:relative; margin:0 0 22px; border-radius:14px; overflow:hidden}
+  .bannerEdit .bnrCam{position:absolute; right:8px; bottom:8px; width:32px; height:32px; border-radius:50%; background:var(--accent); color:#fff; display:flex; align-items:center; justify-content:center; font-size:15px; border:2px solid var(--bg); cursor:pointer}
+  .bannerEdit .bnrDel{position:absolute; left:8px; bottom:8px; color:#fff; font-size:12px; font-weight:700; cursor:pointer; background:rgba(0,0,0,.55); border:0; border-radius:20px; padding:6px 10px}
   .pField{margin-bottom:16px}
   .pField label{display:block; font-size:12.5px; font-weight:700; color:var(--muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:.3px}
   .pField input[type=text],.pField input[type=tel],.pField input[type=email],.pField input[type=date],.pField textarea{width:100%; background:var(--card); border:1px solid var(--line); border-radius:10px; color:var(--text); padding:10px; font:inherit; box-sizing:border-box}
@@ -566,12 +573,18 @@
      auto-gradient strip that got removed for looking arbitrary/clashing. Sits above .pHeroTop as
      its own strip, not overlapping the avatar — simpler and keeps the avatar/name row exactly as
      already shipped. Omitted entirely (no element at all) on someone else's profile when they
-     haven't uploaded one; on your own profile it stays as an inviting empty placeholder instead,
-     since that's also the upload entry point. */
-  .pHeroBanner{height:120px; width:100%; background-size:cover; background-position:center; position:relative}
-  .pHeroBannerBlank{background:var(--chip); display:flex; align-items:center; justify-content:center}
-  .pHeroBannerUpload{position:absolute; bottom:8px; right:8px; padding:6px 10px; border-radius:20px; background:rgba(0,0,0,.55); color:#fff; font-size:12px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:4px}
-  .pHeroBannerBlank .pHeroBannerUpload{position:static; background:none; color:var(--muted); font-size:13px}
+     haven't uploaded one; on your own profile it stays as an inviting empty placeholder instead.
+     Setting/deleting the banner itself now lives only in the edit-profile sheet (.bannerEdit,
+     matching mutolaa's own settings screen), not via tapping the hero directly — so this card has
+     no upload affordance of its own any more. Rendered as a real <img> (not a CSS background-image)
+     with an onerror fallback that adds .pHeroBannerBlank and removes itself — same self-healing
+     pattern as every other avatar/cover image here — because banner_version is a monotonic counter
+     that keeps incrementing on delete (never resets to 0, see bump_banner_version), so a deleted
+     banner still looks "truthy" and must be caught by the image actually failing to load, not by
+     re-checking the version number. */
+  .pHeroBanner{height:120px; width:100%; position:relative}
+  .pHeroBannerImg{position:absolute; inset:0; width:100%; height:100%; object-fit:cover}
+  .pHeroBannerBlank{background:var(--chip)}
   /* Avatar floats over the banner's bottom edge (half on the photo, half below it) instead of
      sitting in a fully separate row underneath — matches the overlapping-avatar hero pattern seen
      in mutolaa. .avWrap is pulled up via absolute positioning (42px = half its 84px height) so it
@@ -594,12 +607,20 @@
   .pHeroName{font-weight:800; font-size:17px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
   .pHeroSub{font-size:13px; color:var(--muted); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer}
   .pHeroJoined{font-size:12px; color:var(--muted); margin-top:3px}
-  /* A small icon in the card's own top-right corner, not a text button competing with name/
-     username for room on the same row — that's what was crowding/truncating both. */
-  .pHeroEditBtn{position:absolute; top:12px; right:12px; width:32px; height:32px; border-radius:50%; background:var(--chip); border:1px solid var(--line); color:var(--text); font-size:14px; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:1}
-  .pHeroShareBtn{position:absolute; top:12px; right:52px; width:32px; height:32px; border-radius:50%; background:var(--chip); border:1px solid var(--line); color:var(--text); font-size:14px; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:1}
+  /* Small icons anchored to the banner's own bottom-right corner (top:80px = 120px banner height
+     minus the 32px icon minus an 8px inset, matching the old upload pill's inset) rather than the
+     top-right — the avatar now overlaps the bottom-LEFT of the banner (see .pHeroTop above), so the
+     bottom-right is the empty side of the strip instead of the top, which is empty either way. Not
+     a text button competing with name/username for room — that's what was crowding/truncating both
+     before these became icons. .noBannerPos is the fallback for a public profile with no banner
+     element at all (nothing to anchor "bottom of banner" against), where it reverts to a plain
+     top-right corner of the card itself — own-profile always has a banner (real or blank
+     placeholder) so it never needs that fallback. */
+  .pHeroEditBtn{position:absolute; top:80px; right:12px; width:32px; height:32px; border-radius:50%; background:var(--chip); border:1px solid var(--line); color:var(--text); font-size:14px; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:1}
+  .pHeroShareBtn{position:absolute; top:80px; right:52px; width:32px; height:32px; border-radius:50%; background:var(--chip); border:1px solid var(--line); color:var(--text); font-size:14px; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:1}
   /* Public profile has no edit icon (nothing to edit) — share sits alone in the same corner. */
   .pHeroShareBtn.pHeroShareOnly{right:12px}
+  .pHeroShareBtn.noBannerPos{top:12px}
   /* Follow, unlike edit, is the primary action on someone else's profile — it keeps a real
      button, just moved to its own row below the identity so it never fights name/username for
      width either. */
@@ -2732,12 +2753,12 @@ function renderProfileCard(){
     // instead of showing a broken-image icon.
     const img=p.avatar_version?`<img class="avImg" style="width:${avSize}px;height:${avSize}px" src="${avatarUrl(uid,p.avatar_version)}" onerror="this.remove()">`:'';
     const hasBanner=!!p.banner_version;
-    const bannerHtml=`<div class="pHeroBanner${hasBanner?'':' pHeroBannerBlank'}" id="pBannerArea"${hasBanner?` style="background-image:url('${bannerUrl(uid,p.banner_version)}')"`:''}><span class="pHeroBannerUpload" id="pBannerUploadBtn">📷${hasBanner?'':' Banner qo\'shish'}</span></div>`;
+    const bannerImg=hasBanner?`<img class="pHeroBannerImg" src="${bannerUrl(uid,p.banner_version)}" onerror="this.parentElement.classList.add('pHeroBannerBlank');this.remove()">`:'';
+    const bannerHtml=`<div class="pHeroBanner${hasBanner?'':' pHeroBannerBlank'}" id="pBannerArea">${bannerImg}</div>`;
     card.innerHTML=`<div class="pHero">
       ${bannerHtml}
       <span class="pHeroEditBtn" id="pProfileCardBtn" title="Profilni tahrirlash">✏️</span>
       <span class="pHeroShareBtn" id="pShareBtn" title="Ulashish">📤</span>
-      <input type="file" id="pBannerFile" accept="image/*" style="display:none">
       <div class="pHeroTop">
         <div class="avWrap" style="width:${avSize}px;height:${avSize}px"><div class="avInitials" style="width:${avSize}px;height:${avSize}px;font-size:30px;background:linear-gradient(135deg,${c1},${c2})">${esc(initials(name))}</div>${img}</div>
         <div class="pHeroIdentity">
@@ -2754,12 +2775,6 @@ function renderProfileCard(){
     </div>`;
     $('#pProfileCardBtn').onclick=()=>openProfileEdit();
     $('#pShareBtn').onclick=()=>shareProfile(uid,name);
-    $('#pBannerUploadBtn').onclick=()=>$('#pBannerFile').click();
-    $('#pBannerFile').onchange=(e)=>{
-      const f=e.target.files&&e.target.files[0];if(!f)return;
-      openBannerCrop(f);
-      e.target.value='';
-    };
     $('#pHeroSubBtn').onclick=()=>openProfileEdit();
     $('#pFollowersStat').onclick=()=>openFollowList(uid,'followers');
     $('#pFollowingStat').onclick=()=>openFollowList(uid,'following');
@@ -2900,7 +2915,18 @@ function openProfileEdit(){
     const avatarHtml=()=>`<div class="avInitials" style="background:linear-gradient(135deg,${c1},${c2})">${esc(initials(p.display_name||'?'))}</div>${p.avatar_version?`<img class="avImg" id="avPreview" src="${avatarUrl(uid,p.avatar_version)}" onerror="this.remove()">`:''}`;
     const rowHtml=(id,label,value,placeholder)=>`<div class="pRow" id="${id}"><span class="pRowLabel">${esc(label)}</span><span class="pRowRight"><span class="pRowValue${value?'':' blank'}">${esc(value||placeholder)}</span><span class="pRowChev">›</span></span></div>`;
     const bioPreview=v=>v?(v.length>28?v.slice(0,28)+'…':v):'Kiritilmagan';
+    // Banner set/delete lives here now (mirrors mutolaa's own settings screen), not on the hero
+    // card itself — same img-with-onerror-fallback pattern as the compact hero card uses, since
+    // banner_version keeps incrementing on delete and never goes back to 0 (bump_banner_version),
+    // so a deleted banner still needs the actual image load to fail before falling back to blank.
+    const bannerEditImg=p.banner_version?`<img class="pHeroBannerImg" id="bnrPreview" src="${bannerUrl(uid,p.banner_version)}" onerror="this.parentElement.classList.add('pHeroBannerBlank');this.remove()">`:'';
     $('#profileEditSheetc').innerHTML=`
+      <div class="bannerEdit">
+        <div class="pHeroBanner${p.banner_version?'':' pHeroBannerBlank'}" id="bnrArea">${bannerEditImg}</div>
+        <span class="bnrCam" id="bnrCamBtn">📷</span>
+        ${p.banner_version?'<button class="bnrDel" id="bnrDelBtn">Bannerni o\'chirish</button>':''}
+      </div>
+      <input type="file" accept="image/*" id="bnrFile" style="display:none">
       <div class="avatarEdit">
         <div class="avWrap" id="avWrap">${avatarHtml()}<div class="avCam" id="avCamBtn">📷</div></div>
         <input type="file" accept="image/*" id="avFile" style="display:none">
@@ -2967,7 +2993,20 @@ function openProfileEdit(){
     const delBtn=$('#avDelBtn');
     if(delBtn)delBtn.onclick=()=>{
       haptic();
-      api('/api/profile/avatar/delete',{method:'POST'}).then(r=>{p.avatar_version=r.avatar_version;toast('Rasm o\'chirildi');openProfileEdit();}).catch(()=>{});
+      api('/api/profile/avatar/delete',{method:'POST'}).then(r=>{p.avatar_version=r.avatar_version;toast('Rasm o\'chirildi');renderProfileCard();openProfileEdit();}).catch(()=>{});
+    };
+    // --- banner upload/delete — same file-input pattern as avatar, feeding the same
+    // openBannerCrop() tool the hero card used to trigger directly ---
+    $('#bnrCamBtn').onclick=()=>$('#bnrFile').click();
+    $('#bnrFile').onchange=(e)=>{
+      const f=e.target.files&&e.target.files[0];if(!f)return;
+      openBannerCrop(f);
+      e.target.value='';
+    };
+    const bnrDelBtn=$('#bnrDelBtn');
+    if(bnrDelBtn)bnrDelBtn.onclick=()=>{
+      haptic();
+      api('/api/profile/banner/delete',{method:'POST'}).then(r=>{p.banner_version=r.banner_version;toast('Banner o\'chirildi');renderProfileCard();openProfileEdit();}).catch(()=>{});
     };
     // --- gender pills: auto-save on tap, consistent with the rows around it now all
     // saving immediately rather than waiting on one global Saqlash button ---
@@ -3268,6 +3307,10 @@ $('#bCropConfirmBtn').onclick=()=>{
       toast('Banner yangilandi');
       closeBannerCrop();
       renderProfileCard();
+      // The crop tool now only ever opens from inside the edit-profile sheet (.bannerEdit) — if
+      // it's still open behind this one, refresh it too so its own preview/delete-button state
+      // picks up the new banner instead of showing the pre-upload snapshot until manually reopened.
+      if($('#profileEditSheet').classList.contains('open'))openProfileEdit();
     }).catch(()=>{toast('Banner yuklanmadi');btn.disabled=false;btn.textContent='Saqlash';});
   },'image/jpeg',0.9);
 };
@@ -3441,10 +3484,10 @@ function loadUserProfileHero(userId){
     const followBtn=canAct()?`<button class="followBtn${p.is_following?' on':''}" id="uFollowBtn">${p.is_following?'✓ Obuna bo\'lgan':'+ Obuna bo\'lish'}</button>`:'';
     // Read-only mirror of the banner: shown only when this person actually uploaded one — no
     // blank/inviting placeholder here, that's the own-profile upload entry point only.
-    const bannerHtml=p.banner_version?`<div class="pHeroBanner" style="background-image:url('${bannerUrl(userId,p.banner_version)}')"></div>`:'';
+    const bannerHtml=p.banner_version?`<div class="pHeroBanner"><img class="pHeroBannerImg" src="${bannerUrl(userId,p.banner_version)}" onerror="this.parentElement.classList.add('pHeroBannerBlank');this.remove()"></div>`:'';
     $('#uProfileCard').innerHTML=`<div class="pHero">
       ${bannerHtml}
-      <span class="pHeroShareBtn pHeroShareOnly" id="uShareBtn" title="Ulashish">📤</span>
+      <span class="pHeroShareBtn pHeroShareOnly${p.banner_version?'':' noBannerPos'}" id="uShareBtn" title="Ulashish">📤</span>
       <div class="pHeroTop${p.banner_version?'':' noBanner'}">
         <div class="avWrap" style="width:${avSize}px;height:${avSize}px"><div class="avInitials" style="width:${avSize}px;height:${avSize}px;font-size:30px;background:linear-gradient(135deg,${c1},${c2})">${esc(initials(p.display_name||'?'))}</div>${img}</div>
         <div class="pHeroIdentity">
