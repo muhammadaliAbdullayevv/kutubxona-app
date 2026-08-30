@@ -353,7 +353,7 @@
   .liveBadgeRight{display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700; opacity:.92}
   /* The panel is a full page (like the PDF reader), not a bottom drawer — a "footer" card reads
      as a minor add-on; a whole page reads as what it actually is, the app's stats dashboard. */
-  #liveSheet,#listSheet,#shelvesSheet,#reviewsSheet,#writeReviewSheet,#profileEditSheet,#avatarCropSheet,#davraComposeSheet,#davraThreadSheet,#userProfileSheet,#followListSheet{flex-direction:column}
+  #liveSheet,#listSheet,#shelvesSheet,#reviewsSheet,#writeReviewSheet,#profileEditSheet,#avatarCropSheet,#bannerCropSheet,#davraComposeSheet,#davraThreadSheet,#userProfileSheet,#followListSheet{flex-direction:column}
   /* Generalized from the Statistika panel's own topbar so new full-page sheets (Reading Room's
      drill-in lists, Javon) get the same "whole page, not a bottom drawer" treatment for free. */
   #liveTopbar,.stopbar{flex-shrink:0; display:flex; align-items:center; justify-content:space-between; gap:12px;
@@ -537,6 +537,10 @@
   .cropWrap{position:relative; width:300px; height:300px; max-width:80vw; max-height:80vw; border-radius:12px; overflow:hidden; background:#111; touch-action:none; margin:6px 0 16px}
   #cropCanvas{width:100%; height:100%; display:block}
   .cropMask{position:absolute; inset:0; pointer-events:none; box-shadow:0 0 0 9999px rgba(0,0,0,.55); border-radius:50%; border:2px solid rgba(255,255,255,.9)}
+  /* Wide (3:1) instead of square — matches the banner's own render shape (.pHeroBanner), no
+     circular mask since a banner isn't cropped to a circle. */
+  .bCropWrap{width:300px; height:100px; max-width:88vw; max-height:29.3vw}
+  #bCropCanvas{width:100%; height:100%; display:block}
   #cropZoom{width:100%; max-width:320px; margin:4px 0 18px}
   .cropActions{display:flex; gap:10px; width:100%; max-width:320px}
   .cropActions .btn{flex:1}
@@ -558,10 +562,16 @@
   .onboardText div{font-size:12.5px; opacity:.9; margin-top:2px}
   .onboardChev{font-size:22px; flex-shrink:0; opacity:.85}
   .pHero{position:relative; margin:0 0 18px; border-radius:16px; overflow:hidden; background:var(--card); border:1px solid color-mix(in srgb, var(--line) 45%, var(--muted) 55%); box-shadow:0 2px 10px rgba(0,0,0,.28)}
-  /* No banner — a per-user gradient strip across the whole card width read as an arbitrary,
-     often-clashing color band (e.g. an unlucky brown/olive hash) rather than a deliberate design
-     choice. The avatar keeps its own small gradient ring/fallback fill; that's a contained accent,
-     not a banner. */
+  /* A REAL uploaded photo now (banner_version — migration 103), not the old per-user
+     auto-gradient strip that got removed for looking arbitrary/clashing. Sits above .pHeroTop as
+     its own strip, not overlapping the avatar — simpler and keeps the avatar/name row exactly as
+     already shipped. Omitted entirely (no element at all) on someone else's profile when they
+     haven't uploaded one; on your own profile it stays as an inviting empty placeholder instead,
+     since that's also the upload entry point. */
+  .pHeroBanner{height:120px; width:100%; background-size:cover; background-position:center; position:relative}
+  .pHeroBannerBlank{background:var(--chip); display:flex; align-items:center; justify-content:center}
+  .pHeroBannerUpload{position:absolute; bottom:8px; right:8px; padding:6px 10px; border-radius:20px; background:rgba(0,0,0,.55); color:#fff; font-size:12px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:4px}
+  .pHeroBannerBlank .pHeroBannerUpload{position:static; background:none; color:var(--muted); font-size:13px}
   .pHeroTop{display:flex; align-items:center; padding:16px 14px 16px; gap:12px}
   /* A plain border, not border+box-shadow — the two combined were rendering as an uneven arc
      (thick on one side, nearly gone on the other) instead of a uniform ring on real devices, not
@@ -576,6 +586,9 @@
   /* A small icon in the card's own top-right corner, not a text button competing with name/
      username for room on the same row — that's what was crowding/truncating both. */
   .pHeroEditBtn{position:absolute; top:12px; right:12px; width:32px; height:32px; border-radius:50%; background:var(--chip); border:1px solid var(--line); color:var(--text); font-size:14px; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:1}
+  .pHeroShareBtn{position:absolute; top:12px; right:52px; width:32px; height:32px; border-radius:50%; background:var(--chip); border:1px solid var(--line); color:var(--text); font-size:14px; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:1}
+  /* Public profile has no edit icon (nothing to edit) — share sits alone in the same corner. */
+  .pHeroShareBtn.pHeroShareOnly{right:12px}
   /* Follow, unlike edit, is the primary action on someone else's profile — it keeps a real
      button, just moved to its own row below the identity so it never fights name/username for
      width either. */
@@ -816,6 +829,21 @@
     <div class="cropActions">
       <button class="btn ghost" id="cropCancelBtn">Bekor qilish</button>
       <button class="btn primary" id="cropConfirmBtn">Saqlash</button>
+    </div>
+  </div>
+</div>
+<!-- Same tool as avatarCropSheet, wide (3:1) instead of square — a fully separate copy (own
+     canvas/state/ids) rather than parametrizing the avatar one, so the proven avatar upload path
+     can't regress from a banner-shape change. -->
+<div class="sheet" id="bannerCropSheet" style="z-index:54; align-items:stretch; background:var(--bg)">
+  <div class="stopbar"><div class="stopbarTitle">Bannerni moslashtirish</div><div class="gclose" id="bannerCropClose">✕</div></div>
+  <div class="ssheetc" id="bannerCropSheetc" style="display:flex; flex-direction:column; align-items:center">
+    <div class="cropWrap bCropWrap" id="bCropWrap"><canvas id="bCropCanvas"></canvas></div>
+    <p class="hint" style="text-align:center">Rasmni surish uchun torting, kattalashtirish uchun siqing yoki slayderdan foydalaning</p>
+    <input type="range" id="bCropZoom" min="100" max="300" value="100">
+    <div class="cropActions">
+      <button class="btn ghost" id="bCropCancelBtn">Bekor qilish</button>
+      <button class="btn primary" id="bCropConfirmBtn">Saqlash</button>
     </div>
   </div>
 </div>
@@ -2653,6 +2681,18 @@ const _BADGE_META={
 };
 const myUid=()=>tg?.initDataUnsafe?.user?.id;
 function avatarUrl(uid,v){return COMMUNITY_API_BASE+'/api/profile/avatar/'+encodeURIComponent(uid)+(v?'?v='+v:'?v=0');}
+function bannerUrl(uid,v){return COMMUNITY_API_BASE+'/api/profile/banner/'+encodeURIComponent(uid)+'?v='+(v||0);}
+// Same t.me/share/url + start=<payload> mechanism the book detail page's own Ulashish button
+// uses (see miShare) — a profile_<id> deep link that bot.py's start() handler turns into a
+// message with a button opening the Mini App straight at that profile (?profile=<id>, read by
+// boot() below), since this bot has no BotFather-registered app short name for ?startapp=.
+function shareProfile(userId,name){
+  haptic();
+  const url=`https://t.me/${DB.bot}?start=profile_${encodeURIComponent(userId)}`;
+  const txt=`👤 ${name||'Foydalanuvchi'} profili`;
+  const s=`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(txt)}`;
+  tg?.openTelegramLink?tg.openTelegramLink(s):navigator.share?.({title:txt,url});
+}
 // Small round avatar for a comment/review/feed author — same base-layer-initials + on-top-photo-
 // that-self-removes-on-error pattern used everywhere else an avatar shows (profile hero, book
 // covers): a missing/broken photo degrades to initials instead of a broken-image icon.
@@ -2680,8 +2720,13 @@ function renderProfileCard(){
     // used for book covers (.ci/.ini), so a missing/broken avatar file degrades to initials
     // instead of showing a broken-image icon.
     const img=p.avatar_version?`<img class="avImg" style="width:${avSize}px;height:${avSize}px" src="${avatarUrl(uid,p.avatar_version)}" onerror="this.remove()">`:'';
+    const hasBanner=!!p.banner_version;
+    const bannerHtml=`<div class="pHeroBanner${hasBanner?'':' pHeroBannerBlank'}" id="pBannerArea"${hasBanner?` style="background-image:url('${bannerUrl(uid,p.banner_version)}')"`:''}><span class="pHeroBannerUpload" id="pBannerUploadBtn">📷${hasBanner?'':' Banner qo\'shish'}</span></div>`;
     card.innerHTML=`<div class="pHero">
+      ${bannerHtml}
       <span class="pHeroEditBtn" id="pProfileCardBtn" title="Profilni tahrirlash">✏️</span>
+      <span class="pHeroShareBtn" id="pShareBtn" title="Ulashish">📤</span>
+      <input type="file" id="pBannerFile" accept="image/*" style="display:none">
       <div class="pHeroTop">
         <div class="avWrap" style="width:${avSize}px;height:${avSize}px"><div class="avInitials" style="width:${avSize}px;height:${avSize}px;font-size:30px;background:linear-gradient(135deg,${c1},${c2})">${esc(initials(name))}</div>${img}</div>
         <div class="pHeroIdentity">
@@ -2697,6 +2742,13 @@ function renderProfileCard(){
       ${p.bio?`<div class="pHeroBio">${esc(p.bio)}</div>`:''}
     </div>`;
     $('#pProfileCardBtn').onclick=()=>openProfileEdit();
+    $('#pShareBtn').onclick=()=>shareProfile(uid,name);
+    $('#pBannerUploadBtn').onclick=()=>$('#pBannerFile').click();
+    $('#pBannerFile').onchange=(e)=>{
+      const f=e.target.files&&e.target.files[0];if(!f)return;
+      openBannerCrop(f);
+      e.target.value='';
+    };
     $('#pHeroSubBtn').onclick=()=>openProfileEdit();
     $('#pFollowersStat').onclick=()=>openFollowList(uid,'followers');
     $('#pFollowingStat').onclick=()=>openFollowList(uid,'following');
@@ -3100,6 +3152,115 @@ $('#cropConfirmBtn').onclick=()=>{
     }).catch(()=>{toast('Rasm yuklanmadi');btn.disabled=false;btn.textContent='Saqlash';});
   },'image/jpeg',0.9);
 };
+
+// ---- Banner crop — the exact same pan/zoom tool as the avatar crop above, wide (3:1) instead
+// of square, kept as a fully separate copy (own state/canvas/ids) rather than parametrizing the
+// avatar one, so this can't regress the already-working avatar upload path. ----
+let bannerCropState=null;
+function openBannerCrop(file){
+  const url=URL.createObjectURL(file);
+  const img=new Image();
+  img.onload=()=>{
+    $('#bannerCropSheet').classList.add('open');
+    tg?.BackButton?.show();
+    requestAnimationFrame(()=>{initBannerCropCanvas(img);URL.revokeObjectURL(url);});
+  };
+  img.onerror=()=>{toast('Rasmni ochib bo\'lmadi');URL.revokeObjectURL(url);};
+  img.src=url;
+}
+function initBannerCropCanvas(img){
+  const canvas=$('#bCropCanvas'),wrap=$('#bCropWrap');
+  const cssW=wrap.clientWidth||300,cssH=wrap.clientHeight||100;
+  const dpr=Math.min(window.devicePixelRatio||1,2);
+  canvas.width=Math.round(cssW*dpr);canvas.height=Math.round(cssH*dpr);
+  const minScale=Math.max(canvas.width/img.width,canvas.height/img.height);
+  bannerCropState={
+    img, ctx:canvas.getContext('2d'), canvas,
+    scale:minScale, minScale,
+    offX:(canvas.width-img.width*minScale)/2,
+    offY:(canvas.height-img.height*minScale)/2,
+  };
+  $('#bCropZoom').value=100;
+  drawBannerCrop();
+  wireBannerCropGestures();
+}
+function drawBannerCrop(){
+  const{ctx,canvas,img,scale,offX,offY}=bannerCropState;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.drawImage(img,offX,offY,img.width*scale,img.height*scale);
+}
+function clampBannerCropOffsets(){
+  const{canvas,img,scale}=bannerCropState;
+  const w=img.width*scale,h=img.height*scale;
+  bannerCropState.offX=Math.min(0,Math.max(canvas.width-w,bannerCropState.offX));
+  bannerCropState.offY=Math.min(0,Math.max(canvas.height-h,bannerCropState.offY));
+}
+function setBannerCropScale(newScale){
+  const{canvas,offX,offY,scale:oldScale,minScale}=bannerCropState;
+  newScale=Math.max(minScale,Math.min(minScale*3,newScale));
+  const cx=canvas.width/2,cy=canvas.height/2;
+  const imgX=(cx-offX)/oldScale,imgY=(cy-offY)/oldScale;
+  bannerCropState.scale=newScale;
+  bannerCropState.offX=cx-imgX*newScale;
+  bannerCropState.offY=cy-imgY*newScale;
+  clampBannerCropOffsets();
+  $('#bCropZoom').value=Math.round((newScale/minScale)*100);
+  drawBannerCrop();
+}
+function wireBannerCropGestures(){
+  const canvas=$('#bCropCanvas');
+  const pointers=new Map();
+  let dragStart=null,pinchStart=null;
+  const dist=()=>{const p=[...pointers.values()];return Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y);};
+  canvas.onpointerdown=e=>{
+    canvas.setPointerCapture(e.pointerId);
+    pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(pointers.size===1){dragStart={x:e.clientX,y:e.clientY,offX:bannerCropState.offX,offY:bannerCropState.offY};}
+    else if(pointers.size===2){pinchStart={d:dist(),scale:bannerCropState.scale};dragStart=null;}
+  };
+  canvas.onpointermove=e=>{
+    if(!pointers.has(e.pointerId))return;
+    pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(pointers.size===1&&dragStart){
+      const rect=canvas.getBoundingClientRect();
+      const dpr=canvas.width/rect.width;
+      bannerCropState.offX=dragStart.offX+(e.clientX-dragStart.x)*dpr;
+      bannerCropState.offY=dragStart.offY+(e.clientY-dragStart.y)*dpr;
+      clampBannerCropOffsets();
+      drawBannerCrop();
+    }else if(pointers.size===2&&pinchStart){
+      setBannerCropScale(pinchStart.scale*(dist()/pinchStart.d));
+    }
+  };
+  function release(e){
+    pointers.delete(e.pointerId);
+    if(pointers.size<2)pinchStart=null;
+    dragStart=pointers.size===1?{x:[...pointers.values()][0].x,y:[...pointers.values()][0].y,offX:bannerCropState.offX,offY:bannerCropState.offY}:null;
+  }
+  canvas.onpointerup=release;
+  canvas.onpointercancel=release;
+  canvas.onwheel=e=>{e.preventDefault();setBannerCropScale(bannerCropState.scale*(e.deltaY<0?1.08:1/1.08));};
+  $('#bCropZoom').oninput=e=>setBannerCropScale(bannerCropState.minScale*(parseInt(e.target.value,10)/100));
+}
+function closeBannerCrop(){$('#bannerCropSheet').classList.remove('open');tg?.BackButton?.hide();bannerCropState=null;}
+$('#bCropCancelBtn').onclick=closeBannerCrop;
+$('#bannerCropClose').onclick=closeBannerCrop;
+$('#bannerCropSheet').onclick=e=>{if(e.target.id==='bannerCropSheet')closeBannerCrop();};
+$('#bCropConfirmBtn').onclick=()=>{
+  if(!bannerCropState)return;
+  const btn=$('#bCropConfirmBtn');btn.disabled=true;btn.textContent='Saqlanmoqda...';
+  bannerCropState.canvas.toBlob(blob=>{
+    if(!blob){toast('Xatolik yuz berdi');btn.disabled=false;btn.textContent='Saqlash';return;}
+    const fd=new FormData();fd.append('file',blob,'banner.jpg');
+    haptic('medium');
+    api('/api/profile/banner',{method:'POST',body:fd}).then(()=>{
+      toast('Banner yangilandi');
+      closeBannerCrop();
+      renderProfileCard();
+    }).catch(()=>{toast('Banner yuklanmadi');btn.disabled=false;btn.textContent='Saqlash';});
+  },'image/jpeg',0.9);
+};
+
 let myBadgesCache=null;
 function loadProfile(){
   renderProfileCard();
@@ -3267,7 +3428,12 @@ function loadUserProfileHero(userId){
     const avSize=84;
     const img=p.avatar_version?`<img class="avImg" style="width:${avSize}px;height:${avSize}px" src="${avatarUrl(userId,p.avatar_version)}" onerror="this.remove()">`:'';
     const followBtn=canAct()?`<button class="followBtn${p.is_following?' on':''}" id="uFollowBtn">${p.is_following?'✓ Obuna bo\'lgan':'+ Obuna bo\'lish'}</button>`:'';
+    // Read-only mirror of the banner: shown only when this person actually uploaded one — no
+    // blank/inviting placeholder here, that's the own-profile upload entry point only.
+    const bannerHtml=p.banner_version?`<div class="pHeroBanner" style="background-image:url('${bannerUrl(userId,p.banner_version)}')"></div>`:'';
     $('#uProfileCard').innerHTML=`<div class="pHero">
+      ${bannerHtml}
+      <span class="pHeroShareBtn pHeroShareOnly" id="uShareBtn" title="Ulashish">📤</span>
       <div class="pHeroTop">
         <div class="avWrap" style="width:${avSize}px;height:${avSize}px"><div class="avInitials" style="width:${avSize}px;height:${avSize}px;font-size:30px;background:linear-gradient(135deg,${c1},${c2})">${esc(initials(p.display_name||'?'))}</div>${img}</div>
         <div class="pHeroIdentity">
@@ -3283,6 +3449,7 @@ function loadUserProfileHero(userId){
       </div>
       ${p.bio?`<div class="pHeroBio">${esc(p.bio)}</div>`:''}
     </div>`;
+    $('#uShareBtn').onclick=()=>shareProfile(userId,p.display_name);
     $('#uFollowersStat').onclick=()=>openFollowList(userId,'followers');
     $('#uFollowingStat').onclick=()=>openFollowList(userId,'following');
     const fb=$('#uFollowBtn');
@@ -3587,7 +3754,7 @@ function skeletonShelf(){return `<div class="section"><div class="shead"><h2 cla
 // underneath it — including the bottom nav — which read as "the app is stuck".
 const SHEET_CLOSERS={
   pdfSheet:closePdfReader, fieldEditSheet:closeFieldEdit, birthPickerSheet:closeBirthPicker,
-  avatarCropSheet:closeAvatarCrop, writeReviewSheet:closeWriteReview, davraThreadSheet:closeDavraThread,
+  avatarCropSheet:closeAvatarCrop, bannerCropSheet:closeBannerCrop, writeReviewSheet:closeWriteReview, davraThreadSheet:closeDavraThread,
   davraComposeSheet:closeDavraCompose, davraReshareMenuSheet:closeDavraReshareMenu,
   reviewsSheet:closeReviewsSheet, profileEditSheet:closeProfileEdit, shelvesSheet:closeShelvesSheet,
   listSheet:closeListSheet, liveSheet:closeLiveSheet, sheet:closeSheet,
@@ -3679,6 +3846,11 @@ async function boot(){
   }catch(e){$('#count').textContent='';$('#grid').innerHTML='';$('#empty').style.display='block';$('#empty').innerHTML='<span class="em">⚠️</span>Ma\'lumot yuklanmadi';return;}
   await loadFavs();
   renderChips();run();
+  // Deep-linked here from a shared "profile_<id>" bot message's web_app button (see
+  // shareProfile() / bot.py's profile_ start-payload handler) — open straight to that profile
+  // instead of the normal home screen.
+  const deepLinkProfile=new URLSearchParams(location.search).get('profile');
+  if(deepLinkProfile)openUserProfile(deepLinkProfile);
   checkOnboardingBanner();
   loadContinueReading();
   loadTrending();
