@@ -144,6 +144,7 @@
   .heroInfo{flex:1; min-width:0; color:#fff}
   .heroTitle{font-size:17px; font-weight:800; line-height:1.25; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
   .heroAuthor{font-size:13px; opacity:.85; margin-top:2px}
+  .heroStats{font-size:12.5px; font-weight:700; opacity:.9; margin:8px 0 2px; display:flex; gap:12px; flex-wrap:wrap}
   .heroProg{height:5px; border-radius:3px; background:rgba(255,255,255,.3); margin:12px 0 10px; overflow:hidden}
   .heroProg b{display:block; height:100%; background:#fff; border-radius:3px}
   .heroBtn{border:0; background:rgba(255,255,255,.22); color:#fff; font-weight:800; font-size:13.5px; padding:9px 16px; border-radius:999px; cursor:pointer; font-family:inherit}
@@ -1862,6 +1863,13 @@ function pickRandomPopularBook(){
   _starterBookCache=pool[Math.floor(Math.random()*pool.length)];
   return _starterBookCache;
 }
+// Rating comes straight from the static catalog (b.rt/b.rc, already loaded) so it paints
+// instantly; reading/favorite counts are live-only data, filled in a beat later once
+// loadHeroStartStats' fetch resolves — same static-then-live pattern as the book detail sheet's
+// own 👀 reading-count stat (loadBookExtras/#dStatReading).
+function heroStatsHtml(b){
+  return b.rc?`<span>⭐ ${b.rt} (${b.rc})</span>`:'';
+}
 function heroStartHtml(b){
   const[c1,c2]=coverFor(b.i);
   return `<div class="hero" style="background:linear-gradient(135deg,${c1},${c2})" data-id="${esc(b.i)}">
@@ -1869,9 +1877,20 @@ function heroStartHtml(b){
     <div class="heroInfo">
       <div class="heroTitle">${esc(b.t)}</div>
       <div class="heroAuthor">${esc(b.a||'')}</div>
+      <div class="heroStats" id="heroStartStats">${heroStatsHtml(b)}</div>
       <button class="heroBtn">📖 Boshlash →</button>
     </div>
   </div>`;
+}
+function loadHeroStartStats(b){
+  api('/api/books/'+encodeURIComponent(b.i)+'/stats').then(r=>{
+    const el=$('#heroStartStats');
+    if(!el)return;
+    const parts=[heroStatsHtml(b)];
+    if(r.reading_count>0)parts.push(`<span>👀 ${fmtNum(r.reading_count)} o'qimoqda</span>`);
+    if(r.fav_count>0)parts.push(`<span>❤️ ${fmtNum(r.fav_count)} saqlagan</span>`);
+    el.innerHTML=parts.filter(Boolean).join('');
+  }).catch(()=>{});
 }
 // Topic chips row — tapping one runs it as a search term, reusing the exact same relevance
 // engine every other search already goes through (tags are indexed into _subs already).
@@ -1939,11 +1958,11 @@ function onboardingBannerHtml(){
   return `<div class="onboardBanner" id="onboardingBanner"><span class="onboardIcon">👋</span><div class="onboardText"><b>Profilingizni to'ldiring</b><div>Ism, rasm va boshqa ma'lumotlaringizni kiriting</div></div><span class="onboardChev">›</span></div>`;
 }
 function renderHome(){
-  const h=$('#home');let html='';
+  const h=$('#home');let html='';let starterForStats=null;
   if(needsOnboarding)html+=onboardingBannerHtml();
   if(HOME.continue.length)html+=heroHtml(HOME.continue[0]);
   else if(canAct()&&!HOME.continueLoaded)html+=heroSkeletonHtml();
-  else{const starter=pickRandomPopularBook();if(starter)html+=heroStartHtml(starter);}
+  else{starterForStats=pickRandomPopularBook();if(starterForStats)html+=heroStartHtml(starterForStats);}
   if(HOME.topics.length)html+=topicsHtml(HOME.topics);
   const forYou=computeForYou();
   if(forYou.length)html+=shelf("✨ Siz uchun",forYou);
@@ -1966,6 +1985,7 @@ function renderHome(){
   h.querySelectorAll('[data-see]').forEach(el=>el.onclick=()=>{state.view='search';const s=el.dataset.see;if(s==='newest'){state.all=true;state.sort='newest';$('#sort').value='newest';}else if(s==='audio'){state.type='audio';renderChips();}haptic();setTabs();run();window.scrollTo(0,0);});
   const ob=$('#onboardingBanner');
   if(ob)ob.onclick=()=>{haptic();goToView('profile');setTimeout(()=>openProfileEdit(),150);};
+  if(starterForStats)loadHeroStartStats(starterForStats);
 }
 // ---- gentle auto-scroll for the "recently added" ticker, native scroll underneath so a
 // touch/swipe always fully overrides it (pauses the moment a finger touches it, resumes a
