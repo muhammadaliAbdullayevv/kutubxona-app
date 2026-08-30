@@ -33,6 +33,13 @@
     --shadow:0 6px 20px rgba(20,24,40,.08);
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  /* Without this, Android's WebView can silently inflate text past whatever px size the CSS
+     actually specifies ("font boosting"/text autosizing, meant for legacy desktop-width sites
+     viewed on a phone) — differs by device/OS version, which is exactly why the same screen can
+     look reasonably sized on one phone and comically oversized (with everything padded around
+     that inflated text growing to match) on another, despite identical CSS. Locking this to 100%
+     makes every size in this file the actual rendered size, consistently, everywhere. */
+  html{-webkit-text-size-adjust:100%; text-size-adjust:100%}
   html,body{margin:0; padding:0}
   body{background:var(--bg); color:var(--text); font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;
     padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom); overscroll-behavior-y:none;
