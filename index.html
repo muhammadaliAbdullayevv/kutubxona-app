@@ -353,7 +353,7 @@
   .liveBadgeRight{display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700; opacity:.92}
   /* The panel is a full page (like the PDF reader), not a bottom drawer — a "footer" card reads
      as a minor add-on; a whole page reads as what it actually is, the app's stats dashboard. */
-  #liveSheet,#listSheet,#shelvesSheet,#reviewsSheet,#writeReviewSheet,#profileEditSheet,#avatarCropSheet,#davraComposeSheet,#davraThreadSheet{flex-direction:column}
+  #liveSheet,#listSheet,#shelvesSheet,#reviewsSheet,#writeReviewSheet,#profileEditSheet,#avatarCropSheet,#davraComposeSheet,#davraThreadSheet,#userProfileSheet,#followListSheet{flex-direction:column}
   /* Generalized from the Statistika panel's own topbar so new full-page sheets (Reading Room's
      drill-in lists, Javon) get the same "whole page, not a bottom drawer" treatment for free. */
   #liveTopbar,.stopbar{flex-shrink:0; display:flex; align-items:center; justify-content:space-between; gap:12px;
@@ -379,6 +379,7 @@
   #profileView,#davraView,#readingView{padding-top:0; margin-top:-8px}
   .fitem{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:10px}
   .fitem .fmeta{display:flex; align-items:center; gap:8px; margin-bottom:6px}
+  [data-user]{cursor:pointer}
   .fitem .falias{font-size:12.5px; font-weight:700; color:var(--muted)}
   .fitem .ftext{font-size:14.5px; line-height:1.4; white-space:pre-wrap; margin:2px 0 10px; color:var(--text)}
   .fbook{display:flex; align-items:center; gap:10px; background:var(--chip); border-radius:12px; padding:8px; cursor:pointer}
@@ -575,6 +576,14 @@
   /* Bio previously had nowhere it actually rendered in the app — only inside its own edit row,
      which you'd only see by going back into settings. This is its real display surface. */
   .pHeroBio{font-size:13.5px; color:var(--text); line-height:1.4; padding:0 14px 16px; white-space:pre-wrap}
+  .pFollowRow{display:flex; gap:20px; padding:0 14px 16px}
+  .pFollowStat{cursor:pointer}
+  .pFollowStat b{font-size:15px; color:var(--text)}
+  .pFollowStat span{font-size:12.5px; color:var(--muted); margin-left:4px}
+  .followBtn{flex:0 1 auto; min-width:0; margin-bottom:8px; padding:8px 16px; border-radius:13px; border:0; font-weight:800; font-size:12.5px; white-space:nowrap; cursor:pointer; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff}
+  .followBtn.on{background:var(--card); border:1px solid var(--line); color:var(--text)}
+  .flRow{display:flex; align-items:center; gap:10px; padding:10px 2px; cursor:pointer}
+  .flRow .falias{font-size:14px; font-weight:700; color:var(--text)}
   /* ---- Profil screen tabs: Javonlar / Yutuqlar / Sertifikatlar ---- */
   .ptabs{display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; margin:18px 0 4px; border-bottom:1px solid var(--line)}
   .ptabs::-webkit-scrollbar{display:none}
@@ -699,6 +708,10 @@
   </div>
   <div id="davraView" style="display:none">
     <div class="viewHead"><h2 class="dtitle">💬 Davra</h2><span class="viewThemeBtn" id="btnThemeDavra">🌙</span></div>
+    <div class="row" id="davraFeedToggle" style="margin:0 0 12px">
+      <span class="tw on" data-mode="all">Barchasi</span>
+      <span class="tw" data-mode="following">👥 Mening davram</span>
+    </div>
     <div id="davraList"></div>
     <div class="empty" id="davraEmpty" style="display:none"><span class="em">💬</span>Hali hech narsa yo'q — birinchi bo'lib kitob haqida yozing!</div>
     <button class="more" id="davraMore" style="display:none">Yana yuklash</button>
@@ -725,6 +738,23 @@
 <div class="sheet" id="shelvesSheet" style="z-index:52; align-items:stretch; background:var(--bg)">
   <div class="stopbar"><div class="stopbarTitle" id="shelvesTitle">📚 Javon</div><div class="gclose" id="shelvesClose">✕</div></div>
   <div class="ssheetc" id="shelvesSheetc"></div>
+</div>
+<div class="sheet" id="userProfileSheet" style="z-index:52; align-items:stretch; background:var(--bg)">
+  <div class="stopbar"><div class="stopbarTitle" id="uProfileTitle">👤 Profil</div><div class="gclose" id="userProfileClose">✕</div></div>
+  <div class="ssheetc">
+    <div id="uProfileCard"></div>
+    <div id="uBody">Yuklanmoqda...</div>
+    <div class="ptabs" id="uTabs">
+      <span class="ptab on" data-pt="javon">📚 Javonlar</span>
+      <span class="ptab" data-pt="yutuq">🏆 Yutuqlar</span>
+      <span class="ptab" data-pt="cert">🎓 Sertifikatlar</span>
+    </div>
+    <div id="uTabContent"></div>
+  </div>
+</div>
+<div class="sheet" id="followListSheet" style="z-index:53; align-items:stretch; background:var(--bg)">
+  <div class="stopbar"><div class="stopbarTitle" id="followListTitle">Obunachilar</div><div class="gclose" id="followListClose">✕</div></div>
+  <div class="ssheetc" id="followListSheetc"></div>
 </div>
 <!-- Reviews used to be a single inline vertical list capped at 20, with the write-a-review form
      also inline in the same scroll — a real full "all reviews" page (with its own pagination)
@@ -1035,7 +1065,7 @@ function davraBookCardHtml(bookId,readingCount,inline){
 }
 function davraReshareEmbedHtml(orig){
   return `<div class="fEmbed">
-    <div class="fmeta">${authorAvatarHtml(orig.user_id,orig.avatar_version,orig.alias,20)}<span class="falias">${esc(orig.alias)}</span><span class="cmeta">${fmtAgo(orig.created_at)}</span></div>
+    <div class="fmeta" data-user="${esc(orig.user_id)}">${authorAvatarHtml(orig.user_id,orig.avatar_version,orig.alias,20)}<span class="falias">${esc(orig.alias)}</span><span class="cmeta">${fmtAgo(orig.created_at)}</span></div>
     ${orig.text?`<div class="ftext">${esc(orig.text)}</div>`:''}
     ${davraBookCardHtml(orig.book_id,orig.reading_count)}
   </div>`;
@@ -1047,7 +1077,7 @@ function davraPostHtml(it,focused){
     ? `<span class="freplyCount">💬 ${it.reply_count||0} javob</span>`
     : `<span class="freplyBtn" data-thread="${esc(it.id)}">💬 ${it.reply_count||0}</span>`;
   return `<div class="fitem${focused?' fitemFocused':''}" data-id="${esc(it.id)}">
-    <div class="fmeta">${authorAvatarHtml(it.user_id,it.avatar_version,it.alias)}<span class="falias">${esc(it.alias)}</span><span class="cmeta">${fmtAgo(it.created_at)}</span></div>
+    <div class="fmeta" data-user="${esc(it.user_id)}">${authorAvatarHtml(it.user_id,it.avatar_version,it.alias)}<span class="falias">${esc(it.alias)}</span><span class="cmeta">${fmtAgo(it.created_at)}</span></div>
     ${isReshare?'<div class="freshareTag">🔁 qayta ulashdi</div>':''}
     ${it.text?`<div class="ftext">${esc(it.text)}</div>${isLong?'<span class="fReadMore">Batafsil o\'qish</span>':''}`:''}
     ${isReshare?davraReshareEmbedHtml(it.reshared_post):davraBookCardHtml(it.book_id,it.reading_count,false)}
@@ -1063,6 +1093,10 @@ function davraPostHtml(it,focused){
 }
 function wireDavraPostItems(scope){
   scope.querySelectorAll('[data-book]').forEach(el=>el.onclick=e=>{e.stopPropagation();openDetail(el.dataset.book);});
+  scope.querySelectorAll('[data-user]').forEach(el=>{
+    if(el.dataset.wired)return; el.dataset.wired='1';
+    el.onclick=e=>{e.stopPropagation();openUserProfile(el.dataset.user);};
+  });
   scope.querySelectorAll('[data-thread]').forEach(el=>{
     if(el.dataset.wired)return; el.dataset.wired='1';
     el.onclick=e=>{e.stopPropagation();openDavraThread(el.dataset.thread);};
@@ -1106,12 +1140,17 @@ function wireDavraPostItems(scope){
     };
   });
 }
+// "Barchasi" (global) vs "Mening davram" (following-only, /api/davra/following-feed —
+// db.list_davra_feed(..., following_only=True)) — sticky for the session, same pattern as
+// trendingWindow staying selected across re-renders.
+let davraFeedMode='all';
 function loadDavraFeed(reset){
   if(davraLoading||(davraDone&&!reset))return;
   if(reset){davraCursor=null;davraDone=false;$('#davraList').innerHTML='';}
   davraLoading=true;
   $('#davraMore').style.display='none';
-  const path='/api/davra/feed?limit=20'+(davraCursor?'&before='+encodeURIComponent(davraCursor):'');
+  const endpoint=davraFeedMode==='following'?'/api/davra/following-feed':'/api/davra/feed';
+  const path=endpoint+'?limit=20'+(davraCursor?'&before='+encodeURIComponent(davraCursor):'');
   api(path).then(r=>{
     const items=r.items||[];
     if(items.length){
@@ -1120,11 +1159,26 @@ function loadDavraFeed(reset){
       davraCursor=items[items.length-1].created_at;
     }
     davraDone=items.length<20;
-    $('#davraEmpty').style.display=($('#davraList').children.length===0)?'block':'none';
+    const empty=$('#davraEmpty');
+    empty.style.display=($('#davraList').children.length===0)?'block':'none';
+    if(empty.style.display==='block'){
+      empty.innerHTML=davraFeedMode==='following'
+        ?'<span class="em">👥</span>Hali hech kimga obuna bo\'lmagansiz — postlardagi ismlarga bosib odamlarga obuna bo\'ling.'
+        :'<span class="em">💬</span>Hali hech narsa yo\'q — birinchi bo\'lib kitob haqida yozing!';
+    }
     $('#davraMore').style.display=davraDone?'none':'block';
   }).catch(()=>{$('#davraEmpty').style.display=$('#davraList').children.length===0?'block':'none';}).finally(()=>{davraLoading=false;});
 }
 $('#davraMore').onclick=()=>loadDavraFeed(false);
+$('#davraFeedToggle').querySelectorAll('.tw').forEach(el=>el.onclick=()=>{
+  const mode=el.dataset.mode;
+  if(mode==='following'&&!canAct()){toast('Bu bo\'lim uchun botni Telegram ichida oching');return;}
+  if(mode===davraFeedMode)return;
+  haptic();
+  davraFeedMode=mode;
+  $('#davraFeedToggle').querySelectorAll('.tw').forEach(t=>t.classList.toggle('on',t===el));
+  loadDavraFeed(true);
+});
 
 // ---- Davra composer: pick a book (search over the already-loaded local catalog, same DB.books
 // used everywhere else) + write the post text. ----
@@ -1283,7 +1337,7 @@ function davraReplyItemHtml(it){
   // creates a top-level row (see db.py) — so no reshare embed/tag/button here, unlike davraPostHtml.
   // Resharing a reply would strip it of the "replying to X" context that made it meaningful.
   return `<div class="dtReply" data-id="${esc(it.id)}">
-    <div class="fmeta">${authorAvatarHtml(it.user_id,it.avatar_version,it.alias)}<span class="falias">${esc(it.alias)}</span><span class="cmeta">${fmtAgo(it.created_at)}</span></div>
+    <div class="fmeta" data-user="${esc(it.user_id)}">${authorAvatarHtml(it.user_id,it.avatar_version,it.alias)}<span class="falias">${esc(it.alias)}</span><span class="cmeta">${fmtAgo(it.created_at)}</span></div>
     ${it.text?`<div class="ftext">${esc(it.text)}</div>`:''}
     ${it.book_id&&it.book_id!==davraFocusedBookId?davraBookCardHtml(it.book_id,it.reading_count):''}
     <div class="fActions">
@@ -1712,9 +1766,10 @@ $('#listSheet').onclick=e=>{if(e.target.id==='listSheet')closeListSheet();};
 // ---- Javon (bookshelves) — user-made personal shelves. Opened two ways: from Mutolaaxonam's
 // "Javon" row to browse them (pickBookId=null), or from a book's detail sheet's 📚 button to add
 // THAT book to a shelf (pickBookId set — tapping a shelf row adds instead of drilling in).
-let shelvesPickBookId=null;
-function openShelvesSheet(pickBookId){
+let shelvesPickBookId=null, shelvesViewUserId=null;
+function openShelvesSheet(pickBookId,viewUserId){
   shelvesPickBookId=pickBookId||null;
+  shelvesViewUserId=viewUserId||null;
   haptic();
   $('#shelvesSheet').classList.add('open');
   tg?.BackButton?.show();
@@ -1724,17 +1779,22 @@ function closeShelvesSheet(){
   $('#shelvesSheet').classList.remove('open');
   tg?.BackButton?.hide();
   shelvesPickBookId=null;
+  shelvesViewUserId=null;
 }
 async function loadShelvesList(){
   $('#shelvesTitle').textContent=shelvesPickBookId?'📚 Qaysi javonga qo\'shamiz?':'📚 Javon';
   const c=$('#shelvesSheetc');
   c.innerHTML='Yuklanmoqda...';
   try{
-    const r=await api('/api/profile/shelves');
+    // A public profile's Javonlar are read-only — someone else's shelf list/contents, no
+    // create/add-to-shelf actions (those stay self-only, matching every other write in this app).
+    const path=shelvesViewUserId?`/api/users/${shelvesViewUserId}/shelves`:'/api/profile/shelves';
+    const r=await api(path);
     const items=r.items||[];
     const rows=items.map(s=>`<div class="lrow" data-shelf="${s.id}"><span class="lrowIcon">📚</span><div class="lrowBody"><div class="lrowT">${esc(s.name)}</div><div class="lrowN">${s.count} ta kitob</div></div><span class="lrowChev">›</span></div>`).join('');
-    c.innerHTML=`<button class="btn primary" id="shelfNewBtn" style="width:100%; margin-bottom:6px">+ Yangi javon</button>${items.length?rows:'<p class="hint">Hali javon yo\'q — birinchisini yarating</p>'}`;
-    $('#shelfNewBtn').onclick=()=>createShelfPrompt();
+    const newBtn=shelvesViewUserId?'':`<button class="btn primary" id="shelfNewBtn" style="width:100%; margin-bottom:6px">+ Yangi javon</button>`;
+    c.innerHTML=`${newBtn}${items.length?rows:`<p class="hint">Hali javon yo'q${shelvesViewUserId?'':' — birinchisini yarating'}</p>`}`;
+    if(!shelvesViewUserId)$('#shelfNewBtn').onclick=()=>createShelfPrompt();
     c.querySelectorAll('[data-shelf]').forEach(el=>el.onclick=()=>{
       const id=el.dataset.shelf;
       const shelf=items.find(s=>String(s.id)===String(id));
@@ -1764,13 +1824,15 @@ async function openShelfContents(shelfId,shelfName){
   const c=$('#shelvesSheetc');
   c.innerHTML='Yuklanmoqda...';
   try{
-    const r=await api(`/api/profile/shelves/${shelfId}`);
+    const path=shelvesViewUserId?`/api/users/${shelvesViewUserId}/shelves/${shelfId}`:`/api/profile/shelves/${shelfId}`;
+    const r=await api(path);
     const books=(r.items||[]).map(id=>byId[id]).filter(Boolean);
+    const mine=!shelvesViewUserId;
     c.innerHTML=`<button class="btn ghost" id="shelfBackBtn" style="margin-bottom:10px">‹ Javonlar</button>`+
-      (books.length?`<div class="grid">${books.map(b=>shelfCardHtml(b)).join('')}</div>`:'<p class="hint">Bu javon hali bo\'sh</p>');
+      (books.length?`<div class="grid">${books.map(b=>shelfCardHtml(b,mine)).join('')}</div>`:'<p class="hint">Bu javon hali bo\'sh</p>');
     $('#shelfBackBtn').onclick=loadShelvesList;
     c.querySelectorAll('.book').forEach(el=>el.onclick=e=>{if(e.target.closest('[data-unshelve]'))return;closeShelvesSheet();openDetail(el.dataset.id);});
-    c.querySelectorAll('[data-unshelve]').forEach(el=>el.onclick=e=>{
+    if(mine)c.querySelectorAll('[data-unshelve]').forEach(el=>el.onclick=e=>{
       e.stopPropagation();
       api(`/api/profile/shelves/${shelfId}/items/${encodeURIComponent(el.dataset.unshelve)}`,{method:'DELETE'}).then(()=>{
         toast('Olib tashlandi');
@@ -1782,12 +1844,13 @@ async function openShelfContents(shelfId,shelfName){
     $('#shelfBackBtn').onclick=loadShelvesList;
   }
 }
-function shelfCardHtml(b){
+function shelfCardHtml(b,showUnshelve){
+  if(showUnshelve===undefined)showUnshelve=true;
   const[c1,c2]=coverFor(b.i);
   return `<div class="book" data-id="${esc(b.i)}">
     <div class="cover" style="background:linear-gradient(135deg,${c1},${c2})">
       ${b.hc?`<img class="ci" src="covers/${encodeURIComponent(b.i)}.jpg" loading="lazy" onerror="this.remove()">`:''}
-      <span class="fav" data-unshelve="${esc(b.i)}" title="Javondan olib tashlash">🗑</span>
+      ${showUnshelve?`<span class="fav" data-unshelve="${esc(b.i)}" title="Javondan olib tashlash">🗑</span>`:''}
       <span class="ini">${esc(initials(b.t))}</span>
     </div>
     <div class="meta"><div class="t">${esc(b.t)}</div><div class="a">${esc(b.a||'')}</div></div>
@@ -2613,9 +2676,20 @@ function renderProfileCard(){
       <div class="pHeroName">${esc(name)}</div>
       <div class="pHeroSub" id="pHeroSubBtn">${esc(sub)}</div>
       ${p.bio?`<div class="pHeroBio">${esc(p.bio)}</div>`:''}
+      <div class="pFollowRow">
+        <span class="pFollowStat" id="pFollowersStat"><b>–</b><span>obunachi</span></span>
+        <span class="pFollowStat" id="pFollowingStat"><b>–</b><span>obuna</span></span>
+      </div>
     </div>`;
     $('#pProfileCardBtn').onclick=()=>openProfileEdit();
     $('#pHeroSubBtn').onclick=()=>openProfileEdit();
+    $('#pFollowersStat').onclick=()=>openFollowList(uid,'followers');
+    $('#pFollowingStat').onclick=()=>openFollowList(uid,'following');
+    api('/api/users/'+uid+'/profile').then(fp=>{
+      const fs=$('#pFollowersStat b'),gs=$('#pFollowingStat b');
+      if(fs)fs.textContent=fmtNum(fp.followers);
+      if(gs)gs.textContent=fmtNum(fp.following);
+    }).catch(()=>{});
   }).catch(()=>{card.innerHTML='';});
 }
 // ---- birth-date wheel picker: 3 independent scroll-snap columns (day/month/year), matching the
@@ -3036,52 +3110,58 @@ function loadProfile(){
       </div>`;
     // Badges are already fetched above (myBadgesCache) — the Yutuqlar tab renders from that
     // cache instead of a second round trip, unless it's opened before this resolves.
-    if(document.querySelector('.ptab[data-pt="yutuq"]')?.classList.contains('on'))renderYutuqlarTab();
+    if(document.querySelector('#pTabs .ptab[data-pt="yutuq"]')?.classList.contains('on'))badgesTabHtml(myBadgesCache||[],'pTabContent');
   }).catch(()=>{body.innerHTML='<p class="hint">Ma\'lumot yuklanmadi.</p>';});
-  switchProfileTab(document.querySelector('.ptab.on')?.dataset.pt||'javon');
+  switchProfileTab($('#pTabs').querySelector('.ptab.on')?.dataset.pt||'javon');
 }
-// ---- Profil screen tabs: Javonlar / Yutuqlar / Sertifikatlar ----
+// ---- Profil screen tabs: Javonlar / Yutuqlar / Sertifikatlar — shared with the public
+// "someone else's profile" sheet (#userProfileSheet), which renders the exact same three tabs
+// read-only. userId=null means "my own profile" (the original self-only behavior — create-shelf
+// button, unshelve icons); a real id means the public mirror (see /api/users/{id}/... routes). ----
 $('#pTabs').querySelectorAll('.ptab').forEach(el=>el.onclick=()=>{haptic();switchProfileTab(el.dataset.pt);});
 function switchProfileTab(tab){
   $('#pTabs').querySelectorAll('.ptab').forEach(el=>el.classList.toggle('on',el.dataset.pt===tab));
-  if(tab==='javon')renderJavonlarTab();
-  else if(tab==='yutuq')renderYutuqlarTab();
-  else if(tab==='cert')renderCertificatesTab();
+  if(tab==='javon')shelvesTabHtml(null,'pTabContent');
+  else if(tab==='yutuq')badgesTabHtml(myBadgesCache||[],'pTabContent');
+  else if(tab==='cert')certificatesTabHtml(null,'pTabContent');
 }
-// Top-level shelf list, inline in the profile tab (mirrors loadShelvesList's markup/behavior,
-// but targets #pTabContent and — since we're not inside #shelvesSheet — drilling into one
-// shelf's actual books still reuses the existing full-page Javon sheet, which already has its
-// own back/close handling; only the "which shelves do I have" list needed its own inline copy).
-function renderJavonlarTab(){
-  const c=$('#pTabContent');
+// Top-level shelf list, inline in a profile tab (mirrors loadShelvesList's markup/behavior, but
+// targets containerId and — since we're not inside #shelvesSheet — drilling into one shelf's
+// actual books still reuses the existing full-page Javon sheet, which already has its own
+// back/close handling; only the "which shelves does this account have" list needed its own
+// inline copy).
+function shelvesTabHtml(userId,containerId){
+  const c=$('#'+containerId);
   c.innerHTML='Yuklanmoqda...';
-  api('/api/profile/shelves').then(r=>{
+  const path=userId?`/api/users/${userId}/shelves`:'/api/profile/shelves';
+  api(path).then(r=>{
     const items=r.items||[];
     const rows=items.map(s=>`<div class="lrow" data-shelf="${s.id}"><span class="lrowIcon">📚</span><div class="lrowBody"><div class="lrowT">${esc(s.name)}</div><div class="lrowN">${s.count} ta kitob</div></div><span class="lrowChev">›</span></div>`).join('');
-    c.innerHTML=`<button class="btn primary" id="pShelfNewBtn" style="width:100%; margin-bottom:6px">+ Yangi javon</button>${items.length?rows:'<p class="hint">Hali javon yo\'q — birinchisini yarating</p>'}`;
-    $('#pShelfNewBtn').onclick=()=>createShelfPrompt(renderJavonlarTab);
+    const newBtn=userId?'':`<button class="btn primary" id="${containerId}ShelfNewBtn" style="width:100%; margin-bottom:6px">+ Yangi javon</button>`;
+    c.innerHTML=`${newBtn}${items.length?rows:`<p class="hint">Hali javon yo'q${userId?'':' — birinchisini yarating'}</p>`}`;
+    if(!userId)$('#'+containerId+'ShelfNewBtn').onclick=()=>createShelfPrompt(()=>shelvesTabHtml(userId,containerId));
     c.querySelectorAll('[data-shelf]').forEach(el=>el.onclick=()=>{
       const id=el.dataset.shelf;
       const shelf=items.find(s=>String(s.id)===String(id));
       shelvesPickBookId=null;
+      shelvesViewUserId=userId||null;
       $('#shelvesSheet').classList.add('open');
       tg?.BackButton?.show();
       openShelfContents(id,shelf?.name);
     });
   }).catch(()=>{c.innerHTML='<p class="hint">Yuklab bo\'lmadi</p>';});
 }
-function renderYutuqlarTab(){
-  const c=$('#pTabContent');
-  if(!myBadgesCache){c.innerHTML='Yuklanmoqda...';return;}
-  c.innerHTML=`<div class="badgeGrid">${myBadgesCache.map(b=>{
+function badgesTabHtml(badges,containerId){
+  $('#'+containerId).innerHTML=`<div class="badgeGrid">${badges.map(b=>{
     const m=_BADGE_META[b.code]||{emoji:'🏅',label:b.code};
     return `<div class="badgeCard${b.achieved?'':' locked'}"><div class="badgeEmoji">${m.emoji}</div><div class="badgeLabel">${esc(m.label)}</div></div>`;
   }).join('')}</div>`;
 }
-function renderCertificatesTab(){
-  const c=$('#pTabContent');
+function certificatesTabHtml(userId,containerId){
+  const c=$('#'+containerId);
   c.innerHTML='Yuklanmoqda...';
-  api('/api/profile/certificates').then(r=>{
+  const path=userId?`/api/users/${userId}/certificates`:'/api/profile/certificates';
+  api(path).then(r=>{
     const items=r.items||[];
     c.innerHTML=`<div class="certList">${items.map(cert=>{
       const pct=Math.min(100,Math.round((cert.progress/cert.threshold)*100));
@@ -3099,6 +3179,119 @@ function renderCertificatesTab(){
   }).catch(()=>{c.innerHTML='<p class="hint">Yuklab bo\'lmadi</p>';});
 }
 function goToView(v){state.view=v;state.all=false;setTabs();run();window.scrollTo(0,0);}
+
+// ---- Public profile ("full mirror" of the self profile page, minus contact info) — opened by
+// tapping any name/avatar in Davra. Tapping your OWN name/avatar redirects to the real self
+// profile tab instead of this read-only sheet, since that already has full edit capability. ----
+function openUserProfile(userId){
+  userId=parseInt(userId,10);
+  if(!userId)return;
+  if(canAct()&&userId===myUid()){goToView('profile');return;}
+  haptic();
+  $('#uProfileCard').innerHTML='';
+  $('#uBody').innerHTML='Yuklanmoqda...';
+  $('#uTabs').querySelectorAll('.ptab').forEach(el=>el.classList.toggle('on',el.dataset.pt==='javon'));
+  $('#uTabContent').innerHTML='';
+  $('#userProfileSheet').classList.add('open');
+  tg?.BackButton?.show();
+  loadUserProfileHero(userId);
+  loadUserProfileStats(userId);
+  shelvesTabHtml(userId,'uTabContent');
+}
+function closeUserProfile(){$('#userProfileSheet').classList.remove('open');tg?.BackButton?.hide();}
+$('#userProfileClose').onclick=closeUserProfile;
+$('#userProfileSheet').onclick=e=>{if(e.target.id==='userProfileSheet')closeUserProfile();};
+$('#uTabs').querySelectorAll('.ptab').forEach(el=>el.onclick=()=>{
+  haptic();
+  const userId=parseInt($('#userProfileSheet').dataset.uid,10);
+  $('#uTabs').querySelectorAll('.ptab').forEach(t=>t.classList.toggle('on',t===el));
+  const tab=el.dataset.pt;
+  if(tab==='javon')shelvesTabHtml(userId,'uTabContent');
+  else if(tab==='yutuq')badgesTabHtml($('#userProfileSheet').__badgesCache||[],'uTabContent');
+  else if(tab==='cert')certificatesTabHtml(userId,'uTabContent');
+});
+function loadUserProfileHero(userId){
+  api('/api/users/'+userId+'/profile').then(p=>{
+    $('#userProfileSheet').dataset.uid=userId;
+    $('#uProfileTitle').textContent='👤 '+(p.display_name||'Foydalanuvchi');
+    const[c1,c2]=coverFor(String(userId));
+    const avSize=84;
+    const img=p.avatar_version?`<img class="avImg" style="width:${avSize}px;height:${avSize}px" src="${avatarUrl(userId,p.avatar_version)}" onerror="this.remove()">`:'';
+    const followBtn=canAct()?`<button class="followBtn${p.is_following?' on':''}" id="uFollowBtn">${p.is_following?'✓ Obuna bo\'lgan':'+ Obuna bo\'lish'}</button>`:'';
+    $('#uProfileCard').innerHTML=`<div class="pHero">
+      <div class="pHeroBanner" style="background:linear-gradient(135deg,${c1},${c2})"></div>
+      <div class="pHeroTop">
+        <div class="avWrap" style="width:${avSize}px;height:${avSize}px"><div class="avInitials" style="width:${avSize}px;height:${avSize}px;font-size:30px;background:linear-gradient(135deg,${c1},${c2})">${esc(initials(p.display_name||'?'))}</div>${img}</div>
+        ${followBtn}
+      </div>
+      <div class="pHeroName">${esc(p.display_name||'Foydalanuvchi')}</div>
+      ${p.tahallus?`<div class="pHeroSub">@${esc(p.tahallus)}</div>`:''}
+      ${p.bio?`<div class="pHeroBio">${esc(p.bio)}</div>`:''}
+      <div class="pFollowRow">
+        <span class="pFollowStat" id="uFollowersStat"><b>${fmtNum(p.followers)}</b><span>obunachi</span></span>
+        <span class="pFollowStat" id="uFollowingStat"><b>${fmtNum(p.following)}</b><span>obuna</span></span>
+      </div>
+    </div>`;
+    $('#uFollowersStat').onclick=()=>openFollowList(userId,'followers');
+    $('#uFollowingStat').onclick=()=>openFollowList(userId,'following');
+    const fb=$('#uFollowBtn');
+    if(fb)fb.onclick=()=>{
+      haptic();
+      fb.disabled=true;
+      api('/api/users/'+userId+'/follow',{method:'POST'}).then(r=>{
+        fb.classList.toggle('on',r.following);
+        fb.textContent=r.following?'✓ Obuna bo\'lgan':'+ Obuna bo\'lish';
+        const st=$('#uFollowersStat b');if(st)st.textContent=fmtNum(r.follower_count);
+      }).catch(()=>toast('Xatolik yuz berdi')).finally(()=>{fb.disabled=false;});
+    };
+  }).catch(()=>{$('#uProfileCard').innerHTML='<p class="hint">Profil topilmadi.</p>';});
+}
+function loadUserProfileStats(userId){
+  api('/api/users/'+userId+'/stats').then(r=>{
+    $('#userProfileSheet').__badgesCache=r.badges;
+    const s=r.streak,st=r.stats,rt=r.reading_time||{total_seconds:0,last_7_days_seconds:0};
+    const toMin=sec=>Math.round((sec||0)/60);
+    const rankText=r.rank?`#${fmtNum(r.rank.position)} / ${fmtNum(r.rank.total_users)}`:'—';
+    $('#uBody').innerHTML=`
+      <div class="streakbig"><span class="n">${s.current_streak}</span><span class="u">kunlik seriya${s.active_today?' · bugun faol 🔥':''}</span></div>
+      <div class="statgrid">
+        <div class="st"><div class="sv">🪙 ${fmtNum(r.points||0)}</div><div class="sl">ball hisobi</div></div>
+        <div class="st"><div class="sv">${fmtNum(toMin(rt.total_seconds))}</div><div class="sl">daqiqa o'qildi</div></div>
+        <div class="st"><div class="sv">${rankText}</div><div class="sl">reyting o'rni</div></div>
+        <div class="st"><div class="sv">${fmtNum(toMin(rt.last_7_days_seconds))}</div><div class="sl">so'nggi 7 kun (daq)</div></div>
+      </div>
+      <div class="statgrid">
+        <div class="st"><div class="sv">${st.total_opens}</div><div class="sl">ochilgan kitoblar</div></div>
+        <div class="st"><div class="sv">${st.favorites}</div><div class="sl">sevimlilar</div></div>
+        <div class="st"><div class="sv">${st.comments}</div><div class="sl">izohlar</div></div>
+        <div class="st"><div class="sv">${s.best_streak}</div><div class="sl">eng uzun seriya</div></div>
+      </div>`;
+    if($('#uTabs').querySelector('.ptab[data-pt="yutuq"]')?.classList.contains('on'))badgesTabHtml(r.badges,'uTabContent');
+  }).catch(()=>{$('#uBody').innerHTML='<p class="hint">Ma\'lumot yuklanmadi.</p>';});
+}
+
+// ---- Followers / following list — one sheet, two modes, each row opens that person's own
+// profile (openUserProfile), so you can walk the follow graph (X's followers -> tap one -> their
+// followers -> ...) the same way Instagram lets you. ----
+function followRowHtml(u){
+  return `<div class="flRow" data-user="${esc(u.user_id)}">${authorAvatarHtml(u.user_id,u.avatar_version,u.display_name,36)}<span class="falias">${esc(u.display_name)}</span></div>`;
+}
+function openFollowList(userId,kind){
+  haptic();
+  $('#followListTitle').textContent=kind==='followers'?'Obunachilar':'Obunalar';
+  const c=$('#followListSheetc');
+  c.innerHTML='Yuklanmoqda...';
+  $('#followListSheet').classList.add('open');
+  tg?.BackButton?.show();
+  api(`/api/users/${userId}/${kind}`).then(r=>{
+    const items=r.items||[];
+    c.innerHTML=items.length?items.map(followRowHtml).join(''):'<p class="hint">Hali hech kim yo\'q</p>';
+    c.querySelectorAll('[data-user]').forEach(el=>el.onclick=()=>{closeFollowList();openUserProfile(el.dataset.user);});
+  }).catch(()=>{c.innerHTML='<p class="hint">Yuklab bo\'lmadi</p>';});
+}
+function closeFollowList(){$('#followListSheet').classList.remove('open');tg?.BackButton?.hide();}
+$('#followListClose').onclick=closeFollowList;
+$('#followListSheet').onclick=e=>{if(e.target.id==='followListSheet')closeFollowList();};
 $('#btnProfile').onclick=()=>{haptic();goToView('profile');};
 $('#btnSearchIcon').onclick=()=>{haptic();state.view='search';setTabs();run();window.scrollTo(0,0);setTimeout(()=>$('#q').focus(),80);};
 $('#sheetClose').onclick=()=>closeSheet();
@@ -3347,6 +3540,7 @@ const SHEET_CLOSERS={
   davraComposeSheet:closeDavraCompose, davraReshareMenuSheet:closeDavraReshareMenu,
   reviewsSheet:closeReviewsSheet, profileEditSheet:closeProfileEdit, shelvesSheet:closeShelvesSheet,
   listSheet:closeListSheet, liveSheet:closeLiveSheet, sheet:closeSheet,
+  userProfileSheet:closeUserProfile, followListSheet:closeFollowList,
   // closeGlobe lives in the separate type="module" script below (Three.js globe) and only
   // becomes a real global once that deferred module finishes running — referencing it bare HERE
   // (evaluated immediately, before the module has loaded) throws ReferenceError. Wrapping it in
