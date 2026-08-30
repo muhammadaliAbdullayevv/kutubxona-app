@@ -1632,7 +1632,7 @@ function openDetail(id){
       <h2 class="dtitle">${esc(b.t)}</h2>
       <div class="dauthor">${esc(b.a||'Noma\'lum muallif')}</div>
       <div class="dStatRow">
-        <div class="dStat"><div class="dStatL">Reyting</div><div class="dStatV">${b.rc?`⭐ ${b.rt}`:'–'}</div></div>
+        <div class="dStat"><div class="dStatL">Reyting</div><div class="dStatV" id="dStatRating">${b.rc?`⭐ ${b.rt}`:'–'}</div></div>
         <div class="dStat"><div class="dStatL">O'qimoqda</div><div class="dStatV" id="dStatReading">–</div></div>
         <div class="dStat"><div class="dStatL">Yuklab olingan</div><div class="dStatV">${b.dl?fmtNum(b.dl):'–'}</div></div>
       </div>
@@ -2676,12 +2676,16 @@ function loadReviewPreview(bookId,totalCount){
   }).catch(()=>{wrap.innerHTML='';});
 }
 function loadRating(bookId){
-  // The big number + stars already show at the top of the page now (in .dStatRow, from the
-  // catalog's own b.rt/b.rc — instant, no round trip) — repeating "4/5 — N ta baho" here too was
-  // a straight duplicate, so this section is just the reviews themselves: a preview shelf first,
-  // the write/edit action below it (matching the reference's own order), no distribution graph.
+  // The big number + stars show at the top of the page instantly (in .dStatRow, from the
+  // catalog's own b.rt/b.rc — no round trip needed just to render the sheet) — but that's a
+  // static export snapshot, not live: rating your own book here wouldn't move it until the
+  // catalog next regenerates. This fetch already pulls the real live average/count for the
+  // reviews section below, so it also upgrades #dStatRating in place once it lands — same
+  // static-then-live pattern #dStatReading already uses just below it.
   const body=$('#rBody');if(!body)return;
   api('/api/books/'+encodeURIComponent(bookId)+'/rating').then(r=>{
+    const statEl=$('#dStatRating');
+    if(statEl&&$('#sheet').classList.contains('open'))statEl.textContent=r.count?`⭐ ${r.average}`:'–';
     body.innerHTML=`
       <div id="rPreview"></div>
       ${canAct()?`<button class="btn primary" id="rWriteBtn" style="width:100%; margin-top:10px">${r.my_rating?"Izohni tahrirlash":"Kitob haqida izoh qoldirish"}</button>`:'<p class="hint">Baho berish uchun botda oching.</p>'}`;
