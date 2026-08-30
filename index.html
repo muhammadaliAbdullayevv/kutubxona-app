@@ -225,6 +225,7 @@
   .toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
   .hint{color:var(--muted); font-size:13px; margin:6px 0}
   .cmeta{font-size:12px; color:var(--muted); font-weight:700}
+  .rAuthorRow{display:flex; align-items:center; gap:7px; margin:6px 0 2px}
   /* Book globe */
   #globe{align-items:stretch; background:var(--bg)}
   #globeCanvas{width:100%; height:100%; touch-action:none; display:block}
@@ -501,6 +502,12 @@
   /* ---- profile header: banner + large avatar, matching mutolaa's proportions instead of the
      small flat row this used to be. The banner is a computed per-user gradient (same coverFor()
      used for book covers elsewhere), not an uploadable cover photo — that stays out of scope. ---- */
+  .onboardBanner{display:flex; align-items:center; gap:12px; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border-radius:16px; padding:14px 16px; margin:0 0 16px; cursor:pointer}
+  .onboardIcon{font-size:24px; flex-shrink:0}
+  .onboardText{flex:1; min-width:0}
+  .onboardText b{font-size:14px; display:block}
+  .onboardText div{font-size:12.5px; opacity:.9; margin-top:2px}
+  .onboardChev{font-size:22px; flex-shrink:0; opacity:.85}
   .pHero{position:relative; margin:0 0 18px; border-radius:16px; overflow:hidden; background:var(--card); border:1px solid color-mix(in srgb, var(--line) 45%, var(--muted) 55%); box-shadow:0 2px 10px rgba(0,0,0,.28)}
   .pHeroBanner{height:76px; width:100%}
   .pHeroTop{display:flex; align-items:flex-end; justify-content:space-between; padding:0 14px; margin-top:-30px; gap:10px}
@@ -949,7 +956,7 @@ function fitemHtml(it){
     bookHtml=`<div class="fbook" data-book="${esc(b.i)}"><div class="fbcover" style="background:linear-gradient(135deg,${c1},${c2})">${b.hc?`<img class="ci" src="covers/${encodeURIComponent(b.i)}.jpg" loading="lazy" onerror="this.remove()">`:''}<span class="ini">${esc(initials(b.t))}</span></div><div class="fbinfo"><div class="fbtitle">${esc(b.t)}</div>${it.reading_count>0?`<span class="fblive">🔴 ${it.reading_count} o'qimoqda</span>`:''}</div></div>`;
   }
   return `<div class="fitem" data-id="${esc(it.id)}">
-    <div class="fmeta"><span class="falias">${esc(it.alias)}</span>${it.stars?starsHtml(it.stars,'fstars'):''}<span class="cmeta">${fmtAgo(it.created_at)}</span></div>
+    <div class="fmeta">${authorAvatarHtml(it.user_id,it.avatar_version,it.alias)}<span class="falias">${esc(it.alias)}</span>${it.stars?starsHtml(it.stars,'fstars'):''}<span class="cmeta">${fmtAgo(it.created_at)}</span></div>
     ${it.text?`<div class="ftext">${esc(it.text)}</div>`:''}
     ${bookHtml}
     <button class="flike" data-kind="${it.kind}" data-id="${esc(it.id)}">🤍 <span class="fcount">${it.like_count||0}</span></button>
@@ -1508,8 +1515,25 @@ function marqueeShelf(title,books,see){
   </div>`;
 }
 function heroSkeletonHtml(){return `<div class="hero" style="pointer-events:none; background:var(--card)"><div class="heroCover skel" style="border-radius:14px"></div><div class="heroInfo"><div class="skel" style="height:16px;width:70%;border-radius:6px;margin-bottom:8px"></div><div class="skel" style="height:12px;width:40%;border-radius:6px"></div></div></div>`;}
+// Nudges a signed-in user with no display_name yet (i.e. never touched profile settings) to go
+// set it up — set once at boot (checkOnboardingBanner), re-rendered as part of renderHome's own
+// normal rebuild so it doesn't get wiped by the next innerHTML replace like a bolted-on
+// afterthought would.
+let needsOnboarding=false;
+function checkOnboardingBanner(){
+  if(!canAct())return;
+  api('/api/profile/settings').then(p=>{
+    const was=needsOnboarding;
+    needsOnboarding=!p.display_name;
+    if(needsOnboarding!==was&&isHome())renderHome();
+  }).catch(()=>{});
+}
+function onboardingBannerHtml(){
+  return `<div class="onboardBanner" id="onboardingBanner"><span class="onboardIcon">👋</span><div class="onboardText"><b>Profilingizni to'ldiring</b><div>Ism, rasm va boshqa ma'lumotlaringizni kiriting</div></div><span class="onboardChev">›</span></div>`;
+}
 function renderHome(){
   const h=$('#home');let html='';
+  if(needsOnboarding)html+=onboardingBannerHtml();
   if(HOME.continue.length)html+=heroHtml(HOME.continue[0]);
   else if(canAct()&&!HOME.continueLoaded)html+=heroSkeletonHtml();
   if(HOME.topics.length)html+=topicsHtml(HOME.topics);
@@ -1532,6 +1556,8 @@ function renderHome(){
   h.querySelectorAll('#trendWin .tw').forEach(el=>el.onclick=()=>{haptic();trendingWindow=el.dataset.w;loadTrending();});
   h.querySelectorAll('[data-auth]').forEach(el=>el.onclick=()=>{state.view='search';state.all=false;$('#q').value=el.dataset.auth;state.q=el.dataset.auth;$('#clr').style.display='block';haptic();setTabs();run();window.scrollTo(0,0);});
   h.querySelectorAll('[data-see]').forEach(el=>el.onclick=()=>{state.view='search';const s=el.dataset.see;if(s==='newest'){state.all=true;state.sort='newest';$('#sort').value='newest';}else if(s==='audio'){state.type='audio';renderChips();}haptic();setTabs();run();window.scrollTo(0,0);});
+  const ob=$('#onboardingBanner');
+  if(ob)ob.onclick=()=>{haptic();goToView('profile');setTimeout(()=>openProfileEdit(),150);};
 }
 // ---- gentle auto-scroll for the "recently added" ticker, native scroll underneath so a
 // touch/swipe always fully overrides it (pauses the moment a finger touches it, resumes a
@@ -2123,6 +2149,16 @@ const _BADGE_META={
 };
 const myUid=()=>tg?.initDataUnsafe?.user?.id;
 function avatarUrl(uid,v){return COMMUNITY_API_BASE+'/api/profile/avatar/'+encodeURIComponent(uid)+(v?'?v='+v:'?v=0');}
+// Small round avatar for a comment/review/feed author — same base-layer-initials + on-top-photo-
+// that-self-removes-on-error pattern used everywhere else an avatar shows (profile hero, book
+// covers): a missing/broken photo degrades to initials instead of a broken-image icon.
+function authorAvatarHtml(userId,avatarVersion,name,size){
+  size=size||26;
+  const[c1,c2]=coverFor(String(userId||'u'));
+  const img=(userId&&avatarVersion)?`<img src="${avatarUrl(userId,avatarVersion)}" style="width:${size}px;height:${size}px;position:absolute;top:0;left:0;border-radius:50%;object-fit:cover" onerror="this.remove()">`:'';
+  return `<span style="width:${size}px;height:${size}px;position:relative;display:inline-flex;flex-shrink:0">`+
+    `<span style="width:${size}px;height:${size}px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:${Math.max(9,Math.round(size*0.4))}px;font-weight:800;color:#fff;background:linear-gradient(135deg,${c1},${c2})">${esc(initials(name))}</span>${img}</span>`;
+}
 // Small circular avatar+name row at the top of the Profil screen — tap opens the full editor.
 // Kept as its own render pass (not folded into loadProfile's single big innerHTML) since the
 // avatar can change from the editor without needing to reload the whole stats block underneath.
@@ -2648,7 +2684,7 @@ function ratingRowHtml(r){
   return `<div class="rrow${mine?' mine':''}" data-id="${esc(r.id)}"${mine?' data-mine="1"':''}>
     <div class="rstars">${starsHtml(r.stars)}</div>
     ${r.review_text?`<div class="rtext">${esc(r.review_text)}</div>`:''}
-    <div class="cmeta">${mine?'Sizning izohingiz':esc(r.alias)}</div>
+    <div class="rAuthorRow">${authorAvatarHtml(r.user_id,r.avatar_version,r.alias)}<span class="cmeta">${mine?'Sizning izohingiz':esc(r.alias)}</span></div>
     <div class="rvote">
       <span class="rhelp${voted===true?' on':''}" data-id="${esc(r.id)}" data-v="1"${canAct()?'':' data-off="1"'}>👍 Foydali (${r.helpful_yes})</span>
       <span class="rhelp${voted===false?' on':''}" data-id="${esc(r.id)}" data-v="0"${canAct()?'':' data-off="1"'}>👎 Foydali emas (${r.helpful_no})</span>
@@ -2661,7 +2697,7 @@ function reviewCardHtml(r){
   return `<div class="rcard${mine?' mine':''}"${mine?' data-mine="1"':''}>
     <div class="rcStars">${starsHtml(r.stars)}</div>
     ${r.review_text?`<div class="rcText">${esc(r.review_text)}</div>`:'<div class="rcText hint">Izoh yozilmagan</div>'}
-    <div class="rcMeta">${mine?'Sizning izohingiz · ✏️':esc(r.alias)}</div>
+    <div class="rAuthorRow">${authorAvatarHtml(r.user_id,r.avatar_version,r.alias,20)}<span class="rcMeta">${mine?'Sizning izohingiz · ✏️':esc(r.alias)}</span></div>
   </div>`;
 }
 function wireRatingVotes(scope,bookId,onVoted){
@@ -2932,6 +2968,7 @@ async function boot(){
   }catch(e){$('#count').textContent='';$('#grid').innerHTML='';$('#empty').style.display='block';$('#empty').innerHTML='<span class="em">⚠️</span>Ma\'lumot yuklanmadi';return;}
   await loadFavs();
   renderChips();run();
+  checkOnboardingBanner();
   loadContinueReading();
   loadTrending();
   loadTopSearchTerms();
