@@ -572,11 +572,19 @@
   .pHeroBannerBlank{background:var(--chip); display:flex; align-items:center; justify-content:center}
   .pHeroBannerUpload{position:absolute; bottom:8px; right:8px; padding:6px 10px; border-radius:20px; background:rgba(0,0,0,.55); color:#fff; font-size:12px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:4px}
   .pHeroBannerBlank .pHeroBannerUpload{position:static; background:none; color:var(--muted); font-size:13px}
-  .pHeroTop{display:flex; align-items:center; padding:16px 14px 16px; gap:12px}
+  /* Avatar floats over the banner's bottom edge (half on the photo, half below it) instead of
+     sitting in a fully separate row underneath — matches the overlapping-avatar hero pattern seen
+     in mutolaa. .avWrap is pulled up via absolute positioning (42px = half its 84px height) so it
+     straddles the banner/content boundary; .pHeroIdentity keeps its left offset reserved for it via
+     padding on .pHeroTop, and padding-top clears the overlap zone so name/username never sit under
+     the floating ring. Only valid when a banner element actually precedes this row — see .noBanner. */
+  .pHeroTop{position:relative; padding:48px 14px 16px 110px}
+  .pHeroTop.noBanner{padding-top:14px}
   /* A plain border, not border+box-shadow — the two combined were rendering as an uneven arc
      (thick on one side, nearly gone on the other) instead of a uniform ring on real devices, not
      just a headless-testing artifact. A single border on a border-radius:50% box can't do that. */
-  .pHero .avWrap{position:relative; flex-shrink:0; border-radius:50%; border:3px solid var(--accent); box-sizing:content-box}
+  .pHero .avWrap{position:absolute; left:14px; top:-42px; border-radius:50%; border:3px solid var(--accent); box-sizing:content-box; background:var(--card)}
+  .pHeroTop.noBanner .avWrap{top:14px}
   .pHero .avImg{position:absolute; top:0; left:0; border-radius:50%; object-fit:cover}
   .pHero .avInitials{border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:800; color:#fff}
   .pHeroIdentity{flex:1; min-width:0}
@@ -3434,7 +3442,7 @@ function loadUserProfileHero(userId){
     $('#uProfileCard').innerHTML=`<div class="pHero">
       ${bannerHtml}
       <span class="pHeroShareBtn pHeroShareOnly" id="uShareBtn" title="Ulashish">📤</span>
-      <div class="pHeroTop">
+      <div class="pHeroTop${p.banner_version?'':' noBanner'}">
         <div class="avWrap" style="width:${avSize}px;height:${avSize}px"><div class="avInitials" style="width:${avSize}px;height:${avSize}px;font-size:30px;background:linear-gradient(135deg,${c1},${c2})">${esc(initials(p.display_name||'?'))}</div>${img}</div>
         <div class="pHeroIdentity">
           <div class="pHeroName">${esc(p.display_name||'Foydalanuvchi')}</div>
