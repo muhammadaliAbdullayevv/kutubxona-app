@@ -1271,16 +1271,16 @@ $('#rmQuote').onclick=()=>{
 // showing who you're replying to and an ✕ to reset back to the root. ----
 let davraFocusedPostId=null, davraReplyTarget=null, davraReplyTargetName=null;
 function davraReplyItemHtml(it){
-  const isReshare=!!it.reshared_post;
+  // Replies never carry reshared_post — only add_davra_reshare sets that field, and it always
+  // creates a top-level row (see db.py) — so no reshare embed/tag/button here, unlike davraPostHtml.
+  // Resharing a reply would strip it of the "replying to X" context that made it meaningful.
   return `<div class="dtReply" data-id="${esc(it.id)}">
     <div class="fmeta">${authorAvatarHtml(it.user_id,it.avatar_version,it.alias)}<span class="falias">${esc(it.alias)}</span><span class="cmeta">${fmtAgo(it.created_at)}</span></div>
-    ${isReshare?'<div class="freshareTag">🔁 qayta ulashdi</div>':''}
     ${it.text?`<div class="ftext">${esc(it.text)}</div>`:''}
-    ${isReshare?davraReshareEmbedHtml(it.reshared_post):(it.book_id&&it.book_id!==davraFocusedBookId?davraBookCardHtml(it.book_id,it.reading_count):'')}
+    ${it.book_id&&it.book_id!==davraFocusedBookId?davraBookCardHtml(it.book_id,it.reading_count):''}
     <div class="fActions">
       <button class="flike${it.liked?' on':''}" data-id="${esc(it.id)}">${it.liked?'❤️':'🤍'} <span class="fcount">${it.like_count||0}</span></button>
       <span class="dtReplyAction" data-target="${esc(it.id)}" data-name="${esc(it.alias)}">Javob qaytarish</span>
-      <span class="freshareBtn" data-reshare="${esc(it.id)}">🔁 ${it.reshare_count||0}</span>
       ${it.is_mine?`<span class="fEditBtn" data-edit="${esc(it.id)}" data-text="${esc(it.text||'')}">✏️</span><span class="fDelBtn" data-del="${esc(it.id)}">🗑</span>`:''}
     </div>
     ${it.reply_count>0?`<span class="dtExpand" data-expand="${esc(it.id)}" data-count="${it.reply_count}">${it.reply_count} ta javobni ko'rish ↓</span>`:''}
