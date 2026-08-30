@@ -572,6 +572,7 @@
   .pHeroIdentity{flex:1; min-width:0}
   .pHeroName{font-weight:800; font-size:17px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
   .pHeroSub{font-size:13px; color:var(--muted); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer}
+  .pHeroJoined{font-size:12px; color:var(--muted); margin-top:3px}
   /* A small icon in the card's own top-right corner, not a text button competing with name/
      username for room on the same row — that's what was crowding/truncating both. */
   .pHeroEditBtn{position:absolute; top:12px; right:12px; width:32px; height:32px; border-radius:50%; background:var(--chip); border:1px solid var(--line); color:var(--text); font-size:14px; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:1}
@@ -710,7 +711,8 @@
     <div id="pProfileCard"></div>
     <div id="pBody">Yuklanmoqda...</div>
     <div class="ptabs" id="pTabs">
-      <span class="ptab on" data-pt="javon">📚 Javonlar</span>
+      <span class="ptab on" data-pt="posts">💬 Fikrlar</span>
+      <span class="ptab" data-pt="javon">📚 Javonlar</span>
       <span class="ptab" data-pt="yutuq">🏆 Yutuqlar</span>
       <span class="ptab" data-pt="cert">🎓 Sertifikatlar</span>
     </div>
@@ -755,7 +757,8 @@
     <div id="uProfileCard"></div>
     <div id="uBody">Yuklanmoqda...</div>
     <div class="ptabs" id="uTabs">
-      <span class="ptab on" data-pt="javon">📚 Javonlar</span>
+      <span class="ptab on" data-pt="posts">💬 Fikrlar</span>
+      <span class="ptab" data-pt="javon">📚 Javonlar</span>
       <span class="ptab" data-pt="yutuq">🏆 Yutuqlar</span>
       <span class="ptab" data-pt="cert">🎓 Sertifikatlar</span>
     </div>
@@ -2684,6 +2687,7 @@ function renderProfileCard(){
         <div class="pHeroIdentity">
           <div class="pHeroName">${esc(name)}</div>
           <div class="pHeroSub" id="pHeroSubBtn">${esc(sub)}</div>
+          <div class="pHeroJoined" id="pHeroJoined"></div>
         </div>
       </div>
       <div class="pFollowRow">
@@ -2697,12 +2701,14 @@ function renderProfileCard(){
     $('#pFollowersStat').onclick=()=>openFollowList(uid,'followers');
     $('#pFollowingStat').onclick=()=>openFollowList(uid,'following');
     api('/api/users/'+uid+'/profile').then(fp=>{
+      const jd=$('#pHeroJoined');if(jd)jd.textContent=formatJoinedYear(fp.joined_date);
       const fs=$('#pFollowersStat b'),gs=$('#pFollowingStat b');
       if(fs)fs.textContent=fmtNum(fp.followers);
       if(gs)gs.textContent=fmtNum(fp.following);
     }).catch(()=>{});
   }).catch(()=>{card.innerHTML='';});
 }
+function formatJoinedYear(iso){return iso?`📅 ${iso.slice(0,4)}-yil qo'shilgan`:'';}
 // ---- birth-date wheel picker: 3 independent scroll-snap columns (day/month/year), matching the
 // native-feeling picker every mobile OS has — a plain <input type=date> was the actual bug here,
 // rendering as a bare unstyled text box with no picker UI at all on some hosts. ----
@@ -3123,7 +3129,7 @@ function loadProfile(){
     // cache instead of a second round trip, unless it's opened before this resolves.
     if(document.querySelector('#pTabs .ptab[data-pt="yutuq"]')?.classList.contains('on'))badgesTabHtml(myBadgesCache||[],'pTabContent');
   }).catch(()=>{body.innerHTML='<p class="hint">Ma\'lumot yuklanmadi.</p>';});
-  switchProfileTab($('#pTabs').querySelector('.ptab.on')?.dataset.pt||'javon');
+  switchProfileTab($('#pTabs').querySelector('.ptab.on')?.dataset.pt||'posts');
 }
 // ---- Profil screen tabs: Javonlar / Yutuqlar / Sertifikatlar — shared with the public
 // "someone else's profile" sheet (#userProfileSheet), which renders the exact same three tabs
@@ -3132,9 +3138,40 @@ function loadProfile(){
 $('#pTabs').querySelectorAll('.ptab').forEach(el=>el.onclick=()=>{haptic();switchProfileTab(el.dataset.pt);});
 function switchProfileTab(tab){
   $('#pTabs').querySelectorAll('.ptab').forEach(el=>el.classList.toggle('on',el.dataset.pt===tab));
-  if(tab==='javon')shelvesTabHtml(null,'pTabContent');
+  if(tab==='posts')postsTabHtml(myUid(),'pTabContent');
+  else if(tab==='javon')shelvesTabHtml(null,'pTabContent');
   else if(tab==='yutuq')badgesTabHtml(myBadgesCache||[],'pTabContent');
   else if(tab==='cert')certificatesTabHtml(null,'pTabContent');
+}
+// ---- "Fikrlar" profile tab — that account's own top-level Davra posts, own or someone else's
+// profile alike, reusing the exact same post renderer/wiring as the main Davra feed
+// (davraPostHtml/wireDavraPostItems) rather than a second rendering path. ----
+const _postsTabState={};
+function postsTabHtml(userId,containerId,reset){
+  if(reset===undefined)reset=true;
+  const c=$('#'+containerId);
+  if(reset){_postsTabState[containerId]={cursor:null,done:false};c.innerHTML='Yuklanmoqda...';}
+  const st=_postsTabState[containerId];
+  if(st.done&&!reset)return;
+  const path=`/api/users/${userId}/posts?limit=20`+(st.cursor?'&before='+encodeURIComponent(st.cursor):'');
+  api(path).then(r=>{
+    const items=r.items||[];
+    if(reset)c.innerHTML='';
+    const oldMore=c.querySelector('.more');if(oldMore)oldMore.remove();
+    if(items.length){
+      c.insertAdjacentHTML('beforeend',items.map(it=>davraPostHtml(it,false)).join(''));
+      wireDavraPostItems(c);
+      st.cursor=items[items.length-1].created_at;
+    }
+    st.done=items.length<20;
+    if(c.children.length===0){c.innerHTML='<p class="hint">Hali post yo\'q</p>';}
+    else if(!st.done){
+      const moreBtn=document.createElement('button');
+      moreBtn.className='more';moreBtn.textContent='Yana yuklash';
+      moreBtn.onclick=()=>postsTabHtml(userId,containerId,false);
+      c.appendChild(moreBtn);
+    }
+  }).catch(()=>{if(reset)c.innerHTML='<p class="hint">Yuklab bo\'lmadi</p>';});
 }
 // Top-level shelf list, inline in a profile tab (mirrors loadShelvesList's markup/behavior, but
 // targets containerId and — since we're not inside #shelvesSheet — drilling into one shelf's
@@ -3201,13 +3238,13 @@ function openUserProfile(userId){
   haptic();
   $('#uProfileCard').innerHTML='';
   $('#uBody').innerHTML='Yuklanmoqda...';
-  $('#uTabs').querySelectorAll('.ptab').forEach(el=>el.classList.toggle('on',el.dataset.pt==='javon'));
+  $('#uTabs').querySelectorAll('.ptab').forEach(el=>el.classList.toggle('on',el.dataset.pt==='posts'));
   $('#uTabContent').innerHTML='';
   $('#userProfileSheet').classList.add('open');
   tg?.BackButton?.show();
   loadUserProfileHero(userId);
   loadUserProfileStats(userId);
-  shelvesTabHtml(userId,'uTabContent');
+  postsTabHtml(userId,'uTabContent');
 }
 function closeUserProfile(){$('#userProfileSheet').classList.remove('open');tg?.BackButton?.hide();}
 $('#userProfileClose').onclick=closeUserProfile;
@@ -3217,7 +3254,8 @@ $('#uTabs').querySelectorAll('.ptab').forEach(el=>el.onclick=()=>{
   const userId=parseInt($('#userProfileSheet').dataset.uid,10);
   $('#uTabs').querySelectorAll('.ptab').forEach(t=>t.classList.toggle('on',t===el));
   const tab=el.dataset.pt;
-  if(tab==='javon')shelvesTabHtml(userId,'uTabContent');
+  if(tab==='posts')postsTabHtml(userId,'uTabContent');
+  else if(tab==='javon')shelvesTabHtml(userId,'uTabContent');
   else if(tab==='yutuq')badgesTabHtml($('#userProfileSheet').__badgesCache||[],'uTabContent');
   else if(tab==='cert')certificatesTabHtml(userId,'uTabContent');
 });
@@ -3235,6 +3273,7 @@ function loadUserProfileHero(userId){
         <div class="pHeroIdentity">
           <div class="pHeroName">${esc(p.display_name||'Foydalanuvchi')}</div>
           ${p.tahallus?`<div class="pHeroSub">@${esc(p.tahallus)}</div>`:''}
+          <div class="pHeroJoined">${formatJoinedYear(p.joined_date)}</div>
         </div>
       </div>
       ${followBtn?`<div class="pHeroActions">${followBtn}</div>`:''}
