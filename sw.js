@@ -1,7 +1,7 @@
 // Kutubxona PWA service worker.
 // Bump CACHE_VERSION on any shell (HTML/CSS/JS) change so old clients pick up the new
 // version instead of serving a stale cached shell forever.
-const CACHE_VERSION = 'v112';
+const CACHE_VERSION = 'v113';
 const SHELL_CACHE = `kutubxona-shell-${CACHE_VERSION}`;
 const DATA_CACHE = `kutubxona-data-${CACHE_VERSION}`;
 const COVER_CACHE = `kutubxona-covers-${CACHE_VERSION}`;
@@ -53,10 +53,28 @@ function mediaStreamPath(pathname) {
 function mediaCacheKey(url) {
   return url.origin + url.pathname;
 }
-async function sliceFromCached(cached, rangeHeader) {
-  const blob = await cached.blob();
+// Small in-memory cache of already-materialized {blob,type} for a cached file, keyed by the same
+// origin+pathname key the Cache API entry uses. Without this, every single Range sub-request for
+// the SAME book re-ran `await cached.blob()` on the whole cached Response — and pdf.js/the
+// audio player issue many of those in a row while paging/seeking through one large file, so a
+// 50-150MB book was being re-materialized into a Blob dozens of times in quick succession. That's
+// real, repeated main-thread/GC work on every page turn, not just on first load — a very plausible
+// cause of "the app sometimes gets stuck" specifically while reading. Capped at 2 entries (current
+// + previous book) since the SW can be killed and restarted by the browser at any time anyway —
+// this is a same-session speed win, not meant to be a durable cache.
+const _blobCache = new Map();
+const _BLOB_CACHE_MAX = 2;
+async function getCachedBlob(cacheKey, cached) {
+  const hit = _blobCache.get(cacheKey);
+  if (hit) return hit;
+  const entry = { blob: await cached.blob(), type: cached.headers.get('Content-Type') || 'application/octet-stream' };
+  _blobCache.set(cacheKey, entry);
+  if (_blobCache.size > _BLOB_CACHE_MAX) _blobCache.delete(_blobCache.keys().next().value);
+  return entry;
+}
+async function sliceFromCached(cacheKey, cached, rangeHeader) {
+  const { blob, type } = await getCachedBlob(cacheKey, cached);
   const total = blob.size;
-  const type = cached.headers.get('Content-Type') || 'application/octet-stream';
   if (!rangeHeader) {
     return new Response(blob, { status: 200, headers: { 'Content-Type': type, 'Content-Length': String(total), 'Accept-Ranges': 'bytes' } });
   }
@@ -96,6 +114,10 @@ async function evictForSpace(cache, incomingBytes) {
   let i = 0;
   while (total + incomingBytes > MEDIA_CACHE_MAX_BYTES && i < entries.length) {
     await cache.delete(entries[i].req);
+    // Keep the in-memory blob cache in sync — otherwise an evicted-then-later-re-downloaded file
+    // could keep serving its stale in-memory blob instead of the fresh one for the rest of this
+    // SW instance's lifetime.
+    _blobCache.delete(mediaCacheKey(new URL(entries[i].req.url)));
     total -= entries[i].size;
     i++;
   }
@@ -139,7 +161,7 @@ async function handleMediaRequest(event, url) {
   const cache = await caches.open(MEDIA_CACHE);
   const cacheKey = mediaCacheKey(url);
   const cached = await cache.match(cacheKey);
-  if (cached) return sliceFromCached(cached, event.request.headers.get('range'));
+  if (cached) return sliceFromCached(cacheKey, cached, event.request.headers.get('range'));
   // Not cached yet — serve THIS request straight from the network (with whatever Range the
   // player/reader actually asked for, so first playback/read isn't stalled on a full download),
   // and separately populate the cache in the background for next time (deduplicated above, so
