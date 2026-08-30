@@ -371,7 +371,10 @@
   /* Profile/Davra are primary tab destinations, not overlays — they render in-place as peers
      of #home/#grid (see #profileView/#davraView in the markup), so they only need the same top
      breathing room #home's shelves already get, not a dedicated topbar/scroll-area treatment. */
-  #profileView,#davraView,#readingView{padding-top:6px}
+  /* .wrap already adds 12px of top padding shared by every view (home needs it for the search
+     bar area) — these three don't have anything above their own heading competing for that
+     space, so pull them up instead of stacking more padding on top of it. */
+  #profileView,#davraView,#readingView{padding-top:0; margin-top:-8px}
   .fitem{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:10px}
   .fitem .fmeta{display:flex; align-items:center; gap:8px; margin-bottom:6px}
   .fitem .falias{font-size:12.5px; font-weight:700; color:var(--muted)}
@@ -464,7 +467,13 @@
   .pRowLabel{color:var(--muted); font-size:14px; flex-shrink:0}
   .pRowRight{display:flex; align-items:center; gap:6px; min-width:0}
   .pRowValue{font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:220px}
-  .pRowValue.empty{color:var(--muted); font-weight:400}
+  /* NOT named .empty — that class already exists globally (the "no search results" placeholder,
+     text-align:center + padding:60px 20px for a whole empty section) and CSS matches by class
+     name regardless of what else is on the element, so a row value that used class="pRowValue
+     empty" was silently inheriting that unrelated 60px padding — exactly why every EMPTY field
+     ("Kiritilmagan") rendered as a giant oversized row while a FILLED field (no such class) sat
+     at its correct compact height right next to it. */
+  .pRowValue.blank{color:var(--muted); font-weight:400}
   .pRowChev{color:var(--muted); font-size:20px; flex-shrink:0}
   /* ---- generic single-field edit modal (#fieldEditSheet) ---- */
   .feCard{width:100%; background:var(--card); border-radius:20px 20px 0 0; padding:20px 20px calc(20px + env(safe-area-inset-bottom)); box-sizing:border-box; position:relative; text-align:center}
@@ -508,6 +517,9 @@
   .pHeroEditBtn{flex:0 1 auto; min-width:0; margin-bottom:8px; padding:8px 12px; border-radius:13px; background:var(--card); border:1px solid var(--line); color:var(--text); font-weight:800; font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer}
   .pHeroName{font-weight:800; font-size:19px; padding:12px 14px 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
   .pHeroSub{font-size:13px; color:var(--muted); padding:3px 14px 16px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer}
+  /* Bio previously had nowhere it actually rendered in the app — only inside its own edit row,
+     which you'd only see by going back into settings. This is its real display surface. */
+  .pHeroBio{font-size:13.5px; color:var(--text); line-height:1.4; padding:0 14px 16px; white-space:pre-wrap}
   /* ---- Profil screen tabs: Javonlar / Yutuqlar / Sertifikatlar ---- */
   .ptabs{display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; margin:18px 0 4px; border-bottom:1px solid var(--line)}
   .ptabs::-webkit-scrollbar{display:none}
@@ -622,7 +634,6 @@
   <div id="profileView" style="display:none">
     <div class="viewHead"><h2 class="dtitle">👤 Profil</h2><span class="viewThemeBtn" id="btnThemeProfile">🌙</span></div>
     <div id="pProfileCard"></div>
-    <div class="sec"><h3>Mavzu</h3><div class="row" id="themeChips" style="padding:2px 0; margin:0"></div></div>
     <div id="pBody">Yuklanmoqda...</div>
     <div class="ptabs" id="pTabs">
       <span class="ptab on" data-pt="javon">📚 Javonlar</span>
@@ -2110,14 +2121,6 @@ const _BADGE_META={
   collector:{emoji:'⭐',label:"To'plovchi"},
   voice:{emoji:'💬',label:"Faol a'zo"},
 };
-function renderThemeChips(){
-  const opt=(m,l)=>`<span class="chip ${themeMode===m?'on':''}" data-m="${m}">${l}</span>`;
-  $('#themeChips').innerHTML=opt('day',"☀️ Kunduzgi")+opt('night',"🌙 Tungi")+opt('system',"⚙️ Tizim");
-  $('#themeChips').querySelectorAll('.chip').forEach(el=>el.onclick=()=>{
-    haptic();setThemeMode(el.dataset.m);
-    $('#themeChips').querySelectorAll('.chip').forEach(c=>c.classList.toggle('on',c.dataset.m===themeMode));
-  });
-}
 const myUid=()=>tg?.initDataUnsafe?.user?.id;
 function avatarUrl(uid,v){return COMMUNITY_API_BASE+'/api/profile/avatar/'+encodeURIComponent(uid)+(v?'?v='+v:'?v=0');}
 // Small circular avatar+name row at the top of the Profil screen — tap opens the full editor.
@@ -2145,6 +2148,7 @@ function renderProfileCard(){
       </div>
       <div class="pHeroName">${esc(name)}</div>
       <div class="pHeroSub" id="pHeroSubBtn">${esc(sub)}</div>
+      ${p.bio?`<div class="pHeroBio">${esc(p.bio)}</div>`:''}
     </div>`;
     $('#pProfileCardBtn').onclick=()=>openProfileEdit();
     $('#pHeroSubBtn').onclick=()=>openProfileEdit();
@@ -2276,7 +2280,7 @@ function openProfileEdit(){
     // profile card and book covers elsewhere — a missing/broken avatar file degrades to initials
     // instead of a broken-image icon.
     const avatarHtml=()=>`<div class="avInitials" style="background:linear-gradient(135deg,${c1},${c2})">${esc(initials(p.display_name||'?'))}</div>${p.avatar_version?`<img class="avImg" id="avPreview" src="${avatarUrl(uid,p.avatar_version)}" onerror="this.remove()">`:''}`;
-    const rowHtml=(id,label,value,placeholder)=>`<div class="pRow" id="${id}"><span class="pRowLabel">${esc(label)}</span><span class="pRowRight"><span class="pRowValue${value?'':' empty'}">${esc(value||placeholder)}</span><span class="pRowChev">›</span></span></div>`;
+    const rowHtml=(id,label,value,placeholder)=>`<div class="pRow" id="${id}"><span class="pRowLabel">${esc(label)}</span><span class="pRowRight"><span class="pRowValue${value?'':' blank'}">${esc(value||placeholder)}</span><span class="pRowChev">›</span></span></div>`;
     const bioPreview=v=>v?(v.length>28?v.slice(0,28)+'…':v):'Kiritilmagan';
     $('#profileEditSheetc').innerHTML=`
       <div class="avatarEdit">
@@ -2285,13 +2289,13 @@ function openProfileEdit(){
         ${p.avatar_version?'<button class="avDel" id="avDelBtn">Rasmni o\'chirish</button>':''}
       </div>
       <div class="pCard">
-        <div class="pRow" id="rowBio"><span class="pRowLabel">Qisqacha men haqimda</span><span class="pRowRight"><span class="pRowValue${bio?'':' empty'}" id="rowBioValue">${esc(bioPreview(bio))}</span><span class="pRowChev">✏️</span></span></div>
+        <div class="pRow" id="rowBio"><span class="pRowLabel">Qisqacha men haqimda</span><span class="pRowRight"><span class="pRowValue${bio?'':' blank'}" id="rowBioValue">${esc(bioPreview(bio))}</span><span class="pRowChev">✏️</span></span></div>
       </div>
       <div class="pCard">
         <h4>Shaxsiy ma'lumotlar</h4>
         ${rowHtml('rowName',"To'liq ism",name,'Kiritilmagan')}
         ${rowHtml('rowTahallus','Tahallus',tahallus?('@'+tahallus):'','Kiritilmagan')}
-        <div class="pRow" id="rowBirth"><span class="pRowLabel">Tug'ilgan sana</span><span class="pRowRight"><span class="pRowValue${birthDate?'':' empty'}" id="rowBirthValue">${birthDate?formatBirthDisplay(birthDate):'Kiritilmagan'}</span><span class="pRowChev">›</span></span></div>
+        <div class="pRow" id="rowBirth"><span class="pRowLabel">Tug'ilgan sana</span><span class="pRowRight"><span class="pRowValue${birthDate?'':' blank'}" id="rowBirthValue">${birthDate?formatBirthDisplay(birthDate):'Kiritilmagan'}</span><span class="pRowChev">›</span></span></div>
         <div class="pField" style="padding:12px 0 6px; border-top:1px solid color-mix(in srgb, var(--line) 45%, var(--muted) 55%); margin:0"><label>Jins</label><div class="genderPick" id="pfGender">
           <span class="chip${gender==='male'?' on':''}" data-g="male">👨 Erkak</span>
           <span class="chip${gender==='female'?' on':''}" data-g="female">👩 Ayol</span>
@@ -2323,7 +2327,7 @@ function openProfileEdit(){
         bio=v;
         const el=$('#rowBioValue');
         el.textContent=bioPreview(v);
-        el.classList.toggle('empty',!v);
+        el.classList.toggle('blank',!v);
         closeFieldEdit();persist();
       },
     });
@@ -2356,7 +2360,7 @@ function openProfileEdit(){
       birthDate=iso;
       const el=$('#rowBirthValue');
       el.textContent=formatBirthDisplay(iso);
-      el.classList.remove('empty');
+      el.classList.remove('blank');
       persist();
     });
     // --- To'liq ism ---
@@ -2365,7 +2369,7 @@ function openProfileEdit(){
       label:"To'liq ism", type:'text', value:name, placeholder:'Ismingiz Familiyangiz', maxLength:80,
       onConfirm:v=>{
         name=v;
-        const el=$('#rowName .pRowValue');el.textContent=v;el.classList.remove('empty');
+        const el=$('#rowName .pRowValue');el.textContent=v;el.classList.remove('blank');
         closeFieldEdit();persist();
       },
     });
@@ -2390,7 +2394,7 @@ function openProfileEdit(){
       onConfirm:v=>{
         if(!/^[A-Za-z0-9_]{3,32}$/.test(v)){toast('Tahallus 3-32 ta harf/raqam/_ dan iborat bo\'lishi kerak');return;}
         tahallus=v;
-        const el=$('#rowTahallus .pRowValue');el.textContent='@'+v;el.classList.remove('empty');
+        const el=$('#rowTahallus .pRowValue');el.textContent='@'+v;el.classList.remove('blank');
         closeFieldEdit();persist();
       },
     });
@@ -2400,7 +2404,7 @@ function openProfileEdit(){
       label:'Telefon raqam', type:'tel', value:phone, placeholder:'+998 XX XXX XX XX', maxLength:32,
       onConfirm:v=>{
         phone=v;
-        const el=$('#rowPhone .pRowValue');el.textContent=v;el.classList.remove('empty');
+        const el=$('#rowPhone .pRowValue');el.textContent=v;el.classList.remove('blank');
         closeFieldEdit();persist();
       },
     });
@@ -2411,7 +2415,7 @@ function openProfileEdit(){
       onConfirm:v=>{
         if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)){toast('E-pochta formati noto\'g\'ri');return;}
         email=v;
-        const el=$('#rowEmail .pRowValue');el.textContent=v;el.classList.remove('empty');
+        const el=$('#rowEmail .pRowValue');el.textContent=v;el.classList.remove('blank');
         closeFieldEdit();persist();
       },
     });
@@ -2538,7 +2542,6 @@ $('#cropConfirmBtn').onclick=()=>{
 };
 let myBadgesCache=null;
 function loadProfile(){
-  renderThemeChips();
   renderProfileCard();
   const body=$('#pBody');if(!body)return;
   $('#pTabs').style.display=canAct()?'flex':'none';
