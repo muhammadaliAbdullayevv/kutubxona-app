@@ -575,11 +575,14 @@
   /* Avatar floats over the banner's bottom edge (half on the photo, half below it) instead of
      sitting in a fully separate row underneath — matches the overlapping-avatar hero pattern seen
      in mutolaa. .avWrap is pulled up via absolute positioning (42px = half its 84px height) so it
-     straddles the banner/content boundary; .pHeroIdentity keeps its left offset reserved for it via
-     padding on .pHeroTop, and padding-top clears the overlap zone so name/username never sit under
-     the floating ring. Only valid when a banner element actually precedes this row — see .noBanner. */
-  .pHeroTop{position:relative; padding:48px 14px 16px 110px}
-  .pHeroTop.noBanner{padding-top:14px}
+     straddles the banner/content boundary. Name/username/joined now stack BELOW the avatar (not
+     beside it, left-aligned to the same edge) — same mutolaa layout: once the avatar half-overlaps
+     the photo, only its lower half has any content-area room beside it, so "beside" collapses into
+     an awkward near-below position instead of a clean one. padding-top clears the avatar's full
+     height (not just the overlap sliver) so text always starts a clean gap under the ring. Only
+     valid when a banner element actually precedes this row — see .noBanner for the no-overlap case. */
+  .pHeroTop{position:relative; padding:52px 14px 16px}
+  .pHeroTop.noBanner{padding-top:108px}
   /* A plain border, not border+box-shadow — the two combined were rendering as an uneven arc
      (thick on one side, nearly gone on the other) instead of a uniform ring on real devices, not
      just a headless-testing artifact. A single border on a border-radius:50% box can't do that. */
