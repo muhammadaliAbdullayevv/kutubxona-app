@@ -366,7 +366,7 @@
   .liveBadgeRight{display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700; opacity:.92}
   /* The panel is a full page (like the PDF reader), not a bottom drawer — a "footer" card reads
      as a minor add-on; a whole page reads as what it actually is, the app's stats dashboard. */
-  #liveSheet,#listSheet,#shelvesSheet,#reviewsSheet,#writeReviewSheet,#profileEditSheet,#avatarCropSheet,#bannerCropSheet,#davraComposeSheet,#davraThreadSheet,#userProfileSheet,#followListSheet{flex-direction:column}
+  #liveSheet,#listSheet,#shelvesSheet,#reviewsSheet,#writeReviewSheet,#profileEditSheet,#avatarCropSheet,#bannerCropSheet,#davraComposeSheet,#davraThreadSheet,#userProfileSheet,#followListSheet,#notifSheet{flex-direction:column}
   /* Generalized from the Statistika panel's own topbar so new full-page sheets (Reading Room's
      drill-in lists, Javon) get the same "whole page, not a bottom drawer" treatment for free. */
   #liveTopbar,.stopbar{flex-shrink:0; display:flex; align-items:center; justify-content:space-between; gap:12px;
@@ -682,6 +682,22 @@
   .pHeroBio{font-size:13.5px; color:var(--text); line-height:1.4; padding:14px; white-space:pre-wrap; border-top:1px solid var(--line)}
   .flRow{display:flex; align-items:center; gap:10px; padding:10px 2px; cursor:pointer}
   .flRow .falias{font-size:14px; font-weight:700; color:var(--text)}
+  /* ---- notifications (#notifSheet) ---- */
+  .notifDot{position:absolute; top:2px; right:2px; width:9px; height:9px; border-radius:50%; background:#ff4d4f; border:2px solid var(--bg)}
+  .notifRow{display:flex; align-items:flex-start; gap:10px; padding:12px 2px; border-top:1px solid var(--line); cursor:pointer}
+  .notifRow:first-of-type{border-top:0}
+  .notifRow.unread{background:color-mix(in srgb, var(--accent) 6%, transparent); margin:0 -8px; padding:12px 8px; border-radius:10px}
+  .notifBody{flex:1; min-width:0}
+  .notifText{font-size:13.5px; color:var(--text); line-height:1.4}
+  .notifText b{font-weight:800}
+  .notifSnippet{font-size:12.5px; color:var(--muted); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .notifTime{font-size:11.5px; color:var(--muted); margin-top:3px}
+  /* Reuses the /myquote selection logic (db.get_personalized_quote_for_user) server-side — this
+     is just the display, sitting above the real notification list every time the sheet opens. */
+  .quoteCard{background:var(--card2); border:1px solid var(--line); border-radius:16px; padding:16px; margin-bottom:16px; cursor:pointer}
+  .quoteCard .qHead{display:flex; align-items:center; gap:6px; font-size:11.5px; font-weight:800; color:var(--accent); text-transform:uppercase; letter-spacing:.3px; margin-bottom:10px}
+  .quoteCard .qText{font-size:15px; font-style:italic; line-height:1.5; color:var(--text)}
+  .quoteCard .qMeta{font-size:12.5px; color:var(--muted); margin-top:10px; font-weight:700}
   /* ---- Profil screen tabs: Javonlar / Yutuqlar / Sertifikatlar ---- */
   .ptabs{display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; margin:18px 0 4px; border-bottom:1px solid var(--line)}
   .ptabs::-webkit-scrollbar{display:none}
@@ -745,7 +761,7 @@
 <div class="wrap">
   <header>
     <div id="homeHeader">
-      <h1>📚 Kutubxona <a href="quran.html" id="btnQuran" style="float:right; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle">📖 Qur'on</a><a id="btnProfile" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer">👤</a><a id="btnTheme" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer">☀️</a><a id="btnSearchIcon" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer">🔍</a></h1>
+      <h1>📚 Kutubxona <a href="quran.html" id="btnQuran" style="float:right; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle">📖 Qur'on</a><a id="btnNotif" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer; position:relative">🔔<span id="notifDot" class="notifDot" style="display:none"></span></a><a id="btnTheme" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer">☀️</a><a id="btnSearchIcon" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer">🔍</a></h1>
       <div class="liveHeaderRow"><a id="btnLive" class="liveBadge">📊 Statistika<span class="liveBadgeRight"><span class="liveDot"></span><span id="btnLiveN">–</span> onlayn</span></a></div>
     </div>
     <!-- Search's own header: an explicit back arrow (the thing that was missing — the only way
@@ -865,6 +881,13 @@
 <div class="sheet" id="followListSheet" style="z-index:53; align-items:stretch; background:var(--bg)">
   <div class="stopbar"><div class="stopbarTitle" id="followListTitle">Obunachilar</div><div class="gclose" id="followListClose">✕</div></div>
   <div class="ssheetc" id="followListSheetc"></div>
+</div>
+<!-- Replaces the old #btnProfile header icon (redundant with the bottom nav's own Sahifam tab) —
+     new followers, likes/replies on your Davra posts, plus a daily book quote (reusing the
+     existing /myquote selection logic, not a new one) at the top every time it's opened. -->
+<div class="sheet" id="notifSheet" style="z-index:53; align-items:stretch; background:var(--bg)">
+  <div class="stopbar"><div class="stopbarTitle">🔔 Bildirishnomalar</div><div class="gclose" id="notifClose">✕</div></div>
+  <div class="ssheetc" id="notifSheetc"></div>
 </div>
 <!-- Reviews used to be a single inline vertical list capped at 20, with the write-a-review form
      also inline in the same scroll — a real full "all reviews" page (with its own pagination)
@@ -3750,7 +3773,67 @@ function openFollowList(userId,kind){
 function closeFollowList(){$('#followListSheet').classList.remove('open');tg?.BackButton?.hide();}
 $('#followListClose').onclick=closeFollowList;
 $('#followListSheet').onclick=e=>{if(e.target.id==='followListSheet')closeFollowList();};
-$('#btnProfile').onclick=()=>{haptic();goToView('profile');};
+// ---- notifications (#notifSheet) — new follower, like/reply on your own Davra post, plus a
+// "today's quote" card that's always re-fetched fresh on open (server picks/records it via the
+// same taste-aware selection /myquote already uses — see db.get_personalized_quote_for_user). ----
+function notifRowHtml(n){
+  const verb=n.type==='follow'?'sizni kuzatishni boshladi':n.type==='davra_like'?'postingizni yoqtirdi':'postingizga javob berdi';
+  const av=authorAvatarHtml(n.actor_user_id,n.actor_avatar_version,n.actor_display_name,40);
+  return `<div class="notifRow${n.read?'':' unread'}" data-type="${esc(n.type)}" data-actor="${esc(n.actor_user_id||'')}" data-post="${esc(n.post_id||'')}">
+    ${av}
+    <div class="notifBody">
+      <div class="notifText"><b>${esc(n.actor_display_name||'Foydalanuvchi')}</b> ${verb}</div>
+      ${n.post_text?`<div class="notifSnippet">${esc(n.post_text)}</div>`:''}
+      <div class="notifTime">${fmtAgo(n.created_at)}</div>
+    </div>
+  </div>`;
+}
+function quoteCardHtml(q){
+  if(!q)return'';
+  const speaker=q.speaker&&q.speaker!=='Muallif'?esc(q.speaker)+' — ':'';
+  return `<div class="quoteCard" id="notifQuoteCard" data-book="${esc(q.book_id)}">
+    <div class="qHead">📖 Kunning iqtibosi</div>
+    <div class="qText">"${esc(q.text)}"</div>
+    <div class="qMeta">${speaker}${esc(q.book_title||'')}${q.author?', '+esc(q.author):''}</div>
+  </div>`;
+}
+function openNotifications(){
+  haptic();
+  const c=$('#notifSheetc');
+  c.innerHTML='Yuklanmoqda...';
+  $('#notifSheet').classList.add('open');
+  tg?.BackButton?.show();
+  if(!canAct()){c.innerHTML='<p class="hint">Bildirishnomalarni ko\'rish uchun botda oching.</p>';return;}
+  Promise.all([
+    api('/api/notifications/quote').catch(()=>({quote:null})),
+    api('/api/notifications').catch(()=>({items:[]})),
+  ]).then(([qr,nr])=>{
+    const items=nr.items||[];
+    c.innerHTML=quoteCardHtml(qr.quote)+(items.length?items.map(notifRowHtml).join(''):'<p class="hint">Hozircha bildirishnoma yo\'q</p>');
+    const qc=$('#notifQuoteCard');
+    if(qc)qc.onclick=()=>{const b=byId[qc.dataset.book];closeNotifications();if(b)openDetail(b.i);};
+    c.querySelectorAll('[data-type]').forEach(el=>el.onclick=()=>{
+      const type=el.dataset.type,actor=el.dataset.actor,post=el.dataset.post;
+      closeNotifications();
+      if(type==='follow'&&actor)openUserProfile(actor);
+      else if(post){goToView('davra');setTimeout(()=>openDavraThread(post),150);}
+    });
+  }).catch(()=>{c.innerHTML='<p class="hint">Yuklab bo\'lmadi</p>';});
+  // Mark-read fires alongside the fetch above, not after it — the badge dot clearing right away
+  // (rather than only once the list finishes loading) matches every other "seen it" affordance in
+  // the app (e.g. opening a sheet), and a slower notification-list fetch shouldn't delay it.
+  api('/api/notifications/read',{method:'POST'}).then(refreshNotifDot).catch(()=>{});
+}
+function closeNotifications(){$('#notifSheet').classList.remove('open');tg?.BackButton?.hide();}
+$('#notifClose').onclick=closeNotifications;
+$('#notifSheet').onclick=e=>{if(e.target.id==='notifSheet')closeNotifications();};
+function refreshNotifDot(){
+  if(!canAct())return;
+  api('/api/notifications/unread-count').then(r=>{
+    const dot=$('#notifDot');if(dot)dot.style.display=(r.count>0)?'block':'none';
+  }).catch(()=>{});
+}
+$('#btnNotif').onclick=()=>{haptic();openNotifications();};
 $('#btnSearchIcon').onclick=()=>{haptic();state.view='search';setTabs();run();window.scrollTo(0,0);setTimeout(()=>$('#q').focus(),80);};
 $('#sheetClose').onclick=()=>closeSheet();
 
@@ -4024,7 +4107,7 @@ const SHEET_CLOSERS={
   reviewsSheet:closeReviewsSheet, profileEditSheet:closeProfileEdit, shelvesSheet:closeShelvesSheet,
   listSheet:closeListSheet, liveSheet:closeLiveSheet, sheet:closeSheet,
   userProfileSheet:closeUserProfile, followListSheet:closeFollowList, themeMenuSheet:closeThemeMenu,
-  onboardTourSheet:closeOnboardTour,
+  onboardTourSheet:closeOnboardTour, notifSheet:closeNotifications,
   // closeGlobe lives in the separate type="module" script below (Three.js globe) and only
   // becomes a real global once that deferred module finishes running — referencing it bare HERE
   // (evaluated immediately, before the module has loaded) throws ReferenceError. Wrapping it in
@@ -4183,6 +4266,11 @@ async function boot(){
   setInterval(liveRefreshPublicStats,6000);
   livePresenceTick();
   setInterval(livePresenceTick,25000);
+  // Unread badge: checked at boot, then re-checked whenever the app comes back to the foreground
+  // (visibilitychange) rather than a tight poll interval — this is a low-urgency "do you have
+  // something new" indicator, not a live feed, so it doesn't need the 6s cadence live stats use.
+  refreshNotifDot();
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refreshNotifDot();});
 }
 boot();
 </script>
