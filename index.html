@@ -481,19 +481,18 @@
   #writeReviewSheetc textarea{width:100%; background:var(--card); border:1px solid var(--line); border-radius:10px; color:var(--text); padding:9px; font:inherit; resize:vertical; min-height:90px; margin-top:14px; box-sizing:border-box}
   .rdel{background:none; color:var(--danger); border:0; font-weight:700; cursor:pointer; padding:8px 4px}
   /* ---- profile settings form (#profileEditSheet) ---- */
-  .avatarEdit{display:flex; flex-direction:column; align-items:center; gap:8px; margin-bottom:22px}
-  .avatarEdit .avWrap{position:relative; width:96px; height:96px}
-  .avatarEdit .avImg{position:absolute; top:0; left:0; width:96px; height:96px; border-radius:50%; object-fit:cover; display:block; border:1px solid var(--line)}
-  .avatarEdit .avInitials{width:96px; height:96px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:30px; font-weight:800; color:#fff}
-  .avatarEdit .avCam{position:absolute; right:-2px; bottom:-2px; width:32px; height:32px; border-radius:50%; background:var(--accent); color:#fff; display:flex; align-items:center; justify-content:center; font-size:15px; border:2px solid var(--bg); cursor:pointer}
-  .avatarEdit .avDel{color:var(--danger); font-size:12.5px; font-weight:700; cursor:pointer; background:none; border:0; padding:2px}
-  /* Banner set/delete now lives here in the edit-profile sheet, not on the hero card — matches
-     mutolaa's own settings screen. Same .pHeroBanner strip reused for visual consistency with the
-     real hero, with a camera button and (when a banner exists) a delete pill both anchored to its
-     own corners instead of centered/inline text, mirroring .avCam/.avDel's icon-button treatment. */
-  .bannerEdit{position:relative; margin:0 0 22px; border-radius:14px; overflow:hidden}
-  .bannerEdit .bnrCam{position:absolute; right:8px; bottom:8px; width:32px; height:32px; border-radius:50%; background:var(--accent); color:#fff; display:flex; align-items:center; justify-content:center; font-size:15px; border:2px solid var(--bg); cursor:pointer}
-  .bannerEdit .bnrDel{position:absolute; left:8px; bottom:8px; color:#fff; font-size:12px; font-weight:700; cursor:pointer; background:rgba(0,0,0,.55); border:0; border-radius:20px; padding:6px 10px}
+  /* The banner+avatar preview here reuses the REAL hero card's own classes (.pHero/.pHeroBanner/
+     .pHeroTop/.avWrap — same ones renderProfileCard()/loadUserProfileHero() render with) instead
+     of a separate centered, non-overlapping layout. That makes what's previewed while editing
+     pixel-identical to the actual profile, so whether a banner photo and the avatar ring look right
+     together is visible right here — no more needing to close the editor and check the real page
+     to find out. Delete actions sit in their own plain link row below the preview rather than as
+     overlays on it, since the corners already carry a camera button apiece and the avatar's own
+     bottom-left overlap onto the banner leaves no clean empty spot for a second overlay per photo. */
+  .heroEditPreview .bnrCam{position:absolute; top:8px; right:8px; width:32px; height:32px; border-radius:50%; background:var(--accent); color:#fff; display:flex; align-items:center; justify-content:center; font-size:15px; border:2px solid var(--bg); cursor:pointer; z-index:2}
+  .heroEditPreview .avCam{position:absolute; right:-2px; bottom:-2px; width:28px; height:28px; border-radius:50%; background:var(--accent); color:#fff; display:flex; align-items:center; justify-content:center; font-size:13px; border:2px solid var(--card); cursor:pointer; z-index:2}
+  .heroEditDelRow{display:flex; justify-content:center; gap:18px; margin:-10px 0 22px}
+  .heroDelLink{color:var(--danger); font-size:12.5px; font-weight:700; cursor:pointer; background:none; border:0; padding:2px}
   .pField{margin-bottom:16px}
   .pField label{display:block; font-size:12.5px; font-weight:700; color:var(--muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:.3px}
   .pField input[type=text],.pField input[type=tel],.pField input[type=email],.pField input[type=date],.pField textarea{width:100%; background:var(--card); border:1px solid var(--line); border-radius:10px; color:var(--text); padding:10px; font:inherit; box-sizing:border-box}
@@ -607,20 +606,21 @@
   .pHeroName{font-weight:800; font-size:17px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
   .pHeroSub{font-size:13px; color:var(--muted); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer}
   .pHeroJoined{font-size:12px; color:var(--muted); margin-top:3px}
-  /* Small icons anchored to the banner's own bottom-right corner (top:80px = 120px banner height
-     minus the 32px icon minus an 8px inset, matching the old upload pill's inset) rather than the
-     top-right — the avatar now overlaps the bottom-LEFT of the banner (see .pHeroTop above), so the
-     bottom-right is the empty side of the strip instead of the top, which is empty either way. Not
-     a text button competing with name/username for room — that's what was crowding/truncating both
-     before these became icons. .noBannerPos is the fallback for a public profile with no banner
-     element at all (nothing to anchor "bottom of banner" against), where it reverts to a plain
-     top-right corner of the card itself — own-profile always has a banner (real or blank
-     placeholder) so it never needs that fallback. */
-  .pHeroEditBtn{position:absolute; top:80px; right:12px; width:32px; height:32px; border-radius:50%; background:var(--chip); border:1px solid var(--line); color:var(--text); font-size:14px; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:1}
-  .pHeroShareBtn{position:absolute; top:80px; right:52px; width:32px; height:32px; border-radius:50%; background:var(--chip); border:1px solid var(--line); color:var(--text); font-size:14px; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:1}
-  /* Public profile has no edit icon (nothing to edit) — share sits alone in the same corner. */
-  .pHeroShareBtn.pHeroShareOnly{right:12px}
-  .pHeroShareBtn.noBannerPos{top:12px}
+  /* Anchored just BELOW the banner (top:128px = 120px banner height + 8px gap) instead of floating
+     on top of the photo — hard to read against some photos, and easy to miss. Kept as position:
+     absolute (not a normal-flow sibling) specifically so inserting it doesn't push .pHeroTop's own
+     top edge down, which would shrink or erase the avatar's overlap onto the banner (that overlap
+     is computed as a fixed offset from .pHeroTop's top — see .pHero .avWrap above). Right-aligned
+     so it never collides with the avatar, which overlaps the bottom-LEFT of the banner instead.
+     .noBannerPos is the fallback for a public profile with no banner element at all (nothing to
+     anchor "below the banner" against) — own-profile always has a banner (real or blank
+     placeholder) so it never needs that fallback. Edit carries its own label now (not an icon alone
+     competing for meaning) since "✏️" alone next to a share icon read as ambiguous — share stays
+     icon-only as the secondary action. */
+  .pHeroActionsRow{position:absolute; top:128px; right:14px; display:flex; align-items:center; gap:8px; z-index:1}
+  .pHeroActionsRow.noBannerPos{top:12px}
+  .pHeroEditBtn{display:inline-flex; align-items:center; gap:6px; padding:7px 14px; border-radius:20px; background:var(--chip); border:1px solid var(--line); color:var(--text); font-size:13px; font-weight:700; cursor:pointer; white-space:nowrap}
+  .pHeroShareBtn{width:32px; height:32px; border-radius:50%; background:var(--chip); border:1px solid var(--line); color:var(--text); font-size:14px; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0}
   /* Follow, unlike edit, is the primary action on someone else's profile — it keeps a real
      button, just moved to its own row below the identity so it never fights name/username for
      width either. */
@@ -2757,8 +2757,10 @@ function renderProfileCard(){
     const bannerHtml=`<div class="pHeroBanner${hasBanner?'':' pHeroBannerBlank'}" id="pBannerArea">${bannerImg}</div>`;
     card.innerHTML=`<div class="pHero">
       ${bannerHtml}
-      <span class="pHeroEditBtn" id="pProfileCardBtn" title="Profilni tahrirlash">✏️</span>
-      <span class="pHeroShareBtn" id="pShareBtn" title="Ulashish">📤</span>
+      <div class="pHeroActionsRow">
+        <span class="pHeroEditBtn" id="pProfileCardBtn">✏️ Profilni tahrirlash</span>
+        <span class="pHeroShareBtn" id="pShareBtn" title="Ulashish">📤</span>
+      </div>
       <div class="pHeroTop">
         <div class="avWrap" style="width:${avSize}px;height:${avSize}px"><div class="avInitials" style="width:${avSize}px;height:${avSize}px;font-size:30px;background:linear-gradient(135deg,${c1},${c2})">${esc(initials(name))}</div>${img}</div>
         <div class="pHeroIdentity">
@@ -2909,29 +2911,40 @@ function openProfileEdit(){
     let name=p.display_name||'', tahallus=p.tahallus||'', gender=p.gender||null,
         birthDate=p.birth_date||null, phone=p.phone_number||'', email=p.email||'', bio=p.bio||'';
     const[c1,c2]=coverFor(String(uid||'u'));
+    const avSize=84;
     // Same base-layer-initials + on-top-photo-that-self-removes-on-error pattern as the compact
     // profile card and book covers elsewhere — a missing/broken avatar file degrades to initials
     // instead of a broken-image icon.
-    const avatarHtml=()=>`<div class="avInitials" style="background:linear-gradient(135deg,${c1},${c2})">${esc(initials(p.display_name||'?'))}</div>${p.avatar_version?`<img class="avImg" id="avPreview" src="${avatarUrl(uid,p.avatar_version)}" onerror="this.remove()">`:''}`;
+    const avatarHtml=()=>`<div class="avInitials" style="width:${avSize}px;height:${avSize}px;font-size:30px;background:linear-gradient(135deg,${c1},${c2})">${esc(initials(p.display_name||'?'))}</div>${p.avatar_version?`<img class="avImg" id="avPreview" style="width:${avSize}px;height:${avSize}px" src="${avatarUrl(uid,p.avatar_version)}" onerror="this.remove()">`:''}`;
     const rowHtml=(id,label,value,placeholder)=>`<div class="pRow" id="${id}"><span class="pRowLabel">${esc(label)}</span><span class="pRowRight"><span class="pRowValue${value?'':' blank'}">${esc(value||placeholder)}</span><span class="pRowChev">›</span></span></div>`;
     const bioPreview=v=>v?(v.length>28?v.slice(0,28)+'…':v):'Kiritilmagan';
-    // Banner set/delete lives here now (mirrors mutolaa's own settings screen), not on the hero
-    // card itself — same img-with-onerror-fallback pattern as the compact hero card uses, since
-    // banner_version keeps incrementing on delete and never goes back to 0 (bump_banner_version),
-    // so a deleted banner still needs the actual image load to fail before falling back to blank.
+    // Banner+avatar preview reuses the REAL hero card's own overlapping layout (.pHero/.pHeroBanner/
+    // .pHeroTop/.avWrap — the exact classes renderProfileCard()/loadUserProfileHero() render with)
+    // instead of two separate, non-overlapping blocks — so whether a banner photo and the avatar
+    // ring actually fit together is visible right here, without leaving the editor to check the
+    // real profile page. Same img-with-onerror-fallback pattern as elsewhere, since banner_version
+    // keeps incrementing on delete and never goes back to 0 (bump_banner_version), so a deleted
+    // banner still needs the actual image load to fail before falling back to blank.
     const bannerEditImg=p.banner_version?`<img class="pHeroBannerImg" id="bnrPreview" src="${bannerUrl(uid,p.banner_version)}" onerror="this.parentElement.classList.add('pHeroBannerBlank');this.remove()">`:'';
+    const heroPreviewHtml=`<div class="pHero heroEditPreview">
+      <div class="pHeroBanner${p.banner_version?'':' pHeroBannerBlank'}" id="bnrArea">${bannerEditImg}</div>
+      <span class="bnrCam" id="bnrCamBtn">📷</span>
+      <div class="pHeroTop">
+        <div class="avWrap" id="avWrap" style="width:${avSize}px;height:${avSize}px">${avatarHtml()}<div class="avCam" id="avCamBtn">📷</div></div>
+        <div class="pHeroIdentity">
+          <div class="pHeroName">${esc(p.display_name||'Foydalanuvchi')}</div>
+          <div class="pHeroSub">${p.tahallus?'@'+esc(p.tahallus):''}</div>
+        </div>
+      </div>
+    </div>`;
     $('#profileEditSheetc').innerHTML=`
-      <div class="bannerEdit">
-        <div class="pHeroBanner${p.banner_version?'':' pHeroBannerBlank'}" id="bnrArea">${bannerEditImg}</div>
-        <span class="bnrCam" id="bnrCamBtn">📷</span>
-        ${p.banner_version?'<button class="bnrDel" id="bnrDelBtn">Bannerni o\'chirish</button>':''}
-      </div>
+      ${heroPreviewHtml}
       <input type="file" accept="image/*" id="bnrFile" style="display:none">
-      <div class="avatarEdit">
-        <div class="avWrap" id="avWrap">${avatarHtml()}<div class="avCam" id="avCamBtn">📷</div></div>
-        <input type="file" accept="image/*" id="avFile" style="display:none">
-        ${p.avatar_version?'<button class="avDel" id="avDelBtn">Rasmni o\'chirish</button>':''}
-      </div>
+      <input type="file" accept="image/*" id="avFile" style="display:none">
+      ${(p.banner_version||p.avatar_version)?`<div class="heroEditDelRow">
+        ${p.banner_version?'<button class="heroDelLink" id="bnrDelBtn">Bannerni o\'chirish</button>':''}
+        ${p.avatar_version?'<button class="heroDelLink" id="avDelBtn">Rasmni o\'chirish</button>':''}
+      </div>`:''}
       <div class="pCard">
         <div class="pRow" id="rowBio"><span class="pRowLabel">Qisqacha men haqimda</span><span class="pRowRight"><span class="pRowValue${bio?'':' blank'}" id="rowBioValue">${esc(bioPreview(bio))}</span><span class="pRowChev">✏️</span></span></div>
       </div>
@@ -3198,6 +3211,7 @@ $('#cropConfirmBtn').onclick=()=>{
     api('/api/profile/avatar',{method:'POST',body:fd}).then(()=>{
       toast('Rasm yangilandi');
       closeAvatarCrop();
+      renderProfileCard(); // the compact hero card sits behind the edit sheet in a separate DOM tree — refresh it too, not just the sheet
       openProfileEdit(); // refetch+rebuild the edit sheet behind this one, same as the old direct-upload path did
     }).catch(()=>{toast('Rasm yuklanmadi');btn.disabled=false;btn.textContent='Saqlash';});
   },'image/jpeg',0.9);
@@ -3307,8 +3321,8 @@ $('#bCropConfirmBtn').onclick=()=>{
       toast('Banner yangilandi');
       closeBannerCrop();
       renderProfileCard();
-      // The crop tool now only ever opens from inside the edit-profile sheet (.bannerEdit) — if
-      // it's still open behind this one, refresh it too so its own preview/delete-button state
+      // The crop tool now only ever opens from inside the edit-profile sheet (.heroEditPreview) —
+      // if it's still open behind this one, refresh it too so its own preview/delete-button state
       // picks up the new banner instead of showing the pre-upload snapshot until manually reopened.
       if($('#profileEditSheet').classList.contains('open'))openProfileEdit();
     }).catch(()=>{toast('Banner yuklanmadi');btn.disabled=false;btn.textContent='Saqlash';});
@@ -3487,7 +3501,9 @@ function loadUserProfileHero(userId){
     const bannerHtml=p.banner_version?`<div class="pHeroBanner"><img class="pHeroBannerImg" src="${bannerUrl(userId,p.banner_version)}" onerror="this.parentElement.classList.add('pHeroBannerBlank');this.remove()"></div>`:'';
     $('#uProfileCard').innerHTML=`<div class="pHero">
       ${bannerHtml}
-      <span class="pHeroShareBtn pHeroShareOnly${p.banner_version?'':' noBannerPos'}" id="uShareBtn" title="Ulashish">📤</span>
+      <div class="pHeroActionsRow${p.banner_version?'':' noBannerPos'}">
+        <span class="pHeroShareBtn" id="uShareBtn" title="Ulashish">📤</span>
+      </div>
       <div class="pHeroTop${p.banner_version?'':' noBanner'}">
         <div class="avWrap" style="width:${avSize}px;height:${avSize}px"><div class="avInitials" style="width:${avSize}px;height:${avSize}px;font-size:30px;background:linear-gradient(135deg,${c1},${c2})">${esc(initials(p.display_name||'?'))}</div>${img}</div>
         <div class="pHeroIdentity">
