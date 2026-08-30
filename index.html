@@ -443,9 +443,14 @@
   /* var(--card2) instead of var(--card) — card2 is the lighter of the two tokens, so it reads as
      a distinct raised surface against the page background; the plain --line border alone was too
      close in value to the page/card colors to register as a real boundary. */
-  .pCard{background:var(--card2); border:1px solid var(--line); border-radius:14px; padding:2px 14px; margin-bottom:16px}
+  /* var(--line) alone was still too close to var(--card2)/var(--bg) to register as a real
+     border on an actual phone screen (differences that look fine on a calibrated monitor often
+     crush together on OLED panels at typical brightness) — mixing in var(--muted), which is
+     deliberately much lighter, gives a border that's unmistakably visible in both themes, plus a
+     shadow so the card reads as a raised surface even where the border itself is subtle. */
+  .pCard{background:var(--card2); border:1px solid color-mix(in srgb, var(--line) 45%, var(--muted) 55%); border-radius:14px; padding:2px 14px; margin-bottom:16px; box-shadow:0 2px 10px rgba(0,0,0,.28)}
   .pCard h4{font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; font-weight:700; padding:12px 0 4px; margin:0}
-  .pRow{display:flex; align-items:center; justify-content:space-between; padding:13px 0; border-top:1px solid var(--line); cursor:pointer; gap:10px}
+  .pRow{display:flex; align-items:center; justify-content:space-between; padding:13px 0; border-top:1px solid color-mix(in srgb, var(--line) 45%, var(--muted) 55%); cursor:pointer; gap:10px}
   .pRow:first-of-type{border-top:0}
   .pRowLabel{color:var(--muted); font-size:14px; flex-shrink:0}
   .pRowRight{display:flex; align-items:center; gap:6px; min-width:0}
@@ -478,7 +483,7 @@
   /* ---- profile header: banner + large avatar, matching mutolaa's proportions instead of the
      small flat row this used to be. The banner is a computed per-user gradient (same coverFor()
      used for book covers elsewhere), not an uploadable cover photo — that stays out of scope. ---- */
-  .pHero{position:relative; margin:0 0 18px; border-radius:16px; overflow:hidden; background:var(--card); border:1px solid var(--line)}
+  .pHero{position:relative; margin:0 0 18px; border-radius:16px; overflow:hidden; background:var(--card); border:1px solid color-mix(in srgb, var(--line) 45%, var(--muted) 55%); box-shadow:0 2px 10px rgba(0,0,0,.28)}
   .pHeroBanner{height:76px; width:100%}
   .pHeroTop{display:flex; align-items:flex-end; justify-content:space-between; padding:0 14px; margin-top:-30px; gap:10px}
   /* A plain border, not border+box-shadow — the two combined were rendering as an uneven arc
@@ -2278,7 +2283,7 @@ function openProfileEdit(){
         ${rowHtml('rowName',"To'liq ism",name,'Kiritilmagan')}
         ${rowHtml('rowTahallus','Tahallus',tahallus?('@'+tahallus):'','Kiritilmagan')}
         <div class="pRow" id="rowBirth"><span class="pRowLabel">Tug'ilgan sana</span><span class="pRowRight"><span class="pRowValue${birthDate?'':' empty'}" id="rowBirthValue">${birthDate?formatBirthDisplay(birthDate):'Kiritilmagan'}</span><span class="pRowChev">›</span></span></div>
-        <div class="pField" style="padding:12px 0 6px; border-top:1px solid var(--line); margin:0"><label>Jins</label><div class="genderPick" id="pfGender">
+        <div class="pField" style="padding:12px 0 6px; border-top:1px solid color-mix(in srgb, var(--line) 45%, var(--muted) 55%); margin:0"><label>Jins</label><div class="genderPick" id="pfGender">
           <span class="chip${gender==='male'?' on':''}" data-g="male">👨 Erkak</span>
           <span class="chip${gender==='female'?' on':''}" data-g="female">👩 Ayol</span>
         </div></div>
