@@ -471,7 +471,10 @@
   .pHero{position:relative; margin:0 0 18px; border-radius:16px; overflow:hidden; background:var(--card); border:1px solid var(--line)}
   .pHeroBanner{height:76px; width:100%}
   .pHeroTop{display:flex; align-items:flex-end; justify-content:space-between; padding:0 14px; margin-top:-30px; gap:10px}
-  .pHero .avWrap{position:relative; flex-shrink:0; border-radius:50%; border:3px solid var(--card); box-shadow:0 0 0 2px var(--accent)}
+  /* A plain border, not border+box-shadow — the two combined were rendering as an uneven arc
+     (thick on one side, nearly gone on the other) instead of a uniform ring on real devices, not
+     just a headless-testing artifact. A single border on a border-radius:50% box can't do that. */
+  .pHero .avWrap{position:relative; flex-shrink:0; border-radius:50%; border:3px solid var(--accent); box-sizing:content-box}
   .pHero .avImg{position:absolute; top:0; left:0; border-radius:50%; object-fit:cover}
   .pHero .avInitials{border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:800; color:#fff}
   /* Deliberately NOT .btn.ghost — that class hardcodes width:52px for the small square icon
