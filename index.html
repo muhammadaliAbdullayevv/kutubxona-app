@@ -558,10 +558,11 @@
   .onboardText div{font-size:12.5px; opacity:.9; margin-top:2px}
   .onboardChev{font-size:22px; flex-shrink:0; opacity:.85}
   .pHero{position:relative; margin:0 0 18px; border-radius:16px; overflow:hidden; background:var(--card); border:1px solid color-mix(in srgb, var(--line) 45%, var(--muted) 55%); box-shadow:0 2px 10px rgba(0,0,0,.28)}
-  .pHeroBanner{height:76px; width:100%}
-  /* Avatar, name+username, and the edit/follow button all sit in one row now — name/username no
-     longer stack full-width below the avatar, they sit right beside it. */
-  .pHeroTop{display:flex; align-items:center; padding:0 14px 16px; margin-top:-30px; gap:12px}
+  /* No banner — a per-user gradient strip across the whole card width read as an arbitrary,
+     often-clashing color band (e.g. an unlucky brown/olive hash) rather than a deliberate design
+     choice. The avatar keeps its own small gradient ring/fallback fill; that's a contained accent,
+     not a banner. */
+  .pHeroTop{display:flex; align-items:center; padding:16px 14px 16px; gap:12px}
   /* A plain border, not border+box-shadow — the two combined were rendering as an uneven arc
      (thick on one side, nearly gone on the other) instead of a uniform ring on real devices, not
      just a headless-testing artifact. A single border on a border-radius:50% box can't do that. */
@@ -571,12 +572,14 @@
   .pHeroIdentity{flex:1; min-width:0}
   .pHeroName{font-weight:800; font-size:17px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
   .pHeroSub{font-size:13px; color:var(--muted); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer}
-  /* Deliberately NOT .btn.ghost — that class hardcodes width:52px for the small square icon
-     buttons used elsewhere, and (.btn.ghost's two-class selector beats a single-class override
-     here no matter the source order) fighting that specificity was the wrong approach; a fresh,
-     self-contained style for a button that needs to fit a text label is simpler and correct. */
-  .pHeroEditBtn{flex-shrink:0; padding:8px 12px; border-radius:13px; background:var(--card); border:1px solid var(--line); color:var(--text); font-weight:800; font-size:12.5px; white-space:nowrap; cursor:pointer}
-  .followBtn{flex-shrink:0; padding:8px 16px; border-radius:13px; border:0; font-weight:800; font-size:12.5px; white-space:nowrap; cursor:pointer; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff}
+  /* A small icon in the card's own top-right corner, not a text button competing with name/
+     username for room on the same row — that's what was crowding/truncating both. */
+  .pHeroEditBtn{position:absolute; top:12px; right:12px; width:32px; height:32px; border-radius:50%; background:var(--chip); border:1px solid var(--line); color:var(--text); font-size:14px; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:1}
+  /* Follow, unlike edit, is the primary action on someone else's profile — it keeps a real
+     button, just moved to its own row below the identity so it never fights name/username for
+     width either. */
+  .pHeroActions{padding:0 14px 14px}
+  .followBtn{padding:8px 18px; border-radius:13px; border:0; font-weight:800; font-size:12.5px; white-space:nowrap; cursor:pointer; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff}
   .followBtn.on{background:var(--card); border:1px solid var(--line); color:var(--text)}
   /* Follow-counts and bio are now their own bordered sections — a divider above each rather than
      just stacked text — so the identity row, the stats, and the bio read as distinct blocks. */
@@ -2675,14 +2678,13 @@ function renderProfileCard(){
     // instead of showing a broken-image icon.
     const img=p.avatar_version?`<img class="avImg" style="width:${avSize}px;height:${avSize}px" src="${avatarUrl(uid,p.avatar_version)}" onerror="this.remove()">`:'';
     card.innerHTML=`<div class="pHero">
-      <div class="pHeroBanner" style="background:linear-gradient(135deg,${c1},${c2})"></div>
+      <span class="pHeroEditBtn" id="pProfileCardBtn" title="Profilni tahrirlash">✏️</span>
       <div class="pHeroTop">
         <div class="avWrap" style="width:${avSize}px;height:${avSize}px"><div class="avInitials" style="width:${avSize}px;height:${avSize}px;font-size:30px;background:linear-gradient(135deg,${c1},${c2})">${esc(initials(name))}</div>${img}</div>
         <div class="pHeroIdentity">
           <div class="pHeroName">${esc(name)}</div>
           <div class="pHeroSub" id="pHeroSubBtn">${esc(sub)}</div>
         </div>
-        <button class="pHeroEditBtn" id="pProfileCardBtn">✏️ Tahrirlash</button>
       </div>
       <div class="pFollowRow">
         <span class="pFollowStat" id="pFollowersStat"><b>–</b><span>obunachi</span></span>
@@ -3228,15 +3230,14 @@ function loadUserProfileHero(userId){
     const img=p.avatar_version?`<img class="avImg" style="width:${avSize}px;height:${avSize}px" src="${avatarUrl(userId,p.avatar_version)}" onerror="this.remove()">`:'';
     const followBtn=canAct()?`<button class="followBtn${p.is_following?' on':''}" id="uFollowBtn">${p.is_following?'✓ Obuna bo\'lgan':'+ Obuna bo\'lish'}</button>`:'';
     $('#uProfileCard').innerHTML=`<div class="pHero">
-      <div class="pHeroBanner" style="background:linear-gradient(135deg,${c1},${c2})"></div>
       <div class="pHeroTop">
         <div class="avWrap" style="width:${avSize}px;height:${avSize}px"><div class="avInitials" style="width:${avSize}px;height:${avSize}px;font-size:30px;background:linear-gradient(135deg,${c1},${c2})">${esc(initials(p.display_name||'?'))}</div>${img}</div>
         <div class="pHeroIdentity">
           <div class="pHeroName">${esc(p.display_name||'Foydalanuvchi')}</div>
           ${p.tahallus?`<div class="pHeroSub">@${esc(p.tahallus)}</div>`:''}
         </div>
-        ${followBtn}
       </div>
+      ${followBtn?`<div class="pHeroActions">${followBtn}</div>`:''}
       <div class="pFollowRow">
         <span class="pFollowStat" id="uFollowersStat"><b>${fmtNum(p.followers)}</b><span>obunachi</span></span>
         <span class="pFollowStat" id="uFollowingStat"><b>${fmtNum(p.following)}</b><span>obuna</span></span>
