@@ -430,7 +430,10 @@
   .genderPick .chip{flex:1; text-align:center; padding:10px}
   /* ---- settings rows grouped into cards ("Shaxsiy ma'lumotlar"/"Aloqa ma'lumotlari"),
      each row drilling into openFieldEdit()/openBirthPicker() rather than an inline input ---- */
-  .pCard{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:2px 14px; margin-bottom:16px}
+  /* var(--card2) instead of var(--card) — card2 is the lighter of the two tokens, so it reads as
+     a distinct raised surface against the page background; the plain --line border alone was too
+     close in value to the page/card colors to register as a real boundary. */
+  .pCard{background:var(--card2); border:1px solid var(--line); border-radius:14px; padding:2px 14px; margin-bottom:16px}
   .pCard h4{font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; font-weight:700; padding:12px 0 4px; margin:0}
   .pRow{display:flex; align-items:center; justify-content:space-between; padding:13px 0; border-top:1px solid var(--line); cursor:pointer; gap:10px}
   .pRow:first-of-type{border-top:0}
@@ -467,7 +470,7 @@
      used for book covers elsewhere), not an uploadable cover photo — that stays out of scope. ---- */
   .pHero{position:relative; margin:0 0 18px; border-radius:16px; overflow:hidden; background:var(--card); border:1px solid var(--line)}
   .pHeroBanner{height:76px; width:100%}
-  .pHeroTop{display:flex; align-items:flex-end; justify-content:space-between; padding:0 14px; margin-top:-42px; gap:10px}
+  .pHeroTop{display:flex; align-items:flex-end; justify-content:space-between; padding:0 14px; margin-top:-30px; gap:10px}
   .pHero .avWrap{position:relative; flex-shrink:0; border-radius:50%; border:3px solid var(--card); box-shadow:0 0 0 2px var(--accent)}
   .pHero .avImg{position:absolute; top:0; left:0; border-radius:50%; object-fit:cover}
   .pHero .avInitials{border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:800; color:#fff}
@@ -684,7 +687,7 @@
     <div class="feIcon" id="feIcon">✍️</div>
     <div class="feTitle" id="feTitle"></div>
     <div class="feSubtitle" id="feSubtitle"></div>
-    <div class="pField" style="text-align:left"><label id="feLabel"></label><input type="text" id="feInput"></div>
+    <div class="pField" style="text-align:left"><label id="feLabel"></label><input type="text" id="feInput"><textarea id="feTextarea" style="display:none"></textarea><div class="cnt" id="feCnt" style="display:none">0/500</div></div>
     <div class="tStatus" id="feStatus"></div>
     <button class="btn primary" id="feConfirmBtn" style="width:100%; margin-top:10px">Tasdiqlash</button>
   </div>
@@ -2191,34 +2194,43 @@ let myProfileCache=null;
 // through their own small bottom-sheet dialog (icon+title+subtitle+one input+Tasdiqlash), not one
 // giant flat form. One reusable sheet parametrized per-field beats four near-identical bespoke
 // ones — all four share the exact same layout, only the copy and validation differ.
-let feOnConfirm=null,feTahDeb=null;
+let feOnConfirm=null,feTahDeb=null,feAllowEmpty=false;
 function openFieldEdit(opts){
   haptic();
   $('#feIcon').textContent=opts.icon;
   $('#feTitle').textContent=opts.title;
   $('#feSubtitle').textContent=opts.subtitle;
   $('#feLabel').textContent=opts.label;
-  const input=$('#feInput');
-  input.type=opts.type||'text';
-  input.value=opts.value||'';
-  input.placeholder=opts.placeholder||'';
-  input.maxLength=opts.maxLength||200;
+  const input=$('#feInput'),ta=$('#feTextarea'),cnt=$('#feCnt');
+  const multiline=!!opts.multiline;
+  const maxLen=opts.maxLength||(multiline?500:200);
+  input.style.display=multiline?'none':'';
+  ta.style.display=multiline?'':'none';
+  cnt.style.display=multiline?'':'none';
+  const active=multiline?ta:input;
+  active.value=opts.value||'';
+  active.placeholder=opts.placeholder||'';
+  active.maxLength=maxLen;
+  if(!multiline)input.type=opts.type||'text';
+  else cnt.textContent=active.value.length+'/'+maxLen;
   const status=$('#feStatus');status.textContent='';status.className='tStatus';
   feOnConfirm=opts.onConfirm;
+  feAllowEmpty=!!opts.allowEmpty;
   const btn=$('#feConfirmBtn');
-  const updateBtn=()=>{btn.disabled=!input.value.trim();};
+  const updateBtn=()=>{btn.disabled=feAllowEmpty?false:!active.value.trim();};
   updateBtn();
-  input.oninput=()=>{updateBtn();if(opts.onInput)opts.onInput(input.value.trim());};
+  active.oninput=()=>{updateBtn();if(multiline)cnt.textContent=active.value.length+'/'+maxLen;if(opts.onInput)opts.onInput(active.value.trim());};
   $('#fieldEditSheet').classList.add('open');
   tg?.BackButton?.show();
-  setTimeout(()=>input.focus(),300);
+  setTimeout(()=>active.focus(),300);
 }
 function closeFieldEdit(){$('#fieldEditSheet').classList.remove('open');tg?.BackButton?.hide();clearTimeout(feTahDeb);}
 $('#fieldEditClose').onclick=closeFieldEdit;
 $('#fieldEditSheet').onclick=e=>{if(e.target.id==='fieldEditSheet')closeFieldEdit();};
 $('#feConfirmBtn').onclick=()=>{
-  const v=$('#feInput').value.trim();
-  if(!v)return;
+  const active=$('#feTextarea').style.display==='none'?$('#feInput'):$('#feTextarea');
+  const v=active.value.trim();
+  if(!v&&!feAllowEmpty)return;
   if(feOnConfirm)feOnConfirm(v);
 };
 
@@ -2231,20 +2243,23 @@ function openProfileEdit(){
   api('/api/profile/settings').then(p=>{
     myProfileCache=p;
     let name=p.display_name||'', tahallus=p.tahallus||'', gender=p.gender||null,
-        birthDate=p.birth_date||null, phone=p.phone_number||'', email=p.email||'';
+        birthDate=p.birth_date||null, phone=p.phone_number||'', email=p.email||'', bio=p.bio||'';
     const[c1,c2]=coverFor(String(uid||'u'));
     // Same base-layer-initials + on-top-photo-that-self-removes-on-error pattern as the compact
     // profile card and book covers elsewhere — a missing/broken avatar file degrades to initials
     // instead of a broken-image icon.
     const avatarHtml=()=>`<div class="avInitials" style="background:linear-gradient(135deg,${c1},${c2})">${esc(initials(p.display_name||'?'))}</div>${p.avatar_version?`<img class="avImg" id="avPreview" src="${avatarUrl(uid,p.avatar_version)}" onerror="this.remove()">`:''}`;
     const rowHtml=(id,label,value,placeholder)=>`<div class="pRow" id="${id}"><span class="pRowLabel">${esc(label)}</span><span class="pRowRight"><span class="pRowValue${value?'':' empty'}">${esc(value||placeholder)}</span><span class="pRowChev">›</span></span></div>`;
+    const bioPreview=v=>v?(v.length>28?v.slice(0,28)+'…':v):'Kiritilmagan';
     $('#profileEditSheetc').innerHTML=`
       <div class="avatarEdit">
         <div class="avWrap" id="avWrap">${avatarHtml()}<div class="avCam" id="avCamBtn">📷</div></div>
         <input type="file" accept="image/*" id="avFile" style="display:none">
         ${p.avatar_version?'<button class="avDel" id="avDelBtn">Rasmni o\'chirish</button>':''}
       </div>
-      <div class="pField"><label>Qisqacha men haqimda</label><textarea id="pfBio" maxlength="500" placeholder="O'zingiz haqingizda qisqacha yozing...">${esc(p.bio||'')}</textarea><div class="cnt" id="pfBioCnt">0/500</div><button class="btn ghost" id="bioSaveBtn" style="width:100%; margin-top:8px">Bioni saqlash</button></div>
+      <div class="pCard">
+        <div class="pRow" id="rowBio"><span class="pRowLabel">Qisqacha men haqimda</span><span class="pRowRight"><span class="pRowValue${bio?'':' empty'}" id="rowBioValue">${esc(bioPreview(bio))}</span><span class="pRowChev">✏️</span></span></div>
+      </div>
       <div class="pCard">
         <h4>Shaxsiy ma'lumotlar</h4>
         ${rowHtml('rowName',"To'liq ism",name,'Kiritilmagan')}
@@ -2260,17 +2275,31 @@ function openProfileEdit(){
         ${rowHtml('rowPhone','Telefon raqam',phone,'Kiritilmagan')}
         ${rowHtml('rowEmail','E-pochta',email,'Kiritilmagan')}
       </div>`;
-    const bioEl=$('#pfBio'),bioCnt=$('#pfBioCnt');
     // Auto-saves the FULL current state on every field's own confirm — /api/profile/settings is
     // a full-replace upsert (see db.upsert_user_profile), not a per-field PATCH, so every call
     // here must resend everything or it would null out the fields not being edited right now.
     function persist(){
       api('/api/profile/settings',{method:'POST',body:JSON.stringify({
         display_name:name||null, tahallus:tahallus||null, birth_date:birthDate,
-        gender, phone_number:phone||null, email:email||null, bio:bioEl.value.trim()||null,
+        gender, phone_number:phone||null, email:email||null, bio:bio||null,
       })}).then(()=>{toast('Saqlandi');renderProfileCard();})
         .catch(()=>toast('Saqlashda xatolik — tahallus band bo\'lishi mumkin'));
     }
+    // --- bio: same drill-in-row + modal pattern as everything else now, matching mutolaa's own
+    // "Qisqacha men haqimda" row (pencil icon, not a chevron) instead of an always-expanded
+    // inline textarea sitting outside any card ---
+    $('#rowBio').onclick=()=>openFieldEdit({
+      icon:'📝', title:'Qisqacha men haqimda', subtitle:"O'zingiz haqingizda qisqacha yozing",
+      label:'Bio', multiline:true, value:bio, placeholder:"O'zingiz haqingizda qisqacha yozing...",
+      maxLength:500, allowEmpty:true,
+      onConfirm:v=>{
+        bio=v;
+        const el=$('#rowBioValue');
+        el.textContent=bioPreview(v);
+        el.classList.toggle('empty',!v);
+        closeFieldEdit();persist();
+      },
+    });
     // --- avatar upload/delete ---
     // The file input itself stays a plain <input type=file accept=image/*> with no `capture`
     // attribute — that's deliberate: adding capture would force camera-only on many mobile
@@ -2286,11 +2315,6 @@ function openProfileEdit(){
       haptic();
       api('/api/profile/avatar/delete',{method:'POST'}).then(r=>{p.avatar_version=r.avatar_version;toast('Rasm o\'chirildi');openProfileEdit();}).catch(()=>{});
     };
-    // --- bio: still inline (mutolaa's own bio field is an in-place editable card, not a
-    // drill-in modal like the rows below) ---
-    const updBioCnt=()=>bioCnt.textContent=bioEl.value.length+'/500';
-    updBioCnt();bioEl.oninput=updBioCnt;
-    $('#bioSaveBtn').onclick=persist;
     // --- gender pills: auto-save on tap, consistent with the rows around it now all
     // saving immediately rather than waiting on one global Saqlash button ---
     $('#pfGender').querySelectorAll('.chip').forEach(el=>el.onclick=()=>{
