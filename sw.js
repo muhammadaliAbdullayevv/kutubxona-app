@@ -1,7 +1,7 @@
 // Kutubxona PWA service worker.
 // Bump CACHE_VERSION on any shell (HTML/CSS/JS) change so old clients pick up the new
 // version instead of serving a stale cached shell forever.
-const CACHE_VERSION = 'v115';
+const CACHE_VERSION = 'v116';
 const SHELL_CACHE = `kutubxona-shell-${CACHE_VERSION}`;
 const DATA_CACHE = `kutubxona-data-${CACHE_VERSION}`;
 const COVER_CACHE = `kutubxona-covers-${CACHE_VERSION}`;
