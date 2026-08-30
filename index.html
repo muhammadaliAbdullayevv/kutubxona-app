@@ -386,15 +386,22 @@
   .fbinfo{flex:1; min-width:0}
   .fbtitle{font-size:13px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text)}
   .fblive{font-size:11px; color:var(--accent); font-weight:700}
-  .fActions{display:flex; align-items:center; gap:18px; margin-top:10px}
+  .fActions{display:flex; align-items:center; gap:16px; margin-top:10px; flex-wrap:wrap}
   .flike{border:none; background:none; color:var(--muted); font-size:13px; font-weight:700; cursor:pointer; padding:4px 0; display:flex; align-items:center; gap:5px; font-family:inherit}
   .flike.on{color:var(--danger)}
-  .freplyBtn,.freplyCount{font-size:13px; font-weight:700; color:var(--muted); display:flex; align-items:center; gap:5px; cursor:pointer}
+  .freplyBtn,.freplyCount,.freshareBtn,.fviews{font-size:13px; font-weight:700; color:var(--muted); display:flex; align-items:center; gap:5px}
+  .freplyBtn,.freshareBtn{cursor:pointer}
   .fitem:not(.fitemFocused){cursor:pointer}
+  .fitem:not(.fitemFocused) .ftext{display:-webkit-box; -webkit-line-clamp:5; -webkit-box-orient:vertical; overflow:hidden}
+  .fReadMore{color:var(--accent); font-size:13px; font-weight:700; margin:-6px 0 8px; display:inline-block}
+  .freshareTag{font-size:12px; font-weight:700; color:var(--muted); margin:-2px 0 6px}
+  .fEmbed{border:1px solid var(--line); border-radius:12px; padding:10px; margin:2px 0 10px}
+  .fEmbed .ftext{-webkit-line-clamp:4; display:-webkit-box; -webkit-box-orient:vertical; overflow:hidden; margin:2px 0 8px}
   .fitemFocused{border-color:var(--accent); border-width:1.5px}
   .fitemFocused .ftext{font-size:16px}
   .davraFab{position:fixed; right:16px; bottom:calc(env(safe-area-inset-bottom) + 20px + var(--bottomnav-h)); width:54px; height:54px; border-radius:50%; border:none; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; font-size:22px; box-shadow:var(--shadow); cursor:pointer; z-index:25; display:flex; align-items:center; justify-content:center}
-  #davraComposeSheetc textarea,#dtReplyBox textarea{width:100%; box-sizing:border-box; background:var(--card); border:1px solid var(--line); border-radius:10px; color:var(--text); padding:9px; font:inherit; resize:vertical; min-height:90px; margin-top:12px}
+  #davraComposeSheetc textarea{width:100%; box-sizing:border-box; background:var(--card); border:1px solid var(--line); border-radius:10px; color:var(--text); padding:9px; font:inherit; resize:vertical; min-height:90px; margin-top:12px}
+  .dcQuotePreview{margin-top:14px; pointer-events:none; opacity:.9}
   #dcBookSearch{width:100%; box-sizing:border-box; background:var(--card); border:1px solid var(--line); border-radius:10px; color:var(--text); padding:9px; font:inherit; margin-top:10px}
   .dcResults{margin-top:6px; max-height:260px; overflow-y:auto}
   .dcResult{display:flex; flex-direction:column; gap:2px; padding:9px 10px; border-radius:10px; cursor:pointer}
@@ -408,9 +415,23 @@
   .dcPickedTitle{font-size:13px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text)}
   .dcPickedAuthor{font-size:11.5px; color:var(--muted)}
   .dcPickedChange{font-size:12px; font-weight:700; color:var(--accent); cursor:pointer; flex-shrink:0}
-  .dtBack{font-size:13.5px; font-weight:700; color:var(--accent); margin-bottom:12px; cursor:pointer}
-  #dtReplyBox{margin:14px 0 18px}
-  .dtReplies .fitem{margin-left:0}
+  #dtComposerBar{position:absolute; left:0; right:0; bottom:0; background:var(--bg); border-top:1px solid var(--line); padding:8px 14px calc(env(safe-area-inset-bottom) + 8px); box-sizing:border-box}
+  .dtReplyChip{display:flex; align-items:center; justify-content:space-between; background:var(--chip); border-radius:10px; padding:5px 10px; margin-bottom:6px; font-size:12px; color:var(--muted)}
+  .dtReplyChipX{cursor:pointer; font-weight:700; padding:0 4px}
+  .dtComposerRow{display:flex; align-items:flex-end; gap:8px}
+  .dtComposerRow textarea{flex:1; resize:none; max-height:90px; box-sizing:border-box; background:var(--card); border:1px solid var(--line); border-radius:14px; color:var(--text); padding:9px 12px; font:inherit}
+  .dtComposerRow button{width:38px; height:38px; border-radius:50%; border:none; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; font-size:16px; flex-shrink:0; cursor:pointer}
+  .dtReplyActionRow{margin:10px 0 16px}
+  .dtReply{border-top:1px solid var(--line); padding:12px 0}
+  .dtNested{margin-left:18px; border-left:2px solid var(--line); padding-left:12px}
+  .dtNested .dtReply:first-child{border-top:none; padding-top:8px}
+  .dtReplyAction{font-size:13px; font-weight:700; color:var(--muted); cursor:pointer}
+  .dtExpand{display:block; font-size:12.5px; font-weight:700; color:var(--accent); margin-top:6px; cursor:pointer}
+  .reshareMenuCard{background:var(--card); border-radius:18px 18px 0 0; padding:16px 14px calc(env(safe-area-inset-bottom) + 14px); width:100%; box-sizing:border-box}
+  .reshareMenuItem{display:flex; align-items:center; gap:14px; padding:12px 6px; cursor:pointer}
+  .rmIcon{font-size:20px; width:32px; text-align:center; flex-shrink:0}
+  .rmTitle{font-size:14.5px; font-weight:700; color:var(--text)}
+  .rmSub{font-size:12px; color:var(--muted); margin-top:2px}
   .liveHead{text-align:center; padding:6px 0 24px}
   .liveClock{font-size:40px; font-weight:800; letter-spacing:.5px; font-variant-numeric:tabular-nums; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
     background:linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; background-clip:text; color:transparent}
@@ -719,7 +740,20 @@
 </div>
 <div class="sheet" id="davraThreadSheet" style="z-index:54; align-items:stretch; background:var(--bg)">
   <div class="stopbar"><div class="stopbarTitle">💬 Post</div><div class="gclose" id="davraThreadClose">✕</div></div>
-  <div class="ssheetc" id="davraThreadSheetc"></div>
+  <div class="ssheetc" id="davraThreadSheetc" style="padding-bottom:100px"></div>
+  <div id="dtComposerBar">
+    <div class="dtReplyChip" id="dtReplyChip" style="display:none"><span id="dtReplyChipText"></span><span class="dtReplyChipX" id="dtReplyChipX">✕</span></div>
+    <div class="dtComposerRow">
+      <textarea id="dtReplyText" maxlength="1500" placeholder="Javob yozing..." rows="1"></textarea>
+      <button id="dtReplySend">➤</button>
+    </div>
+  </div>
+</div>
+<div class="sheet" id="davraReshareMenuSheet" style="z-index:55">
+  <div class="reshareMenuCard">
+    <div class="reshareMenuItem" id="rmQuote"><span class="rmIcon">✍️</span><div><div class="rmTitle">Fikr qo'shib ulashish</div><div class="rmSub">Postga o'z fikringizni yozib, qayta ulashing</div></div></div>
+    <div class="reshareMenuItem" id="rmRepost"><span class="rmIcon">🔁</span><div><div class="rmTitle">Qayta ulashish</div><div class="rmSub">Postni darhol ulashing</div></div></div>
+  </div>
 </div>
 <div class="sheet" id="profileEditSheet" style="z-index:52; align-items:stretch; background:var(--bg)">
   <div class="stopbar"><div class="stopbarTitle">👤 Profilni tahrirlash</div><div class="gclose" id="profileEditClose">✕</div></div>
@@ -968,9 +1002,12 @@ $('#liveSheet').onclick=e=>{if(e.target.id==='liveSheet')closeLiveSheet();};
 
 // ---- Davra: Twitter-style book-attached posts + threaded replies, newest first. A post is a
 // standalone object (db.davra_posts) — separate from a book's own review/comment section, not a
-// second view onto it. Replies can target either a top-level post or another reply (arbitrary
-// depth); the thread sheet below reads that by re-opening itself with a new focused post id one
-// level at a time (davraThreadStack), rather than rendering a full nested tree up front. ----
+// second view onto it. A reshare/quote-post is just another post row (reshared_post embedded
+// one level deep by the backend) so it reuses the same renderer. Replies can target either a
+// top-level post or another reply (arbitrary depth) — the thread sheet keeps everything on ONE
+// page: direct replies list inline, each with its own collapsed "N ta javobni ko'rish" expand
+// (fetched and inserted in place, not a page navigation), and a single persistent bottom
+// composer that retargets to whichever comment's "Javob qaytarish" was last tapped. ----
 let davraCursor=null, davraDone=false, davraLoading=false;
 function fmtAgo(iso){
   if(!iso)return'';
@@ -980,23 +1017,35 @@ function fmtAgo(iso){
   if(diff<2592000)return Math.round(diff/86400)+' kun oldin';
   return new Date(iso).toLocaleDateString('uz-UZ',{day:'numeric',month:'short'});
 }
+function davraBookCardHtml(bookId,readingCount){
+  const b=byId[bookId];
+  if(!b)return'';
+  const[c1,c2]=coverFor(b.i);
+  return `<div class="fbook" data-book="${esc(b.i)}"><div class="fbcover" style="background:linear-gradient(135deg,${c1},${c2})">${b.hc?`<img class="ci" src="covers/${encodeURIComponent(b.i)}.jpg" loading="lazy" onerror="this.remove()">`:''}<span class="ini">${esc(initials(b.t))}</span></div><div class="fbinfo"><div class="fbtitle">${esc(b.t)}</div>${readingCount>0?`<span class="fblive">🔴 ${readingCount} o'qimoqda</span>`:''}</div></div>`;
+}
+function davraReshareEmbedHtml(orig){
+  return `<div class="fEmbed">
+    <div class="fmeta">${authorAvatarHtml(orig.user_id,orig.avatar_version,orig.alias,20)}<span class="falias">${esc(orig.alias)}</span><span class="cmeta">${fmtAgo(orig.created_at)}</span></div>
+    ${orig.text?`<div class="ftext">${esc(orig.text)}</div>`:''}
+    ${davraBookCardHtml(orig.book_id,orig.reading_count)}
+  </div>`;
+}
 function davraPostHtml(it,focused){
-  const b=byId[it.book_id];
-  let bookHtml='';
-  if(b){
-    const[c1,c2]=coverFor(b.i);
-    bookHtml=`<div class="fbook" data-book="${esc(b.i)}"><div class="fbcover" style="background:linear-gradient(135deg,${c1},${c2})">${b.hc?`<img class="ci" src="covers/${encodeURIComponent(b.i)}.jpg" loading="lazy" onerror="this.remove()">`:''}<span class="ini">${esc(initials(b.t))}</span></div><div class="fbinfo"><div class="fbtitle">${esc(b.t)}</div>${it.reading_count>0?`<span class="fblive">🔴 ${it.reading_count} o'qimoqda</span>`:''}</div></div>`;
-  }
+  const isReshare=!!it.reshared_post;
+  const isLong=!focused&&(it.text||'').length>220;
   const replyBadge=focused
     ? `<span class="freplyCount">💬 ${it.reply_count||0} javob</span>`
     : `<span class="freplyBtn" data-thread="${esc(it.id)}">💬 ${it.reply_count||0}</span>`;
   return `<div class="fitem${focused?' fitemFocused':''}" data-id="${esc(it.id)}">
     <div class="fmeta">${authorAvatarHtml(it.user_id,it.avatar_version,it.alias)}<span class="falias">${esc(it.alias)}</span><span class="cmeta">${fmtAgo(it.created_at)}</span></div>
-    ${it.text?`<div class="ftext">${esc(it.text)}</div>`:''}
-    ${bookHtml}
+    ${isReshare?'<div class="freshareTag">🔁 qayta ulashdi</div>':''}
+    ${it.text?`<div class="ftext">${esc(it.text)}</div>${isLong?'<span class="fReadMore">Batafsil o\'qish</span>':''}`:''}
+    ${isReshare?davraReshareEmbedHtml(it.reshared_post):davraBookCardHtml(it.book_id,it.reading_count)}
     <div class="fActions">
       <button class="flike${it.liked?' on':''}" data-id="${esc(it.id)}">${it.liked?'❤️':'🤍'} <span class="fcount">${it.like_count||0}</span></button>
       ${replyBadge}
+      <span class="freshareBtn" data-reshare="${esc(it.id)}">🔁 ${it.reshare_count||0}</span>
+      <span class="fviews">👁 ${fmtNum(it.view_count||0)}</span>
     </div>
   </div>`;
 }
@@ -1006,6 +1055,10 @@ function wireDavraPostItems(scope){
     if(el.dataset.wired)return; el.dataset.wired='1';
     el.onclick=e=>{e.stopPropagation();openDavraThread(el.dataset.thread);};
   });
+  scope.querySelectorAll('[data-reshare]').forEach(el=>{
+    if(el.dataset.wired)return; el.dataset.wired='1';
+    el.onclick=e=>{e.stopPropagation();openDavraReshareMenu(el.dataset.reshare);};
+  });
   scope.querySelectorAll('.flike').forEach(el=>{
     if(el.dataset.wired)return; el.dataset.wired='1';
     el.onclick=e=>{
@@ -1014,7 +1067,6 @@ function wireDavraPostItems(scope){
       haptic();
       api('/api/davra/posts/'+encodeURIComponent(el.dataset.id)+'/like',{method:'POST'}).then(r=>{
         el.classList.toggle('on',r.liked);
-        el.textContent='';
         el.innerHTML=`${r.liked?'❤️':'🤍'} <span class="fcount">${r.like_count}</span>`;
       }).catch(()=>{});
     };
@@ -1108,49 +1160,168 @@ $('#davraFab').onclick=openDavraCompose;
 $('#davraComposeClose').onclick=closeDavraCompose;
 $('#davraComposeSheet').onclick=e=>{if(e.target.id==='davraComposeSheet')closeDavraCompose();};
 
-// ---- Davra thread: shows one focused post plus its direct replies. Tapping a reply re-opens
-// this same view focused on THAT reply (pushing onto davraThreadStack), which is what makes
-// unlimited-depth "reply to a reply" work without rendering a nested tree. ----
-let davraThreadStack=[];
+// ---- Quote-post: same compose sheet as openDavraCompose, but pre-attached to an existing post
+// (no book picker — the "book" is whatever the quoted post is about) instead of free text alone.
+let davraQuoteTarget=null;
+function openDavraQuoteCompose(postId){
+  haptic();
+  davraQuoteTarget=postId;
+  $('#davraComposeSheetc').innerHTML='Yuklanmoqda...';
+  $('#davraComposeSheet').classList.add('open');
+  tg?.BackButton?.show();
+  api('/api/davra/posts/'+encodeURIComponent(postId)).then(orig=>{
+    $('#davraComposeSheetc').innerHTML=`
+      <textarea id="dcText" maxlength="1500" placeholder="Fikringizni qo'shing..."></textarea>
+      <div class="cnt" id="dcCnt">0/1500</div>
+      <div class="dcQuotePreview">${davraReshareEmbedHtml(orig)}</div>
+      <button class="btn primary" id="dcSubmit" style="width:100%; margin-top:14px">Joylash</button>`;
+    $('#dcText').oninput=()=>{$('#dcCnt').textContent=`${$('#dcText').value.length}/1500`;};
+    $('#dcSubmit').onclick=submitDavraQuote;
+  }).catch(()=>{$('#davraComposeSheetc').innerHTML='<p class="hint">Yuklanmadi.</p>';});
+}
+function submitDavraQuote(){
+  const text=$('#dcText').value.trim();
+  const btn=$('#dcSubmit');
+  btn.disabled=true;
+  api('/api/davra/posts/'+encodeURIComponent(davraQuoteTarget)+'/reshare',{method:'POST',body:JSON.stringify({text:text||null})}).then(()=>{
+    toast('Joylandi');closeDavraCompose();loadDavraFeed(true);
+  }).catch(()=>{toast('Xatolik yuz berdi');btn.disabled=false;});
+}
+
+// ---- Reshare menu: "Qayta ulashish" (instant repost) vs "Fikr qo'shib ulashish" (quote-post
+// with your own added text) — same two-option bottom sheet mutolaa uses. ----
+let davraReshareTarget=null;
+function openDavraReshareMenu(postId){
+  if(!canAct()){toast('Ulashish uchun botni Telegram ichida oching');return;}
+  haptic();
+  davraReshareTarget=postId;
+  $('#davraReshareMenuSheet').classList.add('open');
+}
+function closeDavraReshareMenu(){$('#davraReshareMenuSheet').classList.remove('open');}
+$('#davraReshareMenuSheet').onclick=e=>{if(e.target.id==='davraReshareMenuSheet')closeDavraReshareMenu();};
+$('#rmRepost').onclick=()=>{
+  const id=davraReshareTarget;closeDavraReshareMenu();
+  api('/api/davra/posts/'+encodeURIComponent(id)+'/reshare',{method:'POST',body:JSON.stringify({text:null})}).then(()=>{
+    toast('Ulashildi');loadDavraFeed(true);
+  }).catch(()=>toast('Xatolik yuz berdi'));
+};
+$('#rmQuote').onclick=()=>{
+  const id=davraReshareTarget;closeDavraReshareMenu();
+  openDavraQuoteCompose(id);
+};
+
+// ---- Davra thread: ONE page — the focused post/reply at top, its direct replies listed inline
+// below. Each reply that itself has replies shows a collapsed "N ta javobni ko'rish" link;
+// tapping it fetches and inserts that reply's own children right there (toggleDavraExpand),
+// recursively, instead of navigating to a new page. A single persistent bottom composer
+// (#dtComposerBar) posts to whichever id is currently targeted (davraReplyTarget) — defaults to
+// the focused post, and re-targets when "Javob qaytarish" is tapped on any comment, with a chip
+// showing who you're replying to and an ✕ to reset back to the root. ----
+let davraFocusedPostId=null, davraReplyTarget=null, davraReplyTargetName=null;
+function davraReplyItemHtml(it){
+  const isReshare=!!it.reshared_post;
+  return `<div class="dtReply" data-id="${esc(it.id)}">
+    <div class="fmeta">${authorAvatarHtml(it.user_id,it.avatar_version,it.alias)}<span class="falias">${esc(it.alias)}</span><span class="cmeta">${fmtAgo(it.created_at)}</span></div>
+    ${isReshare?'<div class="freshareTag">🔁 qayta ulashdi</div>':''}
+    ${it.text?`<div class="ftext">${esc(it.text)}</div>`:''}
+    ${isReshare?davraReshareEmbedHtml(it.reshared_post):(it.book_id&&it.book_id!==davraFocusedBookId?davraBookCardHtml(it.book_id,it.reading_count):'')}
+    <div class="fActions">
+      <button class="flike${it.liked?' on':''}" data-id="${esc(it.id)}">${it.liked?'❤️':'🤍'} <span class="fcount">${it.like_count||0}</span></button>
+      <span class="dtReplyAction" data-target="${esc(it.id)}" data-name="${esc(it.alias)}">Javob qaytarish</span>
+      <span class="freshareBtn" data-reshare="${esc(it.id)}">🔁 ${it.reshare_count||0}</span>
+    </div>
+    ${it.reply_count>0?`<span class="dtExpand" data-expand="${esc(it.id)}" data-count="${it.reply_count}">${it.reply_count} ta javobni ko'rish ↓</span>`:''}
+    <div class="dtNested" id="dtNested-${esc(it.id)}"></div>
+  </div>`;
+}
+function wireDavraReplyRow(scope){
+  wireDavraPostItems(scope);
+  scope.querySelectorAll('.dtReplyAction').forEach(el=>{
+    if(el.dataset.wired)return; el.dataset.wired='1';
+    el.onclick=e=>{e.stopPropagation();setDavraReplyTarget(el.dataset.target,el.dataset.name);};
+  });
+  scope.querySelectorAll('.dtExpand').forEach(el=>{
+    if(el.dataset.wired)return; el.dataset.wired='1';
+    el.onclick=e=>{e.stopPropagation();toggleDavraExpand(el);};
+  });
+}
+function toggleDavraExpand(el){
+  const id=el.dataset.expand;
+  const nested=$('#dtNested-'+id);
+  if(nested.dataset.open==='1'){
+    nested.innerHTML='';nested.dataset.open='0';
+    el.textContent=el.dataset.count+" ta javobni ko'rish ↓";
+    return;
+  }
+  el.textContent='Yuklanmoqda...';
+  api('/api/davra/posts/'+encodeURIComponent(id)+'/replies').then(r=>{
+    const replies=r.replies||[];
+    nested.innerHTML=replies.map(davraReplyItemHtml).join('');
+    nested.dataset.open='1';
+    wireDavraReplyRow(nested);
+    el.textContent='Yashirish ↑';
+  }).catch(()=>{el.textContent=el.dataset.count+" ta javobni ko'rish ↓";});
+}
+function setDavraReplyTarget(id,name){
+  davraReplyTarget=id;
+  davraReplyTargetName=(id===davraFocusedPostId)?null:name;
+  renderDavraReplyChip();
+  $('#dtReplyText').focus();
+}
+function renderDavraReplyChip(){
+  const chip=$('#dtReplyChip');
+  if(davraReplyTargetName){
+    chip.style.display='flex';
+    $('#dtReplyChipText').textContent=davraReplyTargetName+'ga javob qaytarish';
+  } else chip.style.display='none';
+}
+let davraFocusedBookId=null;
 function openDavraThread(postId){
   haptic();
-  // Tapping a reply while the thread sheet is already open means the user is drilling one level
-  // deeper (a reply's own replies) — push onto the stack so "‹ Orqaga" can step back out.
-  // Tapping a card from the main feed is always a fresh open, regardless of stale leftover state.
-  if($('#davraThreadSheet').classList.contains('open')){davraThreadStack.push(postId);}
-  else{davraThreadStack=[postId];$('#davraThreadSheet').classList.add('open');tg?.BackButton?.show();}
+  davraFocusedPostId=postId;
+  davraFocusedBookId=null;
+  setDavraReplyTarget(postId,null);
   $('#davraThreadSheetc').innerHTML='Yuklanmoqda...';
+  $('#davraThreadSheet').classList.add('open');
+  tg?.BackButton?.show();
   loadDavraThread(postId);
+  api('/api/davra/posts/'+encodeURIComponent(postId)+'/view',{method:'POST'}).catch(()=>{});
 }
 function loadDavraThread(postId){
   Promise.all([
     api('/api/davra/posts/'+encodeURIComponent(postId)),
     api('/api/davra/posts/'+encodeURIComponent(postId)+'/replies'),
   ]).then(([post,repliesRes])=>{
+    davraFocusedBookId=post.book_id;
     const replies=repliesRes.replies||[];
-    const back=davraThreadStack.length>1?'<div class="dtBack" id="dtBack">‹ Orqaga</div>':'';
     $('#davraThreadSheetc').innerHTML=`
-      ${back}
       ${davraPostHtml(post,true)}
-      ${canAct()?`<div id="dtReplyBox"><textarea id="dtReplyText" maxlength="1500" placeholder="Javob yozing..."></textarea><button class="btn primary" id="dtReplySubmit" style="width:100%; margin-top:8px">Javob berish</button></div>`:'<p class="hint">Javob yozish uchun botni Telegram ichida oching.</p>'}
-      <div class="dtReplies" id="dtReplies">${replies.map(r=>davraPostHtml(r,false)).join('')||'<p class="hint">Hali javob yo\'q — birinchi bo\'ling!</p>'}</div>`;
+      <div class="dtReplyActionRow"><span class="dtReplyAction" data-target="${esc(post.id)}" data-name="${esc(post.alias)}">Javob qaytarish</span></div>
+      <div class="dtReplies" id="dtReplies">${replies.map(davraReplyItemHtml).join('')||'<p class="hint">Hali javob yo\'q — birinchi bo\'ling!</p>'}</div>`;
     wireDavraPostItems($('#davraThreadSheetc'));
-    const backEl=$('#dtBack');
-    if(backEl)backEl.onclick=()=>{davraThreadStack.pop();loadDavraThread(davraThreadStack[davraThreadStack.length-1]);};
-    const submitEl=$('#dtReplySubmit');
-    if(submitEl)submitEl.onclick=()=>{
-      const text=$('#dtReplyText').value.trim();
-      if(!text)return;
-      submitEl.disabled=true;
-      api('/api/davra/posts/'+encodeURIComponent(postId)+'/reply',{method:'POST',body:JSON.stringify({text})}).then(()=>{
-        loadDavraThread(postId);
-      }).catch(()=>{toast('Xatolik yuz berdi');submitEl.disabled=false;});
-    };
+    wireDavraReplyRow($('#davraThreadSheetc'));
   }).catch(()=>{$('#davraThreadSheetc').innerHTML='<p class="hint">Yuklanmadi.</p>';});
 }
-function closeDavraThread(){$('#davraThreadSheet').classList.remove('open');tg?.BackButton?.hide();davraThreadStack=[];}
+function closeDavraThread(){
+  $('#davraThreadSheet').classList.remove('open');tg?.BackButton?.hide();
+  davraFocusedPostId=null;davraReplyTarget=null;davraReplyTargetName=null;
+  $('#dtReplyText').value='';renderDavraReplyChip();
+}
 $('#davraThreadClose').onclick=closeDavraThread;
 $('#davraThreadSheet').onclick=e=>{if(e.target.id==='davraThreadSheet')closeDavraThread();};
+$('#dtReplyChipX').onclick=()=>setDavraReplyTarget(davraFocusedPostId,null);
+$('#dtReplySend').onclick=()=>{
+  if(!canAct()){toast('Javob berish uchun botni Telegram ichida oching');return;}
+  const text=$('#dtReplyText').value.trim();
+  if(!text||!davraReplyTarget)return;
+  const btn=$('#dtReplySend');
+  btn.disabled=true;
+  api('/api/davra/posts/'+encodeURIComponent(davraReplyTarget)+'/reply',{method:'POST',body:JSON.stringify({text})}).then(()=>{
+    $('#dtReplyText').value='';
+    setDavraReplyTarget(davraFocusedPostId,null);
+    loadDavraThread(davraFocusedPostId);
+  }).catch(()=>toast('Xatolik yuz berdi')).finally(()=>{btn.disabled=false;});
+};
 const COVERS=[['#c17a3d','#8c4a24'],['#a8452f','#6b2418'],['#4a6b4a','#2d4530'],['#c99a2e','#8a5c16'],['#5a4a6b','#382d45'],['#8a3a4a','#5c2530'],['#3a6b6b','#254545'],['#b06a2a','#6b3816'],['#6b5a3a','#453825']];
 function coverFor(id){let h=0;const s=String(id||'');for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;return COVERS[h%COVERS.length];}
 function initials(t){return String(t||'?').replace(/[^\p{L}\p{N} ]/gu,'').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'📖';}
