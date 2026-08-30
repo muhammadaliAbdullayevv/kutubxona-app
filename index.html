@@ -1849,6 +1849,30 @@ function heroHtml(item){
     </div>
   </div>`;
 }
+// Fills the same hero slot for anyone with nothing in progress yet (new users especially) — a
+// suggestion to START a book, not resume one, so it's a plain "Boshlash" button with no percent/
+// progress bar (there isn't any yet) instead of heroHtml's resume button. Picked once per app
+// session (cached), randomly among the most-downloaded books, so it's a real "popular" pick
+// without showing literally the single most-downloaded book to every visitor every time.
+let _starterBookCache=null;
+function pickRandomPopularBook(){
+  if(_starterBookCache)return _starterBookCache;
+  const pool=[...(DB.books||[])].sort((a,b)=>(b.dl||0)-(a.dl||0)).slice(0,20);
+  if(!pool.length)return null;
+  _starterBookCache=pool[Math.floor(Math.random()*pool.length)];
+  return _starterBookCache;
+}
+function heroStartHtml(b){
+  const[c1,c2]=coverFor(b.i);
+  return `<div class="hero" style="background:linear-gradient(135deg,${c1},${c2})" data-id="${esc(b.i)}">
+    <div class="heroCover">${b.hc?`<img class="ci" src="covers/${encodeURIComponent(b.i)}.jpg" loading="lazy" onerror="this.remove()">`:''}<span class="ini">${esc(initials(b.t))}</span></div>
+    <div class="heroInfo">
+      <div class="heroTitle">${esc(b.t)}</div>
+      <div class="heroAuthor">${esc(b.a||'')}</div>
+      <button class="heroBtn">📖 Boshlash →</button>
+    </div>
+  </div>`;
+}
 // Topic chips row — tapping one runs it as a search term, reusing the exact same relevance
 // engine every other search already goes through (tags are indexed into _subs already).
 function topicsHtml(topics){
@@ -1919,6 +1943,7 @@ function renderHome(){
   if(needsOnboarding)html+=onboardingBannerHtml();
   if(HOME.continue.length)html+=heroHtml(HOME.continue[0]);
   else if(canAct()&&!HOME.continueLoaded)html+=heroSkeletonHtml();
+  else{const starter=pickRandomPopularBook();if(starter)html+=heroStartHtml(starter);}
   if(HOME.topics.length)html+=topicsHtml(HOME.topics);
   const forYou=computeForYou();
   if(forYou.length)html+=shelf("✨ Siz uchun",forYou);
@@ -2732,8 +2757,13 @@ function openProfileEdit(){
       api('/api/profile/settings',{method:'POST',body:JSON.stringify({
         display_name:name||null, tahallus:tahallus||null, birth_date:birthDate,
         gender, phone_number:phone||null, email:email||null, bio:bio||null,
-      })}).then(()=>{toast('Saqlandi');renderProfileCard();})
-        .catch(()=>toast('Saqlashda xatolik — tahallus band bo\'lishi mumkin'));
+      })}).then(()=>{
+        toast('Saqlandi');renderProfileCard();
+        // Re-check right after a real save (not just once at boot) so the home-page onboarding
+        // banner disappears live once display_name gets set, instead of needing a full app
+        // restart before it notices.
+        checkOnboardingBanner();
+      }).catch(()=>toast('Saqlashda xatolik — tahallus band bo\'lishi mumkin'));
     }
     // --- bio: same drill-in-row + modal pattern as everything else now, matching mutolaa's own
     // "Qisqacha men haqimda" row (pencil icon, not a chevron) instead of an always-expanded
