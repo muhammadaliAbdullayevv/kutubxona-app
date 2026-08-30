@@ -352,7 +352,7 @@
   .liveBadgeRight{display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700; opacity:.92}
   /* The panel is a full page (like the PDF reader), not a bottom drawer — a "footer" card reads
      as a minor add-on; a whole page reads as what it actually is, the app's stats dashboard. */
-  #liveSheet,#listSheet,#shelvesSheet,#reviewsSheet,#writeReviewSheet,#profileEditSheet,#avatarCropSheet{flex-direction:column}
+  #liveSheet,#listSheet,#shelvesSheet,#reviewsSheet,#writeReviewSheet,#profileEditSheet,#avatarCropSheet,#davraComposeSheet,#davraThreadSheet{flex-direction:column}
   /* Generalized from the Statistika panel's own topbar so new full-page sheets (Reading Room's
      drill-in lists, Javon) get the same "whole page, not a bottom drawer" treatment for free. */
   #liveTopbar,.stopbar{flex-shrink:0; display:flex; align-items:center; justify-content:space-between; gap:12px;
@@ -379,7 +379,6 @@
   .fitem{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:10px}
   .fitem .fmeta{display:flex; align-items:center; gap:8px; margin-bottom:6px}
   .fitem .falias{font-size:12.5px; font-weight:700; color:var(--muted)}
-  .fitem .fstars{color:#ffb100; font-size:13px}
   .fitem .ftext{font-size:14.5px; line-height:1.4; white-space:pre-wrap; margin:2px 0 10px; color:var(--text)}
   .fbook{display:flex; align-items:center; gap:10px; background:var(--chip); border-radius:12px; padding:8px; cursor:pointer}
   .fbcover{width:36px; height:50px; border-radius:6px; flex-shrink:0; display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative}
@@ -387,8 +386,31 @@
   .fbinfo{flex:1; min-width:0}
   .fbtitle{font-size:13px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text)}
   .fblive{font-size:11px; color:var(--accent); font-weight:700}
-  .flike{margin-top:10px; border:none; background:none; color:var(--muted); font-size:13px; font-weight:700; cursor:pointer; padding:4px 0; display:flex; align-items:center; gap:5px; font-family:inherit}
+  .fActions{display:flex; align-items:center; gap:18px; margin-top:10px}
+  .flike{border:none; background:none; color:var(--muted); font-size:13px; font-weight:700; cursor:pointer; padding:4px 0; display:flex; align-items:center; gap:5px; font-family:inherit}
   .flike.on{color:var(--danger)}
+  .freplyBtn,.freplyCount{font-size:13px; font-weight:700; color:var(--muted); display:flex; align-items:center; gap:5px; cursor:pointer}
+  .fitem:not(.fitemFocused){cursor:pointer}
+  .fitemFocused{border-color:var(--accent); border-width:1.5px}
+  .fitemFocused .ftext{font-size:16px}
+  .davraFab{position:fixed; right:16px; bottom:calc(env(safe-area-inset-bottom) + 20px + var(--bottomnav-h)); width:54px; height:54px; border-radius:50%; border:none; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; font-size:22px; box-shadow:var(--shadow); cursor:pointer; z-index:25; display:flex; align-items:center; justify-content:center}
+  #davraComposeSheetc textarea,#dtReplyBox textarea{width:100%; box-sizing:border-box; background:var(--card); border:1px solid var(--line); border-radius:10px; color:var(--text); padding:9px; font:inherit; resize:vertical; min-height:90px; margin-top:12px}
+  #dcBookSearch{width:100%; box-sizing:border-box; background:var(--card); border:1px solid var(--line); border-radius:10px; color:var(--text); padding:9px; font:inherit; margin-top:10px}
+  .dcResults{margin-top:6px; max-height:260px; overflow-y:auto}
+  .dcResult{display:flex; flex-direction:column; gap:2px; padding:9px 10px; border-radius:10px; cursor:pointer}
+  .dcResult:hover,.dcResult:active{background:var(--chip)}
+  .dcResult span:first-child{font-size:13.5px; font-weight:700; color:var(--text)}
+  .dcResultAuthor{font-size:12px; color:var(--muted)}
+  .dcPicked{display:flex; align-items:center; gap:10px; background:var(--chip); border-radius:12px; padding:8px; margin-top:10px}
+  .dcPickedCover{width:32px; height:44px; border-radius:6px; flex-shrink:0; display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative}
+  .dcPickedCover .ini{font-size:11px; font-weight:800; color:rgba(255,255,255,.92)}
+  .dcPickedInfo{flex:1; min-width:0}
+  .dcPickedTitle{font-size:13px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text)}
+  .dcPickedAuthor{font-size:11.5px; color:var(--muted)}
+  .dcPickedChange{font-size:12px; font-weight:700; color:var(--accent); cursor:pointer; flex-shrink:0}
+  .dtBack{font-size:13.5px; font-weight:700; color:var(--accent); margin-bottom:12px; cursor:pointer}
+  #dtReplyBox{margin:14px 0 18px}
+  .dtReplies .fitem{margin-left:0}
   .liveHead{text-align:center; padding:6px 0 24px}
   .liveClock{font-size:40px; font-weight:800; letter-spacing:.5px; font-variant-numeric:tabular-nums; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
     background:linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; background-clip:text; color:transparent}
@@ -652,8 +674,9 @@
   <div id="davraView" style="display:none">
     <div class="viewHead"><h2 class="dtitle">💬 Davra</h2><span class="viewThemeBtn" id="btnThemeDavra">🌙</span></div>
     <div id="davraList"></div>
-    <div class="empty" id="davraEmpty" style="display:none"><span class="em">💬</span>Hali hech narsa yo'q</div>
+    <div class="empty" id="davraEmpty" style="display:none"><span class="em">💬</span>Hali hech narsa yo'q — birinchi bo'lib kitob haqida yozing!</div>
     <button class="more" id="davraMore" style="display:none">Yana yuklash</button>
+    <button class="davraFab" id="davraFab">✍️</button>
   </div>
   <div id="readingView" style="display:none">
     <div class="viewHead"><h2 class="dtitle">📖 Mutolaaxonam</h2><span class="viewThemeBtn" id="btnThemeReading">🌙</span></div>
@@ -689,6 +712,14 @@
 <div class="sheet" id="writeReviewSheet" style="z-index:53; align-items:stretch; background:var(--bg)">
   <div class="stopbar"><div class="stopbarTitle">✍️ Izoh qoldirish</div><div class="gclose" id="writeReviewClose">✕</div></div>
   <div class="ssheetc" id="writeReviewSheetc"></div>
+</div>
+<div class="sheet" id="davraComposeSheet" style="z-index:53; align-items:stretch; background:var(--bg)">
+  <div class="stopbar"><div class="stopbarTitle">✍️ Yangi post</div><div class="gclose" id="davraComposeClose">✕</div></div>
+  <div class="ssheetc" id="davraComposeSheetc"></div>
+</div>
+<div class="sheet" id="davraThreadSheet" style="z-index:54; align-items:stretch; background:var(--bg)">
+  <div class="stopbar"><div class="stopbarTitle">💬 Post</div><div class="gclose" id="davraThreadClose">✕</div></div>
+  <div class="ssheetc" id="davraThreadSheetc"></div>
 </div>
 <div class="sheet" id="profileEditSheet" style="z-index:52; align-items:stretch; background:var(--bg)">
   <div class="stopbar"><div class="stopbarTitle">👤 Profilni tahrirlash</div><div class="gclose" id="profileEditClose">✕</div></div>
@@ -935,10 +966,11 @@ $('#btnLive').onclick=()=>openLiveSheet();
 $('#liveClose').onclick=()=>closeLiveSheet();
 $('#liveSheet').onclick=e=>{if(e.target.id==='liveSheet')closeLiveSheet();};
 
-// ---- Davra: cross-book activity feed (reviewed ratings + top-level comments), newest first.
-// Liking reuses the same per-item endpoints the per-book rating list already uses
-// (toggle — tapping again un-likes), just normalized to one {kind,id} shape here since a feed
-// item is either a rating or a comment under the hood. ----
+// ---- Davra: Twitter-style book-attached posts + threaded replies, newest first. A post is a
+// standalone object (db.davra_posts) — separate from a book's own review/comment section, not a
+// second view onto it. Replies can target either a top-level post or another reply (arbitrary
+// depth); the thread sheet below reads that by re-opening itself with a new focused post id one
+// level at a time (davraThreadStack), rather than rendering a full nested tree up front. ----
 let davraCursor=null, davraDone=false, davraLoading=false;
 function fmtAgo(iso){
   if(!iso)return'';
@@ -948,36 +980,48 @@ function fmtAgo(iso){
   if(diff<2592000)return Math.round(diff/86400)+' kun oldin';
   return new Date(iso).toLocaleDateString('uz-UZ',{day:'numeric',month:'short'});
 }
-function fitemHtml(it){
+function davraPostHtml(it,focused){
   const b=byId[it.book_id];
   let bookHtml='';
   if(b){
     const[c1,c2]=coverFor(b.i);
     bookHtml=`<div class="fbook" data-book="${esc(b.i)}"><div class="fbcover" style="background:linear-gradient(135deg,${c1},${c2})">${b.hc?`<img class="ci" src="covers/${encodeURIComponent(b.i)}.jpg" loading="lazy" onerror="this.remove()">`:''}<span class="ini">${esc(initials(b.t))}</span></div><div class="fbinfo"><div class="fbtitle">${esc(b.t)}</div>${it.reading_count>0?`<span class="fblive">🔴 ${it.reading_count} o'qimoqda</span>`:''}</div></div>`;
   }
-  return `<div class="fitem" data-id="${esc(it.id)}">
-    <div class="fmeta">${authorAvatarHtml(it.user_id,it.avatar_version,it.alias)}<span class="falias">${esc(it.alias)}</span>${it.stars?starsHtml(it.stars,'fstars'):''}<span class="cmeta">${fmtAgo(it.created_at)}</span></div>
+  const replyBadge=focused
+    ? `<span class="freplyCount">💬 ${it.reply_count||0} javob</span>`
+    : `<span class="freplyBtn" data-thread="${esc(it.id)}">💬 ${it.reply_count||0}</span>`;
+  return `<div class="fitem${focused?' fitemFocused':''}" data-id="${esc(it.id)}">
+    <div class="fmeta">${authorAvatarHtml(it.user_id,it.avatar_version,it.alias)}<span class="falias">${esc(it.alias)}</span><span class="cmeta">${fmtAgo(it.created_at)}</span></div>
     ${it.text?`<div class="ftext">${esc(it.text)}</div>`:''}
     ${bookHtml}
-    <button class="flike" data-kind="${it.kind}" data-id="${esc(it.id)}">🤍 <span class="fcount">${it.like_count||0}</span></button>
+    <div class="fActions">
+      <button class="flike${it.liked?' on':''}" data-id="${esc(it.id)}">${it.liked?'❤️':'🤍'} <span class="fcount">${it.like_count||0}</span></button>
+      ${replyBadge}
+    </div>
   </div>`;
 }
-function wireDavraItems(scope){
-  scope.querySelectorAll('[data-book]').forEach(el=>el.onclick=()=>openDetail(el.dataset.book));
+function wireDavraPostItems(scope){
+  scope.querySelectorAll('[data-book]').forEach(el=>el.onclick=e=>{e.stopPropagation();openDetail(el.dataset.book);});
+  scope.querySelectorAll('[data-thread]').forEach(el=>{
+    if(el.dataset.wired)return; el.dataset.wired='1';
+    el.onclick=e=>{e.stopPropagation();openDavraThread(el.dataset.thread);};
+  });
   scope.querySelectorAll('.flike').forEach(el=>{
     if(el.dataset.wired)return; el.dataset.wired='1';
-    el.onclick=()=>{
+    el.onclick=e=>{
+      e.stopPropagation();
       if(!canAct()){toast('Yoqtirish uchun botni Telegram ichida oching');return;}
       haptic();
-      const id=el.dataset.id,kind=el.dataset.kind;
-      const call=kind==='comment'
-        ? api('/api/comments/'+encodeURIComponent(id)+'/like',{method:'POST'}).then(r=>r.like_count)
-        : api('/api/ratings/'+encodeURIComponent(id)+'/vote',{method:'POST',body:JSON.stringify({helpful:true})}).then(r=>r.helpful_yes);
-      call.then(count=>{
-        el.classList.toggle('on');
-        el.querySelector('.fcount').textContent=count;
+      api('/api/davra/posts/'+encodeURIComponent(el.dataset.id)+'/like',{method:'POST'}).then(r=>{
+        el.classList.toggle('on',r.liked);
+        el.textContent='';
+        el.innerHTML=`${r.liked?'❤️':'🤍'} <span class="fcount">${r.like_count}</span>`;
       }).catch(()=>{});
     };
+  });
+  scope.querySelectorAll('.fitem:not(.fitemFocused)').forEach(el=>{
+    if(el.dataset.wiredCard)return; el.dataset.wiredCard='1';
+    el.onclick=()=>openDavraThread(el.dataset.id);
   });
 }
 function loadDavraFeed(reset){
@@ -985,12 +1029,12 @@ function loadDavraFeed(reset){
   if(reset){davraCursor=null;davraDone=false;$('#davraList').innerHTML='';}
   davraLoading=true;
   $('#davraMore').style.display='none';
-  const path='/api/feed?limit=20'+(davraCursor?'&before='+encodeURIComponent(davraCursor):'');
+  const path='/api/davra/feed?limit=20'+(davraCursor?'&before='+encodeURIComponent(davraCursor):'');
   api(path).then(r=>{
     const items=r.items||[];
     if(items.length){
-      $('#davraList').insertAdjacentHTML('beforeend',items.map(fitemHtml).join(''));
-      wireDavraItems($('#davraList'));
+      $('#davraList').insertAdjacentHTML('beforeend',items.map(it=>davraPostHtml(it,false)).join(''));
+      wireDavraPostItems($('#davraList'));
       davraCursor=items[items.length-1].created_at;
     }
     davraDone=items.length<20;
@@ -999,6 +1043,114 @@ function loadDavraFeed(reset){
   }).catch(()=>{$('#davraEmpty').style.display=$('#davraList').children.length===0?'block':'none';}).finally(()=>{davraLoading=false;});
 }
 $('#davraMore').onclick=()=>loadDavraFeed(false);
+
+// ---- Davra composer: pick a book (search over the already-loaded local catalog, same DB.books
+// used everywhere else) + write the post text. ----
+let davraComposeBook=null;
+function openDavraCompose(){
+  if(!canAct()){toast('Post yozish uchun botni Telegram ichida oching');return;}
+  haptic();
+  davraComposeBook=null;
+  $('#davraComposeSheetc').innerHTML=`
+    <p class="hint">Qaysi kitob haqida yozmoqchisiz?</p>
+    <div class="dcPicked" id="dcPicked" style="display:none"></div>
+    <input type="text" id="dcBookSearch" placeholder="Kitob nomini qidiring...">
+    <div class="dcResults" id="dcResults"></div>
+    <textarea id="dcText" maxlength="1500" placeholder="Fikringizni yozing..." style="display:none"></textarea>
+    <div class="cnt" id="dcCnt" style="display:none">0/1500</div>
+    <button class="btn primary" id="dcSubmit" style="width:100%; margin-top:14px; display:none">Joylash</button>`;
+  $('#davraComposeSheet').classList.add('open');
+  tg?.BackButton?.show();
+  const search=$('#dcBookSearch'),results=$('#dcResults');
+  search.oninput=()=>{
+    const q=search.value.trim().toLowerCase();
+    if(!q){results.innerHTML='';return;}
+    const matches=(DB.books||[]).filter(b=>b.t.toLowerCase().includes(q)).slice(0,8);
+    results.innerHTML=matches.map(b=>`<div class="dcResult" data-id="${esc(b.i)}"><span>${esc(b.t)}</span><span class="dcResultAuthor">${esc(b.a||'Noma\'lum muallif')}</span></div>`).join('')||'<p class="hint">Topilmadi</p>';
+    results.querySelectorAll('.dcResult').forEach(el=>el.onclick=()=>pickDavraBook(el.dataset.id));
+  };
+  $('#dcText').oninput=()=>{$('#dcCnt').textContent=`${$('#dcText').value.length}/1500`;};
+  $('#dcSubmit').onclick=submitDavraPost;
+}
+function pickDavraBook(bookId){
+  const b=byId[bookId];if(!b)return;
+  davraComposeBook=bookId;
+  haptic();
+  const[c1,c2]=coverFor(b.i);
+  const picked=$('#dcPicked');
+  picked.style.display='flex';
+  picked.innerHTML=`<div class="dcPickedCover" style="background:linear-gradient(135deg,${c1},${c2})">${b.hc?`<img class="ci" src="covers/${encodeURIComponent(b.i)}.jpg" loading="lazy" onerror="this.remove()">`:''}<span class="ini">${esc(initials(b.t))}</span></div><div class="dcPickedInfo"><div class="dcPickedTitle">${esc(b.t)}</div><div class="dcPickedAuthor">${esc(b.a||'')}</div></div><span class="dcPickedChange" id="dcPickedChange">O'zgartirish</span>`;
+  $('#dcPickedChange').onclick=()=>{
+    davraComposeBook=null;
+    picked.style.display='none';
+    $('#dcBookSearch').style.display='';$('#dcBookSearch').value='';
+    $('#dcResults').innerHTML='';
+    $('#dcText').style.display='none';$('#dcCnt').style.display='none';$('#dcSubmit').style.display='none';
+  };
+  $('#dcBookSearch').style.display='none';
+  $('#dcResults').innerHTML='';
+  $('#dcText').style.display='block';
+  $('#dcCnt').style.display='block';
+  $('#dcSubmit').style.display='block';
+  $('#dcText').focus();
+}
+function submitDavraPost(){
+  const text=$('#dcText').value.trim();
+  if(!davraComposeBook){toast('Kitobni tanlang');return;}
+  if(!text){toast('Matn kiriting');return;}
+  $('#dcSubmit').disabled=true;
+  api('/api/davra/posts',{method:'POST',body:JSON.stringify({book_id:davraComposeBook,text})}).then(()=>{
+    toast('Joylandi');closeDavraCompose();loadDavraFeed(true);
+  }).catch(()=>{toast('Xatolik yuz berdi');$('#dcSubmit').disabled=false;});
+}
+function closeDavraCompose(){$('#davraComposeSheet').classList.remove('open');tg?.BackButton?.hide();}
+$('#davraFab').onclick=openDavraCompose;
+$('#davraComposeClose').onclick=closeDavraCompose;
+$('#davraComposeSheet').onclick=e=>{if(e.target.id==='davraComposeSheet')closeDavraCompose();};
+
+// ---- Davra thread: shows one focused post plus its direct replies. Tapping a reply re-opens
+// this same view focused on THAT reply (pushing onto davraThreadStack), which is what makes
+// unlimited-depth "reply to a reply" work without rendering a nested tree. ----
+let davraThreadStack=[];
+function openDavraThread(postId){
+  haptic();
+  // Tapping a reply while the thread sheet is already open means the user is drilling one level
+  // deeper (a reply's own replies) — push onto the stack so "‹ Orqaga" can step back out.
+  // Tapping a card from the main feed is always a fresh open, regardless of stale leftover state.
+  if($('#davraThreadSheet').classList.contains('open')){davraThreadStack.push(postId);}
+  else{davraThreadStack=[postId];$('#davraThreadSheet').classList.add('open');tg?.BackButton?.show();}
+  $('#davraThreadSheetc').innerHTML='Yuklanmoqda...';
+  loadDavraThread(postId);
+}
+function loadDavraThread(postId){
+  Promise.all([
+    api('/api/davra/posts/'+encodeURIComponent(postId)),
+    api('/api/davra/posts/'+encodeURIComponent(postId)+'/replies'),
+  ]).then(([post,repliesRes])=>{
+    const replies=repliesRes.replies||[];
+    const back=davraThreadStack.length>1?'<div class="dtBack" id="dtBack">‹ Orqaga</div>':'';
+    $('#davraThreadSheetc').innerHTML=`
+      ${back}
+      ${davraPostHtml(post,true)}
+      ${canAct()?`<div id="dtReplyBox"><textarea id="dtReplyText" maxlength="1500" placeholder="Javob yozing..."></textarea><button class="btn primary" id="dtReplySubmit" style="width:100%; margin-top:8px">Javob berish</button></div>`:'<p class="hint">Javob yozish uchun botni Telegram ichida oching.</p>'}
+      <div class="dtReplies" id="dtReplies">${replies.map(r=>davraPostHtml(r,false)).join('')||'<p class="hint">Hali javob yo\'q — birinchi bo\'ling!</p>'}</div>`;
+    wireDavraPostItems($('#davraThreadSheetc'));
+    const backEl=$('#dtBack');
+    if(backEl)backEl.onclick=()=>{davraThreadStack.pop();loadDavraThread(davraThreadStack[davraThreadStack.length-1]);};
+    const submitEl=$('#dtReplySubmit');
+    if(submitEl)submitEl.onclick=()=>{
+      const text=$('#dtReplyText').value.trim();
+      if(!text)return;
+      submitEl.disabled=true;
+      api('/api/davra/posts/'+encodeURIComponent(postId)+'/reply',{method:'POST',body:JSON.stringify({text})}).then(()=>{
+        loadDavraThread(postId);
+      }).catch(()=>{toast('Xatolik yuz berdi');submitEl.disabled=false;});
+    };
+  }).catch(()=>{$('#davraThreadSheetc').innerHTML='<p class="hint">Yuklanmadi.</p>';});
+}
+function closeDavraThread(){$('#davraThreadSheet').classList.remove('open');tg?.BackButton?.hide();davraThreadStack=[];}
+$('#davraThreadClose').onclick=closeDavraThread;
+$('#davraThreadSheet').onclick=e=>{if(e.target.id==='davraThreadSheet')closeDavraThread();};
 const COVERS=[['#c17a3d','#8c4a24'],['#a8452f','#6b2418'],['#4a6b4a','#2d4530'],['#c99a2e','#8a5c16'],['#5a4a6b','#382d45'],['#8a3a4a','#5c2530'],['#3a6b6b','#254545'],['#b06a2a','#6b3816'],['#6b5a3a','#453825']];
 function coverFor(id){let h=0;const s=String(id||'');for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;return COVERS[h%COVERS.length];}
 function initials(t){return String(t||'?').replace(/[^\p{L}\p{N} ]/gu,'').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'📖';}
@@ -2901,7 +3053,7 @@ document.querySelectorAll('.viewThemeBtn').forEach(el=>el.onclick=toggleThemeQui
 
 function skeletonShelf(){return `<div class="section"><div class="shead"><h2 class="skel" style="width:140px;height:16px;border-radius:6px"></h2></div><div class="shelf">${Array(4).fill('<div class="si"><div class="skel" style="height:170px;border-radius:14px"></div></div>').join('')}</div></div>`;}
 async function boot(){
-  if(tg){tg.ready();tg.expand();tg.disableVerticalSwipes?.();tg.BackButton?.onClick(()=>{if($('#pdfSheet').classList.contains('open'))closePdfReader();else if($('#fieldEditSheet').classList.contains('open'))closeFieldEdit();else if($('#birthPickerSheet').classList.contains('open'))closeBirthPicker();else if($('#avatarCropSheet').classList.contains('open'))closeAvatarCrop();else if($('#writeReviewSheet').classList.contains('open'))closeWriteReview();else if($('#reviewsSheet').classList.contains('open'))closeReviewsSheet();else if($('#profileEditSheet').classList.contains('open'))closeProfileEdit();else if($('#shelvesSheet').classList.contains('open'))closeShelvesSheet();else if($('#listSheet').classList.contains('open'))closeListSheet();else if($('#sheet').classList.contains('open'))closeSheet();else if($('#globe').classList.contains('open'))closeGlobe();});applyThemeMode();tg.onEvent?.('themeChanged',()=>{if(themeMode==='system')applyThemeMode();});}
+  if(tg){tg.ready();tg.expand();tg.disableVerticalSwipes?.();tg.BackButton?.onClick(()=>{if($('#pdfSheet').classList.contains('open'))closePdfReader();else if($('#fieldEditSheet').classList.contains('open'))closeFieldEdit();else if($('#birthPickerSheet').classList.contains('open'))closeBirthPicker();else if($('#avatarCropSheet').classList.contains('open'))closeAvatarCrop();else if($('#writeReviewSheet').classList.contains('open'))closeWriteReview();else if($('#davraThreadSheet').classList.contains('open'))closeDavraThread();else if($('#davraComposeSheet').classList.contains('open'))closeDavraCompose();else if($('#reviewsSheet').classList.contains('open'))closeReviewsSheet();else if($('#profileEditSheet').classList.contains('open'))closeProfileEdit();else if($('#shelvesSheet').classList.contains('open'))closeShelvesSheet();else if($('#listSheet').classList.contains('open'))closeListSheet();else if($('#sheet').classList.contains('open'))closeSheet();else if($('#globe').classList.contains('open'))closeGlobe();});applyThemeMode();tg.onEvent?.('themeChanged',()=>{if(themeMode==='system')applyThemeMode();});}
   if('serviceWorker' in navigator)window.addEventListener('load',()=>{
     navigator.serviceWorker.register('./sw.js').then(reg=>{
       // A long-lived, never-navigated Mini App session (Telegram keeps the WebView warm across
