@@ -2325,6 +2325,13 @@ function isSearchDiscovery(){return state.view==='search'&&!state.q&&!state.genr
 function showArea(area){
   const forBooks=area==='home'||area==='search';
   const discovery=area==='search'&&isSearchDiscovery();
+  // <header> itself (not just its children) has to be hidden on profile/davra/reading — every
+  // child inside it already collapses to display:none on those views, but the <header> element's
+  // OWN padding/margin/background (it's a sticky, gradient-backed bar) doesn't collapse just
+  // because it has no visible content, so it was rendering as a bare colored strip between the
+  // native title bar and whatever comes next — most visible once the profile view got a real
+  // full-bleed banner right below it, reading as a stray gap/border above the banner.
+  $('header').style.display=forBooks?'':'none';
   $('#homeHeader').style.display=area==='home'?'block':'none';
   $('#searchHeader').style.display=area==='search'?'flex':'none';
   // Icon-only search on home (mutolaa-style) — the real input only appears once you're actually
