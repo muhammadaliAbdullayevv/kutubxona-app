@@ -568,22 +568,25 @@
   .onboardText div{font-size:12.5px; opacity:.9; margin-top:2px}
   .onboardChev{font-size:22px; flex-shrink:0; opacity:.85}
   .pHero{position:relative; margin:0 0 18px; border-radius:16px; overflow:hidden; background:var(--card); border:1px solid color-mix(in srgb, var(--line) 45%, var(--muted) 55%); box-shadow:0 2px 10px rgba(0,0,0,.28)}
-  /* A REAL uploaded photo now (banner_version — migration 103), not the old per-user
-     auto-gradient strip that got removed for looking arbitrary/clashing. Sits above .pHeroTop as
-     its own strip, not overlapping the avatar — simpler and keeps the avatar/name row exactly as
-     already shipped. Omitted entirely (no element at all) on someone else's profile when they
-     haven't uploaded one; on your own profile it stays as an inviting empty placeholder instead.
-     Setting/deleting the banner itself now lives only in the edit-profile sheet (.bannerEdit,
-     matching mutolaa's own settings screen), not via tapping the hero directly — so this card has
-     no upload affordance of its own any more. Rendered as a real <img> (not a CSS background-image)
-     with an onerror fallback that adds .pHeroBannerBlank and removes itself — same self-healing
-     pattern as every other avatar/cover image here — because banner_version is a monotonic counter
-     that keeps incrementing on delete (never resets to 0, see bump_banner_version), so a deleted
-     banner still looks "truthy" and must be caught by the image actually failing to load, not by
-     re-checking the version number. */
+  /* A REAL uploaded photo when set (banner_version — migration 103), else the .pHeroBannerBlank
+     gradient fallback below — every profile (own and public) always renders this element, one way
+     or the other, and the avatar always overlaps its bottom edge (see .pHeroTop/.avWrap) the same
+     way regardless of which case it is. Setting/deleting the banner itself lives only in the
+     edit-profile sheet (.heroEditPreview, matching mutolaa's own settings screen), not via tapping
+     the hero directly — so this card has no upload affordance of its own. Rendered as a real <img>
+     (not a CSS background-image) with an onerror fallback that adds .pHeroBannerBlank and removes
+     itself — same self-healing pattern as every other avatar/cover image here — because
+     banner_version is a monotonic counter that keeps incrementing on delete (never resets to 0, see
+     bump_banner_version), so a deleted banner still looks "truthy" and must be caught by the image
+     actually failing to load, not by re-checking the version number. */
   .pHeroBanner{height:120px; width:100%; position:relative}
   .pHeroBannerImg{position:absolute; inset:0; width:100%; height:100%; object-fit:cover}
-  .pHeroBannerBlank{background:var(--chip)}
+  /* Default banner for anyone who hasn't uploaded a real photo — a fixed teal→cyan→blue gradient
+     (matching a reference swatch), not the neutral --chip fill used elsewhere for "empty" states,
+     so a profile without a banner still looks intentionally designed rather than broken/unfinished.
+     Same on every profile (own and public) and in both themes — a picked brand gradient, not a
+     token-derived one. */
+  .pHeroBannerBlank{background:linear-gradient(135deg, #1de9b3 0%, #14d4f0 50%, #4d78f5 100%)}
   /* Avatar floats over the banner's bottom edge (half on the photo, half below it) instead of
      sitting in a fully separate row underneath — matches the overlapping-avatar hero pattern seen
      in mutolaa. .avWrap is pulled up via absolute positioning (42px = half its 84px height) so it
@@ -591,15 +594,14 @@
      beside it, left-aligned to the same edge) — same mutolaa layout: once the avatar half-overlaps
      the photo, only its lower half has any content-area room beside it, so "beside" collapses into
      an awkward near-below position instead of a clean one. padding-top clears the avatar's full
-     height (not just the overlap sliver) so text always starts a clean gap under the ring. Only
-     valid when a banner element actually precedes this row — see .noBanner for the no-overlap case. */
+     height (not just the overlap sliver) so text always starts a clean gap under the ring. Every
+     profile always renders a banner element now (a real photo, or the .pHeroBannerBlank gradient
+     fallback below) so this overlap math applies unconditionally — no "no banner" case any more. */
   .pHeroTop{position:relative; padding:52px 14px 16px}
-  .pHeroTop.noBanner{padding-top:108px}
   /* A plain border, not border+box-shadow — the two combined were rendering as an uneven arc
      (thick on one side, nearly gone on the other) instead of a uniform ring on real devices, not
      just a headless-testing artifact. A single border on a border-radius:50% box can't do that. */
   .pHero .avWrap{position:absolute; left:14px; top:-42px; border-radius:50%; border:3px solid var(--accent); box-sizing:content-box; background:var(--card)}
-  .pHeroTop.noBanner .avWrap{top:14px}
   .pHero .avImg{position:absolute; top:0; left:0; border-radius:50%; object-fit:cover}
   .pHero .avInitials{border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:800; color:#fff}
   .pHeroIdentity{flex:1; min-width:0}
@@ -612,13 +614,11 @@
      top edge down, which would shrink or erase the avatar's overlap onto the banner (that overlap
      is computed as a fixed offset from .pHeroTop's top — see .pHero .avWrap above). Right-aligned
      so it never collides with the avatar, which overlaps the bottom-LEFT of the banner instead.
-     .noBannerPos is the fallback for a public profile with no banner element at all (nothing to
-     anchor "below the banner" against) — own-profile always has a banner (real or blank
-     placeholder) so it never needs that fallback. Edit carries its own label now (not an icon alone
-     competing for meaning) since "✏️" alone next to a share icon read as ambiguous — share stays
-     icon-only as the secondary action. */
+     Every profile always has a banner element (real photo or the gradient fallback) so top:128px
+     applies unconditionally — no "no banner" fallback position needed any more. Edit carries its
+     own label now (not an icon alone competing for meaning) since "✏️" alone next to a share icon
+     read as ambiguous — share stays icon-only as the secondary action. */
   .pHeroActionsRow{position:absolute; top:128px; right:14px; display:flex; align-items:center; gap:8px; z-index:1}
-  .pHeroActionsRow.noBannerPos{top:12px}
   .pHeroEditBtn{display:inline-flex; align-items:center; gap:6px; padding:7px 14px; border-radius:20px; background:var(--chip); border:1px solid var(--line); color:var(--text); font-size:13px; font-weight:700; cursor:pointer; white-space:nowrap}
   .pHeroShareBtn{width:32px; height:32px; border-radius:50%; background:var(--chip); border:1px solid var(--line); color:var(--text); font-size:14px; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0}
   /* Follow, unlike edit, is the primary action on someone else's profile — it keeps a real
@@ -3496,15 +3496,17 @@ function loadUserProfileHero(userId){
     const avSize=84;
     const img=p.avatar_version?`<img class="avImg" style="width:${avSize}px;height:${avSize}px" src="${avatarUrl(userId,p.avatar_version)}" onerror="this.remove()">`:'';
     const followBtn=canAct()?`<button class="followBtn${p.is_following?' on':''}" id="uFollowBtn">${p.is_following?'✓ Obuna bo\'lgan':'+ Obuna bo\'lish'}</button>`:'';
-    // Read-only mirror of the banner: shown only when this person actually uploaded one — no
-    // blank/inviting placeholder here, that's the own-profile upload entry point only.
-    const bannerHtml=p.banner_version?`<div class="pHeroBanner"><img class="pHeroBannerImg" src="${bannerUrl(userId,p.banner_version)}" onerror="this.parentElement.classList.add('pHeroBannerBlank');this.remove()"></div>`:'';
+    // Read-only mirror of the banner: a real photo if this person uploaded one, otherwise the
+    // same default gradient (.pHeroBannerBlank) the own-profile card falls back to — so every
+    // profile always has a banner-shaped area, and the avatar always overlaps it the same way.
+    const bannerImg=p.banner_version?`<img class="pHeroBannerImg" src="${bannerUrl(userId,p.banner_version)}" onerror="this.parentElement.classList.add('pHeroBannerBlank');this.remove()">`:'';
+    const bannerHtml=`<div class="pHeroBanner${p.banner_version?'':' pHeroBannerBlank'}">${bannerImg}</div>`;
     $('#uProfileCard').innerHTML=`<div class="pHero">
       ${bannerHtml}
-      <div class="pHeroActionsRow${p.banner_version?'':' noBannerPos'}">
+      <div class="pHeroActionsRow">
         <span class="pHeroShareBtn" id="uShareBtn" title="Ulashish">📤</span>
       </div>
-      <div class="pHeroTop${p.banner_version?'':' noBanner'}">
+      <div class="pHeroTop">
         <div class="avWrap" style="width:${avSize}px;height:${avSize}px"><div class="avInitials" style="width:${avSize}px;height:${avSize}px;font-size:30px;background:linear-gradient(135deg,${c1},${c2})">${esc(initials(p.display_name||'?'))}</div>${img}</div>
         <div class="pHeroIdentity">
           <div class="pHeroName">${esc(p.display_name||'Foydalanuvchi')}</div>
