@@ -91,8 +91,14 @@
   @media(min-width:560px){.grid{grid-template-columns:1fr 1fr 1fr}}
   @keyframes cardIn{from{opacity:0; transform:translateY(10px)}to{opacity:1; transform:none}}
   .book,.si{animation:cardIn .4s cubic-bezier(.2,.8,.2,1) backwards; animation-delay:var(--d,0ms)}
-  .book,.si,.chip,.tab,.btn,.authchip,.gtile{transition:transform .15s}
-  .book:active,.si:active,.chip:active,.tab:active,.btn:active,.authchip:active,.gtile:active{transform:scale(.96)}
+  .book,.si,.chip,.tab,.btn,.authchip,.gtile,.followBtn,.navitem,.pHeroEditBtn,.pHeroShareBtn,#pSettingsBtn,#uBackBtn,.ptab,.tw,.reshareMenuItem,.lrow,.pFollowStat,.resume,.davraFab,[data-fav]{transition:transform .15s}
+  .book:active,.si:active,.chip:active,.tab:active,.btn:active,.authchip:active,.gtile:active,.followBtn:active,.navitem:active,.pHeroEditBtn:active,.pHeroShareBtn:active,#pSettingsBtn:active,#uBackBtn:active,.ptab:active,.tw:active,.reshareMenuItem:active,.lrow:active,.pFollowStat:active,.resume:active,.davraFab:active,[data-fav]:active{transform:scale(.96)}
+  /* A slightly bigger, springier pop specifically for favoriting (not unfavoriting) — the plain
+     press-scale above already covers "acknowledged the tap", this is the extra "something good
+     just happened" beat, same idea as Twitter's heart bounce. Triggered from toggleFav(). */
+  @keyframes favPop{0%{transform:scale(1)}30%{transform:scale(1.4)}55%{transform:scale(.88)}100%{transform:scale(1)}}
+  .favPop{animation:favPop .4s ease}
+  @media (prefers-reduced-motion: reduce){.favPop{animation:none!important}}
   @media (prefers-reduced-motion: reduce){.book,.si{animation:none!important}}
   .book{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; cursor:pointer; position:relative; display:flex; flex-direction:column}
   .cover{height:118px; display:flex; align-items:flex-end; padding:10px; position:relative}
@@ -445,6 +451,19 @@
   .rmIcon{font-size:20px; width:32px; text-align:center; flex-shrink:0}
   .rmTitle{font-size:14.5px; font-weight:700; color:var(--text)}
   .rmSub{font-size:12px; color:var(--muted); margin-top:2px}
+  /* ---- first-run welcome tour (#onboardTourSheet) ---- */
+  .tourCard{background:var(--bg); border:1px solid var(--line); border-radius:22px; box-shadow:var(--shadow); padding:32px 24px 22px; width:calc(100% - 40px); max-width:380px; box-sizing:border-box; animation:up .28s cubic-bezier(.2,.8,.2,1)}
+  .tourSlide{display:none; text-align:center; min-height:150px}
+  .tourSlide.on{display:block; animation:cardIn .3s ease}
+  .tourIcon{font-size:46px; margin-bottom:14px}
+  .tourSlide h3{font-size:19px; font-weight:800; margin:0 0 8px; color:var(--text)}
+  .tourSlide p{font-size:14px; color:var(--muted); line-height:1.55; margin:0}
+  .tourDots{display:flex; justify-content:center; gap:6px; margin:22px 0}
+  .tourDots span{width:7px; height:7px; border-radius:50%; background:var(--line); transition:all .2s; cursor:pointer}
+  .tourDots span.on{background:var(--accent); width:20px; border-radius:4px}
+  .tourActions{display:flex; align-items:center; justify-content:space-between; gap:14px}
+  .tourSkip{color:var(--muted); font-size:13px; font-weight:600; cursor:pointer; padding:8px 2px}
+  .tourActions .btn{flex:0 0 auto; padding:11px 24px}
   .liveHead{text-align:center; padding:6px 0 24px}
   .liveClock{font-size:40px; font-weight:800; letter-spacing:.5px; font-variant-numeric:tabular-nums; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
     background:linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; background-clip:text; color:transparent}
@@ -708,9 +727,21 @@
   .rcard .rcText.hint{margin:6px 0; font-size:13px}
   .rcard .rcMeta{font-size:11.5px; color:var(--muted); font-weight:700}
   .rcard.mine .rcMeta{color:var(--accent)}
+  /* ---- pull-to-refresh (#ptr) — main page only (browse/davra/reading/profile), not sheets: those
+     already have their own explicit close affordance and scroll independently. Positioned fixed at
+     the very top, translated down by JS as the user drags; opacity/rotation give the "about to
+     let go" vs "still pulling" states without a second element. ---- */
+  #ptr{position:fixed; top:0; left:50%; width:36px; height:36px; margin-left:-18px; margin-top:-40px;
+    border-radius:50%; background:var(--card); border:1px solid var(--line); box-shadow:var(--shadow);
+    display:flex; align-items:center; justify-content:center; font-size:16px; z-index:40; opacity:0;
+    transition:transform .15s, opacity .15s}
+  #ptr.spin{animation:ptrspin .7s linear infinite}
+  @keyframes ptrspin{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion: reduce){#ptr.spin{animation:none!important}}
 </style>
 </head>
 <body>
+<div id="ptr">↓</div>
 <div class="wrap">
   <header>
     <div id="homeHeader">
@@ -876,6 +907,25 @@
   <div class="reshareMenuCard">
     <div class="reshareMenuItem" id="tmDay"><span class="rmIcon">☀️</span><div><div class="rmTitle">Kunduzgi rejim</div><div class="rmSub">Yorug' interfeys</div></div></div>
     <div class="reshareMenuItem" id="tmNight"><span class="rmIcon">🌙</span><div><div class="rmTitle">Tungi rejim</div><div class="rmSub">Qorong'i interfeys</div></div></div>
+  </div>
+</div>
+<!-- First-run welcome tour — shown once ever (localStorage 'onboardTourSeen'), separate from
+     .onboardBanner (the ongoing "complete your profile" nudge on the home screen, which can
+     reappear until that's actually done). Centered modal, not a bottom sheet, since a one-time
+     welcome moment reads as more deliberate than the app's usual drill-in sheets. -->
+<div class="sheet" id="onboardTourSheet" style="z-index:70; align-items:center; justify-content:center">
+  <div class="tourCard">
+    <div id="tourSlides">
+      <div class="tourSlide on" data-slide="0"><div class="tourIcon">📚</div><h3>Xush kelibsiz!</h3><p>Minglab kitob va audiokitobni bepul o'qing, tinglang va saqlab qo'ying.</p></div>
+      <div class="tourSlide" data-slide="1"><div class="tourIcon">💬</div><h3>Davra</h3><p>Fikr bildiring, boshqa o'quvchilarni kuzating va ular nima o'qiyotganini ko'ring.</p></div>
+      <div class="tourSlide" data-slide="2"><div class="tourIcon">🤖</div><h3>AI kitobchi</h3><p>Nima o'qishni bilmayapsizmi? AI kitobchidan tavsiya so'rang.</p></div>
+      <div class="tourSlide" data-slide="3"><div class="tourIcon">🔥</div><h3>Seriya va ballar</h3><p>Har kuni o'qing, seriyangizni saqlang va reytingda ko'tariling.</p></div>
+    </div>
+    <div class="tourDots" id="tourDots"><span class="on"></span><span></span><span></span><span></span></div>
+    <div class="tourActions">
+      <span class="tourSkip" id="tourSkip">O'tkazib yuborish</span>
+      <button class="btn primary" id="tourNext">Keyingisi</button>
+    </div>
   </div>
 </div>
 <div class="sheet" id="profileEditSheet" style="z-index:52; align-items:stretch; background:var(--bg)">
@@ -1572,6 +1622,44 @@ const PAGE=24;
 
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),1800);}
 function haptic(x='light'){try{tg?.HapticFeedback?.impactOccurred(x)}catch(e){}}
+// One-shot confetti burst for real milestones (finished a book, a new streak day, a new badge) —
+// a plain canvas overlay rather than a library, matching the rest of the app's no-dependency
+// style. Self-removing, no state to track between calls. Skips entirely under reduced-motion,
+// same as the existing card-entrance animation.
+function celebrate(){
+  try{
+    if(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)return;
+    haptic('medium');
+    const canvas=document.createElement('canvas');
+    canvas.style.cssText='position:fixed;inset:0;z-index:400;pointer-events:none';
+    canvas.width=innerWidth;canvas.height=innerHeight;
+    document.body.appendChild(canvas);
+    const ctx=canvas.getContext('2d');
+    const colors=['#ff6b6b','#ffd93d','#6bcb77','#4d96ff','#c77dff','#ff9f43'];
+    const particles=Array.from({length:70},()=>({
+      x:canvas.width/2+(Math.random()-.5)*Math.min(200,canvas.width*.5),
+      y:canvas.height*0.32,
+      vx:(Math.random()-.5)*11,
+      vy:-Math.random()*11-4,
+      size:4+Math.random()*5,
+      color:colors[Math.floor(Math.random()*colors.length)],
+      rot:Math.random()*360,
+      vr:(Math.random()-.5)*22,
+    }));
+    const start=performance.now();
+    function frame(t){
+      const elapsed=t-start;
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      particles.forEach(p=>{
+        p.vy+=0.32;p.x+=p.vx;p.y+=p.vy;p.rot+=p.vr;
+        ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot*Math.PI/180);
+        ctx.fillStyle=p.color;ctx.fillRect(-p.size/2,-p.size/2,p.size,p.size*0.6);ctx.restore();
+      });
+      if(elapsed<1500&&canvas.isConnected)requestAnimationFrame(frame);else canvas.remove();
+    }
+    requestAnimationFrame(frame);
+  }catch(e){}
+}
 
 // ---- favourites via Telegram CloudStorage (fallback: localStorage) ----
 function cloudGet(){return new Promise(res=>{
@@ -2241,13 +2329,23 @@ function run(){
   else{compute();render();showArea('search');}
 }
 
+function bounceHeart(el){el.classList.remove('favPop');void el.offsetWidth;el.classList.add('favPop');}
 function toggleFav(id){
   haptic('medium');
-  if(favs.has(id))favs.delete(id);else favs.add(id);
+  const wasOn=favs.has(id);
+  if(wasOn)favs.delete(id);else favs.add(id);
   saveFavs();
   if(state.view==='reading')renderReading();else render();
   if($('#sheet').classList.contains('open')){const el=$('#dFav');if(el){const on=favs.has(id);el.classList.toggle('on',on);el.textContent=(on?'❤️':'🤍')+' Sevimli';}}
   if($('#listSheet').classList.contains('open')){const el=$(`#listSheetc [data-fav="${CSS.escape(id)}"]`);if(el)el.textContent=favs.has(id)?'❤️':'🤍';}
+  if(!wasOn){
+    // Bounce whichever live heart(s) represent this book right now — grid cards just got
+    // wholesale re-rendered by render()/renderReading() above, so any element reference captured
+    // BEFORE that call would already be a detached node; re-querying here always finds the fresh
+    // one(s) actually in the DOM (there can be more than one — grid + shelf + detail sheet).
+    document.querySelectorAll(`[data-fav="${CSS.escape(id)}"]`).forEach(bounceHeart);
+    const dEl=$('#dFav');if(dEl&&$('#sheet').classList.contains('open'))bounceHeart(dEl);
+  }
   toast(favs.has(id)?'❤️ Saqlandi':'Olib tashlandi');
 }
 
@@ -2493,7 +2591,7 @@ function pdfFlushProgress(){
   api('/api/books/'+encodeURIComponent(pdfBookId)+'/progress',{method:'POST',body:JSON.stringify({current_page:pdfPageNum,total_pages:pdfPageCount||null,active_seconds:delta})}).then(r=>{
     if(r.completed&&!pdfCompletedShown){
       pdfCompletedShown=true;
-      haptic('medium');
+      celebrate(); // haptic('medium') already happens inside celebrate()
       let spanTxt='';
       if(r.started_at&&r.completed_at){
         const days=Math.round((new Date(r.completed_at)-new Date(r.started_at))/86400000);
@@ -3361,6 +3459,39 @@ $('#bCropConfirmBtn').onclick=()=>{
   },'image/jpeg',0.9);
 };
 
+// Detects a genuine "something good just happened" moment (a new badge, or the streak counter
+// going up) by comparing against what was last seen on THIS device (localStorage), and fires
+// celebrate() for it — but only from the second call onward: the very first load of a session has
+// no prior value to compare against, and celebrating on every cold boot just because "3 > nothing"
+// would be a false positive, not a real new achievement. Badges take priority over the streak if
+// both happen to land in the same fetch, so only one burst fires at a time.
+function checkMilestones(r){
+  try{
+    let didCelebrate=false;
+    const achieved=(r.badges||[]).filter(b=>b.achieved).map(b=>b.code);
+    const prevBadgesRaw=localStorage.getItem('achievedBadges');
+    if(prevBadgesRaw!=null){
+      const prevSet=new Set(JSON.parse(prevBadgesRaw));
+      const fresh=achieved.filter(c=>!prevSet.has(c));
+      if(fresh.length){
+        celebrate();didCelebrate=true;
+        const m=_BADGE_META[fresh[0]]||{emoji:'🏅',label:fresh[0]};
+        toast(`${m.emoji} Yangi yutuq: ${m.label}!`);
+      }
+    }
+    localStorage.setItem('achievedBadges',JSON.stringify(achieved));
+    const s=r.streak;
+    const prevStreakRaw=localStorage.getItem('lastSeenStreak');
+    if(prevStreakRaw!=null){
+      const prevStreak=parseInt(prevStreakRaw,10);
+      if(!Number.isNaN(prevStreak)&&s.current_streak>prevStreak&&!didCelebrate){
+        celebrate();
+        toast(`🔥 ${s.current_streak} kunlik seriya!`);
+      }
+    }
+    localStorage.setItem('lastSeenStreak',String(s.current_streak));
+  }catch(e){}
+}
 let myBadgesCache=null;
 function loadProfile(){
   renderProfileCard();
@@ -3369,6 +3500,7 @@ function loadProfile(){
   if(!canAct()){body.innerHTML='<p class="hint">Profilingizni ko\'rish uchun botda oching.</p>';$('#pTabContent').innerHTML='';return;}
   api('/api/profile/me').then(r=>{
     myBadgesCache=r.badges;
+    checkMilestones(r);
     const s=r.streak,st=r.stats,rt=r.reading_time||{total_seconds:0,last_7_days_seconds:0};
     const toMin=sec=>Math.round((sec||0)/60);
     const rankText=r.rank?`#${fmtNum(r.rank.position)} / ${fmtNum(r.rank.total_users)}`:'—';
@@ -3856,6 +3988,23 @@ function closeThemeMenu(){$('#themeMenuSheet').classList.remove('open');tg?.Back
 $('#themeMenuSheet').onclick=e=>{if(e.target.id==='themeMenuSheet')closeThemeMenu();};
 $('#tmDay').onclick=()=>{haptic();setThemeMode('day');toast('☀️ Kunduzgi rejim');closeThemeMenu();};
 $('#tmNight').onclick=()=>{haptic();setThemeMode('night');toast('🌙 Tungi rejim');closeThemeMenu();};
+// ---- first-run welcome tour (#onboardTourSheet) — button/dot navigation only, not a swipe
+// gesture: the app already has one carefully-tuned touch gesture (pull-to-refresh) and adding a
+// second, overlapping one for a one-time screen isn't worth the extra edge cases. ----
+const TOUR_SLIDES=4;
+let tourIdx=0;
+function showTourSlide(i){
+  tourIdx=Math.max(0,Math.min(TOUR_SLIDES-1,i));
+  document.querySelectorAll('.tourSlide').forEach(el=>el.classList.toggle('on',+el.dataset.slide===tourIdx));
+  document.querySelectorAll('#tourDots span').forEach((el,idx)=>el.classList.toggle('on',idx===tourIdx));
+  $('#tourNext').textContent=tourIdx===TOUR_SLIDES-1?'Boshlash':'Keyingisi';
+}
+function openOnboardTour(){tourIdx=0;showTourSlide(0);$('#onboardTourSheet').classList.add('open');tg?.BackButton?.show();}
+function closeOnboardTour(){$('#onboardTourSheet').classList.remove('open');tg?.BackButton?.hide();try{localStorage.setItem('onboardTourSeen','1');}catch(e){}}
+$('#tourNext').onclick=()=>{haptic();if(tourIdx>=TOUR_SLIDES-1)closeOnboardTour();else showTourSlide(tourIdx+1);};
+$('#tourSkip').onclick=()=>{haptic();closeOnboardTour();};
+$('#tourDots').querySelectorAll('span').forEach((el,idx)=>el.onclick=()=>{haptic();showTourSlide(idx);});
+$('#onboardTourSheet').onclick=e=>{if(e.target.id==='onboardTourSheet')closeOnboardTour();};
 $('#btnTheme').onclick=toggleThemeQuick;
 document.querySelectorAll('.viewThemeBtn').forEach(el=>el.onclick=toggleThemeQuick);
 
@@ -3875,6 +4024,7 @@ const SHEET_CLOSERS={
   reviewsSheet:closeReviewsSheet, profileEditSheet:closeProfileEdit, shelvesSheet:closeShelvesSheet,
   listSheet:closeListSheet, liveSheet:closeLiveSheet, sheet:closeSheet,
   userProfileSheet:closeUserProfile, followListSheet:closeFollowList, themeMenuSheet:closeThemeMenu,
+  onboardTourSheet:closeOnboardTour,
   // closeGlobe lives in the separate type="module" script below (Three.js globe) and only
   // becomes a real global once that deferred module finishes running — referencing it bare HERE
   // (evaluated immediately, before the module has loaded) throws ReferenceError. Wrapping it in
@@ -3899,6 +4049,55 @@ function closeTopmostSheet(){
 // real, reachable action. Without this, the tap would switch state.view underneath a sheet that's
 // still open, reading as "nothing happened" until the user also manually closes it.
 function closeAllSheets(){while(closeTopmostSheet());}
+// Dispatches to whichever fetch actually refreshes the currently visible main-page view — books.json
+// itself is a static catalog already kept fresh by the service worker's own stale-while-revalidate
+// strategy, so "browse"/"search" just needs a local recompute (run()); the other three views have
+// real server-backed data worth re-pulling on demand.
+function refreshCurrentView(){
+  if(state.view==='davra')return loadDavraFeed(true);
+  if(state.view==='reading')return loadContinueReading().then(()=>renderReading());
+  if(state.view==='profile'){loadProfile();return;}
+  return run();
+}
+// ---- pull-to-refresh (#ptr) — main page only, not inside sheets (those scroll independently and
+// already have their own close affordance). touchmove listeners stay {passive:true} throughout —
+// never calling preventDefault() means native scrolling is never at risk of breaking; the gesture
+// only ever draws anything once window.scrollY is already 0 and the finger is dragging further
+// down, which on this WebView is otherwise dead space with no native overscroll feedback at all.
+(function(){
+  const ptr=$('#ptr');
+  const THRESHOLD=70,MAX_PULL=110;
+  let startY=null,pulling=false,refreshing=false,lastPull=0;
+  function sheetOpen(){return !!document.querySelector('.sheet.open');}
+  document.addEventListener('touchstart',e=>{
+    if(refreshing||sheetOpen()||window.scrollY>0){startY=null;return;}
+    startY=e.touches[0].clientY;pulling=false;lastPull=0;
+  },{passive:true});
+  document.addEventListener('touchmove',e=>{
+    if(startY==null||refreshing)return;
+    const dy=e.touches[0].clientY-startY;
+    if(dy<=0||window.scrollY>0){ptr.style.opacity='0';ptr.style.transform='';pulling=false;lastPull=0;return;}
+    pulling=true;
+    lastPull=Math.min(MAX_PULL,dy*0.5);
+    ptr.style.opacity=String(Math.min(1,lastPull/THRESHOLD));
+    ptr.style.transform=`translateY(${lastPull+40}px) rotate(${lastPull*2.4}deg)`;
+  },{passive:true});
+  document.addEventListener('touchend',()=>{
+    if(!pulling){startY=null;return;}
+    const pulled=lastPull;
+    startY=null;pulling=false;lastPull=0;
+    if(pulled>=THRESHOLD){
+      refreshing=true;haptic('medium');
+      ptr.classList.add('spin');ptr.style.opacity='1';ptr.style.transform='translateY(50px)';
+      const minSpin=new Promise(res=>setTimeout(res,500));
+      Promise.allSettled([Promise.resolve(refreshCurrentView()),minSpin]).finally(()=>{
+        refreshing=false;ptr.classList.remove('spin');ptr.style.opacity='0';ptr.style.transform='';
+      });
+    }else{
+      ptr.style.opacity='0';ptr.style.transform='';
+    }
+  },{passive:true});
+})();
 async function boot(){
   if(tg){tg.ready();tg.expand();tg.disableVerticalSwipes?.();tg.BackButton?.onClick(()=>{closeTopmostSheet();});applyThemeMode();tg.onEvent?.('themeChanged',()=>{if(themeMode==='system')applyThemeMode();});}
   if('serviceWorker' in navigator)window.addEventListener('load',()=>{
@@ -3972,6 +4171,9 @@ async function boot(){
   // instead of the normal home screen.
   const deepLinkProfile=new URLSearchParams(location.search).get('profile');
   if(deepLinkProfile)openUserProfile(deepLinkProfile);
+  // Skip the welcome tour on a deep-linked open — someone who tapped a shared profile link came
+  // for that profile specifically, not a general first impression of the app.
+  else{try{if(!localStorage.getItem('onboardTourSeen'))openOnboardTour();}catch(e){}}
   checkOnboardingBanner();
   loadContinueReading();
   loadTrending();
