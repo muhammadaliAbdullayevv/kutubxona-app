@@ -628,6 +628,22 @@
   .pHeroActionsRow{position:absolute; top:128px; right:14px; display:flex; align-items:center; gap:8px; z-index:1}
   .pHeroEditBtn{display:inline-flex; align-items:center; gap:6px; padding:7px 14px; border-radius:20px; background:var(--chip); border:1px solid var(--line); color:var(--text); font-size:13px; font-weight:700; cursor:pointer; white-space:nowrap}
   .pHeroShareBtn{width:32px; height:32px; border-radius:50%; background:var(--chip); border:1px solid var(--line); color:var(--text); font-size:14px; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0}
+  /* Own-profile (#pProfileCard) and the public-profile sheet (#uProfileCard) both use this
+     "full-bleed" variant instead of the ordinary inset .pHero card: no rounded corners/border/
+     shadow, and pulled out via negative margin to cancel the surrounding container's own padding
+     (.wrap's 12px/14px on the main page, .ssheetc's 20px/18px inside the sheet) so the banner spans
+     edge-to-edge and fills the space that used to hold a separate title row above it (the "👤
+     Profil" header, or a name-only .stopbar) instead of sitting inset below one. */
+  #pProfileCard .pHero, #uProfileCard .pHero{border-radius:0; border:0; box-shadow:none}
+  #pProfileCard .pHero{margin:-12px -14px 18px}
+  #uProfileCard .pHero{margin:-20px -18px 18px}
+  /* Back (public profile sheet, top-left) and settings/theme (own profile, top-right) — both sit
+     directly on the banner like the old upload pill did, so a solid dark scrim (not the --chip/
+     --line "card" style used by the actions row below) keeps them legible against any photo or the
+     gradient fallback alike, regardless of theme. */
+  #uBackBtn, #pSettingsBtn{position:absolute; top:12px; width:32px; height:32px; border-radius:50%; background:rgba(0,0,0,.45); color:#fff; border:none; font-size:16px; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:2}
+  #uBackBtn{left:12px}
+  #pSettingsBtn{right:12px}
   /* Follow, unlike edit, is the primary action on someone else's profile — it keeps a real
      button, just moved to its own row below the identity so it never fights name/username for
      width either. */
@@ -759,7 +775,6 @@
        Statistika dashboard) not on a screen you navigate to directly; switching away is done by
        tapping another destination, same as #home/#grid already work. -->
   <div id="profileView" style="display:none">
-    <div class="viewHead"><h2 class="dtitle">👤 Profil</h2><span class="viewThemeBtn" id="btnThemeProfile">🌙</span></div>
     <div id="pProfileCard"></div>
     <div id="pBody">Yuklanmoqda...</div>
     <div class="ptabs" id="pTabs">
@@ -804,7 +819,6 @@
   <div class="ssheetc" id="shelvesSheetc"></div>
 </div>
 <div class="sheet" id="userProfileSheet" style="z-index:52; align-items:stretch; background:var(--bg)">
-  <div class="stopbar"><div class="stopbarTitle" id="uProfileTitle">👤 Profil</div><div class="gclose" id="userProfileClose">✕</div></div>
   <div class="ssheetc">
     <div id="uProfileCard"></div>
     <div id="uBody">Yuklanmoqda...</div>
@@ -853,6 +867,15 @@
   <div class="reshareMenuCard">
     <div class="reshareMenuItem" id="rmQuote"><span class="rmIcon">✍️</span><div><div class="rmTitle">Fikr qo'shib ulashish</div><div class="rmSub">Postga o'z fikringizni yozib, qayta ulashing</div></div></div>
     <div class="reshareMenuItem" id="rmRepost"><span class="rmIcon">🔁</span><div><div class="rmTitle">Qayta ulashish</div><div class="rmSub">Postni darhol ulashing</div></div></div>
+  </div>
+</div>
+<!-- Replaces the old single-tap moon-icon theme cycle on the profile page's own header (now
+     removed along with that header row entirely — see #pSettingsBtn) with an explicit two-option
+     picker, opened from a ☰ icon floating on the profile banner. -->
+<div class="sheet" id="themeMenuSheet" style="z-index:55">
+  <div class="reshareMenuCard">
+    <div class="reshareMenuItem" id="tmDay"><span class="rmIcon">☀️</span><div><div class="rmTitle">Kunduzgi rejim</div><div class="rmSub">Yorug' interfeys</div></div></div>
+    <div class="reshareMenuItem" id="tmNight"><span class="rmIcon">🌙</span><div><div class="rmTitle">Tungi rejim</div><div class="rmSub">Qorong'i interfeys</div></div></div>
   </div>
 </div>
 <div class="sheet" id="profileEditSheet" style="z-index:52; align-items:stretch; background:var(--bg)">
@@ -2764,6 +2787,7 @@ function renderProfileCard(){
     const bannerHtml=`<div class="pHeroBanner${hasBanner?'':' pHeroBannerBlank'}" id="pBannerArea">${bannerImg}</div>`;
     card.innerHTML=`<div class="pHero">
       ${bannerHtml}
+      <span id="pSettingsBtn" title="Sozlamalar">☰</span>
       <div class="pHeroActionsRow">
         <span class="pHeroEditBtn" id="pProfileCardBtn">✏️ Profilni tahrirlash</span>
         <span class="pHeroShareBtn" id="pShareBtn" title="Ulashish">📤</span>
@@ -2782,6 +2806,7 @@ function renderProfileCard(){
       </div>
       ${p.bio?`<div class="pHeroBio">${esc(p.bio)}</div>`:''}
     </div>`;
+    $('#pSettingsBtn').onclick=()=>openThemeMenu();
     $('#pProfileCardBtn').onclick=()=>openProfileEdit();
     $('#pShareBtn').onclick=()=>shareProfile(uid,name);
     $('#pHeroSubBtn').onclick=()=>openProfileEdit();
@@ -3487,7 +3512,6 @@ function openUserProfile(userId){
   postsTabHtml(userId,'uTabContent');
 }
 function closeUserProfile(){$('#userProfileSheet').classList.remove('open');tg?.BackButton?.hide();}
-$('#userProfileClose').onclick=closeUserProfile;
 $('#userProfileSheet').onclick=e=>{if(e.target.id==='userProfileSheet')closeUserProfile();};
 $('#uTabs').querySelectorAll('.ptab').forEach(el=>el.onclick=()=>{
   haptic();
@@ -3502,7 +3526,6 @@ $('#uTabs').querySelectorAll('.ptab').forEach(el=>el.onclick=()=>{
 function loadUserProfileHero(userId){
   api('/api/users/'+userId+'/profile').then(p=>{
     $('#userProfileSheet').dataset.uid=userId;
-    $('#uProfileTitle').textContent='👤 '+(p.display_name||'Foydalanuvchi');
     const[c1,c2]=coverFor(String(userId));
     const avSize=84;
     const img=p.avatar_version?`<img class="avImg" style="width:${avSize}px;height:${avSize}px" src="${avatarUrl(userId,p.avatar_version)}" onerror="this.remove()">`:'';
@@ -3514,6 +3537,7 @@ function loadUserProfileHero(userId){
     const bannerHtml=`<div class="pHeroBanner${p.banner_version?'':' pHeroBannerBlank'}">${bannerImg}</div>`;
     $('#uProfileCard').innerHTML=`<div class="pHero">
       ${bannerHtml}
+      <span id="uBackBtn" title="Orqaga">←</span>
       <div class="pHeroActionsRow">
         <span class="pHeroShareBtn" id="uShareBtn" title="Ulashish">📤</span>
       </div>
@@ -3532,6 +3556,7 @@ function loadUserProfileHero(userId){
       </div>
       ${p.bio?`<div class="pHeroBio">${esc(p.bio)}</div>`:''}
     </div>`;
+    $('#uBackBtn').onclick=closeUserProfile;
     $('#uShareBtn').onclick=()=>shareProfile(userId,p.display_name);
     $('#uFollowersStat').onclick=()=>openFollowList(userId,'followers');
     $('#uFollowingStat').onclick=()=>openFollowList(userId,'following');
@@ -3823,6 +3848,14 @@ function toggleThemeQuick(){
   setThemeMode(next);
   toast(next==='day'?'☀️ Kunduzgi rejim':'🌙 Tungi rejim');
 }
+// ---- explicit day/night picker (#themeMenuSheet) — reached from the ☰ button on the own-profile
+// banner, an alternative to the quick single-tap cycle above for the one place a deliberate choice
+// (not "flip to the other one") reads better. ----
+function openThemeMenu(){haptic();$('#themeMenuSheet').classList.add('open');tg?.BackButton?.show();}
+function closeThemeMenu(){$('#themeMenuSheet').classList.remove('open');tg?.BackButton?.hide();}
+$('#themeMenuSheet').onclick=e=>{if(e.target.id==='themeMenuSheet')closeThemeMenu();};
+$('#tmDay').onclick=()=>{haptic();setThemeMode('day');toast('☀️ Kunduzgi rejim');closeThemeMenu();};
+$('#tmNight').onclick=()=>{haptic();setThemeMode('night');toast('🌙 Tungi rejim');closeThemeMenu();};
 $('#btnTheme').onclick=toggleThemeQuick;
 document.querySelectorAll('.viewThemeBtn').forEach(el=>el.onclick=toggleThemeQuick);
 
@@ -3841,7 +3874,7 @@ const SHEET_CLOSERS={
   davraComposeSheet:closeDavraCompose, davraReshareMenuSheet:closeDavraReshareMenu,
   reviewsSheet:closeReviewsSheet, profileEditSheet:closeProfileEdit, shelvesSheet:closeShelvesSheet,
   listSheet:closeListSheet, liveSheet:closeLiveSheet, sheet:closeSheet,
-  userProfileSheet:closeUserProfile, followListSheet:closeFollowList,
+  userProfileSheet:closeUserProfile, followListSheet:closeFollowList, themeMenuSheet:closeThemeMenu,
   // closeGlobe lives in the separate type="module" script below (Three.js globe) and only
   // becomes a real global once that deferred module finishes running — referencing it bare HERE
   // (evaluated immediately, before the module has loaded) throws ReferenceError. Wrapping it in
