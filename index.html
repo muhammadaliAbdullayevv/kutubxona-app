@@ -559,29 +559,36 @@
   .onboardChev{font-size:22px; flex-shrink:0; opacity:.85}
   .pHero{position:relative; margin:0 0 18px; border-radius:16px; overflow:hidden; background:var(--card); border:1px solid color-mix(in srgb, var(--line) 45%, var(--muted) 55%); box-shadow:0 2px 10px rgba(0,0,0,.28)}
   .pHeroBanner{height:76px; width:100%}
-  .pHeroTop{display:flex; align-items:flex-end; justify-content:space-between; padding:0 14px; margin-top:-30px; gap:10px}
+  /* Avatar, name+username, and the edit/follow button all sit in one row now — name/username no
+     longer stack full-width below the avatar, they sit right beside it. */
+  .pHeroTop{display:flex; align-items:center; padding:0 14px 16px; margin-top:-30px; gap:12px}
   /* A plain border, not border+box-shadow — the two combined were rendering as an uneven arc
      (thick on one side, nearly gone on the other) instead of a uniform ring on real devices, not
      just a headless-testing artifact. A single border on a border-radius:50% box can't do that. */
   .pHero .avWrap{position:relative; flex-shrink:0; border-radius:50%; border:3px solid var(--accent); box-sizing:content-box}
   .pHero .avImg{position:absolute; top:0; left:0; border-radius:50%; object-fit:cover}
   .pHero .avInitials{border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:800; color:#fff}
+  .pHeroIdentity{flex:1; min-width:0}
+  .pHeroName{font-weight:800; font-size:17px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .pHeroSub{font-size:13px; color:var(--muted); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer}
   /* Deliberately NOT .btn.ghost — that class hardcodes width:52px for the small square icon
      buttons used elsewhere, and (.btn.ghost's two-class selector beats a single-class override
      here no matter the source order) fighting that specificity was the wrong approach; a fresh,
      self-contained style for a button that needs to fit a text label is simpler and correct. */
-  .pHeroEditBtn{flex:0 1 auto; min-width:0; margin-bottom:8px; padding:8px 12px; border-radius:13px; background:var(--card); border:1px solid var(--line); color:var(--text); font-weight:800; font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer}
-  .pHeroName{font-weight:800; font-size:19px; padding:12px 14px 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-  .pHeroSub{font-size:13px; color:var(--muted); padding:3px 14px 16px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer}
-  /* Bio previously had nowhere it actually rendered in the app — only inside its own edit row,
-     which you'd only see by going back into settings. This is its real display surface. */
-  .pHeroBio{font-size:13.5px; color:var(--text); line-height:1.4; padding:0 14px 16px; white-space:pre-wrap}
-  .pFollowRow{display:flex; gap:20px; padding:0 14px 16px}
+  .pHeroEditBtn{flex-shrink:0; padding:8px 12px; border-radius:13px; background:var(--card); border:1px solid var(--line); color:var(--text); font-weight:800; font-size:12.5px; white-space:nowrap; cursor:pointer}
+  .followBtn{flex-shrink:0; padding:8px 16px; border-radius:13px; border:0; font-weight:800; font-size:12.5px; white-space:nowrap; cursor:pointer; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff}
+  .followBtn.on{background:var(--card); border:1px solid var(--line); color:var(--text)}
+  /* Follow-counts and bio are now their own bordered sections — a divider above each rather than
+     just stacked text — so the identity row, the stats, and the bio read as distinct blocks. */
+  .pFollowRow{display:flex; gap:20px; padding:14px; border-top:1px solid var(--line)}
   .pFollowStat{cursor:pointer}
   .pFollowStat b{font-size:15px; color:var(--text)}
   .pFollowStat span{font-size:12.5px; color:var(--muted); margin-left:4px}
-  .followBtn{flex:0 1 auto; min-width:0; margin-bottom:8px; padding:8px 16px; border-radius:13px; border:0; font-weight:800; font-size:12.5px; white-space:nowrap; cursor:pointer; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff}
-  .followBtn.on{background:var(--card); border:1px solid var(--line); color:var(--text)}
+  /* Bio previously had nowhere it actually rendered in the app — only inside its own edit row,
+     which you'd only see by going back into settings. This is its real display surface. Only
+     rendered at all when non-empty (see renderProfileCard/loadUserProfileHero) — a null bio adds
+     no empty bordered box here. */
+  .pHeroBio{font-size:13.5px; color:var(--text); line-height:1.4; padding:14px; white-space:pre-wrap; border-top:1px solid var(--line)}
   .flRow{display:flex; align-items:center; gap:10px; padding:10px 2px; cursor:pointer}
   .flRow .falias{font-size:14px; font-weight:700; color:var(--text)}
   /* ---- Profil screen tabs: Javonlar / Yutuqlar / Sertifikatlar ---- */
@@ -2671,15 +2678,17 @@ function renderProfileCard(){
       <div class="pHeroBanner" style="background:linear-gradient(135deg,${c1},${c2})"></div>
       <div class="pHeroTop">
         <div class="avWrap" style="width:${avSize}px;height:${avSize}px"><div class="avInitials" style="width:${avSize}px;height:${avSize}px;font-size:30px;background:linear-gradient(135deg,${c1},${c2})">${esc(initials(name))}</div>${img}</div>
-        <button class="pHeroEditBtn" id="pProfileCardBtn">✏️ Profilni tahrirlash</button>
+        <div class="pHeroIdentity">
+          <div class="pHeroName">${esc(name)}</div>
+          <div class="pHeroSub" id="pHeroSubBtn">${esc(sub)}</div>
+        </div>
+        <button class="pHeroEditBtn" id="pProfileCardBtn">✏️ Tahrirlash</button>
       </div>
-      <div class="pHeroName">${esc(name)}</div>
-      <div class="pHeroSub" id="pHeroSubBtn">${esc(sub)}</div>
-      ${p.bio?`<div class="pHeroBio">${esc(p.bio)}</div>`:''}
       <div class="pFollowRow">
         <span class="pFollowStat" id="pFollowersStat"><b>–</b><span>obunachi</span></span>
         <span class="pFollowStat" id="pFollowingStat"><b>–</b><span>obuna</span></span>
       </div>
+      ${p.bio?`<div class="pHeroBio">${esc(p.bio)}</div>`:''}
     </div>`;
     $('#pProfileCardBtn').onclick=()=>openProfileEdit();
     $('#pHeroSubBtn').onclick=()=>openProfileEdit();
@@ -3222,15 +3231,17 @@ function loadUserProfileHero(userId){
       <div class="pHeroBanner" style="background:linear-gradient(135deg,${c1},${c2})"></div>
       <div class="pHeroTop">
         <div class="avWrap" style="width:${avSize}px;height:${avSize}px"><div class="avInitials" style="width:${avSize}px;height:${avSize}px;font-size:30px;background:linear-gradient(135deg,${c1},${c2})">${esc(initials(p.display_name||'?'))}</div>${img}</div>
+        <div class="pHeroIdentity">
+          <div class="pHeroName">${esc(p.display_name||'Foydalanuvchi')}</div>
+          ${p.tahallus?`<div class="pHeroSub">@${esc(p.tahallus)}</div>`:''}
+        </div>
         ${followBtn}
       </div>
-      <div class="pHeroName">${esc(p.display_name||'Foydalanuvchi')}</div>
-      ${p.tahallus?`<div class="pHeroSub">@${esc(p.tahallus)}</div>`:''}
-      ${p.bio?`<div class="pHeroBio">${esc(p.bio)}</div>`:''}
       <div class="pFollowRow">
         <span class="pFollowStat" id="uFollowersStat"><b>${fmtNum(p.followers)}</b><span>obunachi</span></span>
         <span class="pFollowStat" id="uFollowingStat"><b>${fmtNum(p.following)}</b><span>obuna</span></span>
       </div>
+      ${p.bio?`<div class="pHeroBio">${esc(p.bio)}</div>`:''}
     </div>`;
     $('#uFollowersStat').onclick=()=>openFollowList(userId,'followers');
     $('#uFollowingStat').onclick=()=>openFollowList(userId,'following');
