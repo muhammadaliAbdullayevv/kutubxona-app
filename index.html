@@ -383,7 +383,7 @@
   .liveBadgeRight{display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700; opacity:.92}
   /* The panel is a full page (like the PDF reader), not a bottom drawer — a "footer" card reads
      as a minor add-on; a whole page reads as what it actually is, the app's stats dashboard. */
-  #liveSheet,#listSheet,#shelvesSheet,#reviewsSheet,#writeReviewSheet,#profileEditSheet,#avatarCropSheet,#bannerCropSheet,#davraComposeSheet,#davraThreadSheet,#userProfileSheet,#followListSheet,#notifSheet,#usersListSheet{flex-direction:column}
+  #liveSheet,#listSheet,#shelvesSheet,#reviewsSheet,#writeReviewSheet,#profileEditSheet,#avatarCropSheet,#bannerCropSheet,#davraComposeSheet,#davraThreadSheet,#userProfileSheet,#followListSheet,#notifSheet,#usersListSheet,#leaderboardSheet{flex-direction:column}
   /* Generalized from the Statistika panel's own topbar so new full-page sheets (Reading Room's
      drill-in lists, Javon) get the same "whole page, not a bottom drawer" treatment for free. */
   #liveTopbar,.stopbar{flex-shrink:0; display:flex; align-items:center; justify-content:space-between; gap:12px;
@@ -400,6 +400,9 @@
   .lrowT{font-size:14.5px; font-weight:700}
   .lrowN{font-size:12.5px; color:var(--muted); margin-top:2px}
   .lrowChev{color:var(--muted); font-size:18px; flex-shrink:0}
+  .lbRank{font-size:15px; font-weight:800; width:30px; text-align:center; flex-shrink:0; font-variant-numeric:tabular-nums}
+  .lbPoints{font-size:13px; font-weight:800; color:var(--accent); flex-shrink:0; white-space:nowrap}
+  .lrow.lbMe{background:color-mix(in srgb, var(--accent) 10%, transparent); border-radius:10px; padding-left:8px; padding-right:8px; margin-left:-8px; margin-right:-8px}
   /* Profile/Davra are primary tab destinations, not overlays — they render in-place as peers
      of #home/#grid (see #profileView/#davraView in the markup), so they only need the same top
      breathing room #home's shelves already get, not a dedicated topbar/scroll-area treatment. */
@@ -954,18 +957,37 @@
     <!-- Owner-only — hidden by default, shown by openThemeMenu() itself once window.__isOwner is
          known (set from /api/profile/settings' own is_owner field, real enforcement happens
          server-side on /api/admin/users regardless of whether this row is visible). -->
-    <div class="reshareMenuItem" id="tmUsers" style="display:none"><span class="rmIcon">👥</span><div><div class="rmTitle">Foydalanuvchilar</div><div class="rmSub">Barcha foydalanuvchilar ro'yxati</div></div></div>
+    <div class="reshareMenuItem" id="tmUsers" style="display:none"><span class="rmIcon">⚙️</span><div><div class="rmTitle">Boshqaruv paneli</div><div class="rmSub">Statistika, foydalanuvchilar, faollik</div></div></div>
   </div>
 </div>
-<!-- Owner-only "all users" browser — same avatar+name row / tap-to-profile pattern as the
-     followers/following list (#followListSheet), just backed by /api/admin/users (paginated,
-     searchable) instead of the follow-graph endpoints. -->
+<!-- Owner-only control panel — two tabs: the "all users" browser (avatar+name row / tap-to-profile
+     pattern, same as the followers/following list, backed by /api/admin/users) and real-user
+     performance stats (/api/admin/rum-summary, previously only reachable via the /rum bot command).
+     Kept as one sheet with a tab toggle rather than two separate sheets — both are owner-only
+     debugging/oversight tools, no reason to make the owner hunt for two different entry points. -->
 <div class="sheet" id="usersListSheet" style="z-index:53; align-items:stretch; background:var(--bg)">
-  <div class="stopbar"><div class="stopbarTitle">👥 Foydalanuvchilar</div><div class="gclose" id="usersListClose">✕</div></div>
-  <div style="padding:12px 18px 0"><input type="search" id="usersListSearch" placeholder="Ism yoki username bo'yicha qidirish..." style="width:100%; box-sizing:border-box; background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 12px; font:inherit; color:var(--text)"></div>
+  <div class="stopbar"><div class="stopbarTitle">⚙️ Boshqaruv paneli</div><div class="gclose" id="usersListClose">✕</div></div>
+  <div class="row" id="ownerPanelTabs" style="margin:10px 18px 0">
+    <span class="tw on" data-tab="users">👥 Foydalanuvchilar</span>
+    <span class="tw" data-tab="stats">📊 Statistika</span>
+  </div>
+  <div style="padding:10px 18px 0" id="ownerUsersSearchRow"><input type="search" id="usersListSearch" placeholder="Ism yoki username bo'yicha qidirish..." style="width:100%; box-sizing:border-box; background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 12px; font:inherit; color:var(--text)"></div>
   <div class="ssheetc">
-    <div id="usersListItems"></div>
-    <button class="more" id="usersListMore" style="display:none">Yana yuklash</button>
+    <div id="ownerUsersBody">
+      <div id="usersListItems"></div>
+      <button class="more" id="usersListMore" style="display:none">Yana yuklash</button>
+    </div>
+    <div id="ownerStatsBody" style="display:none"></div>
+  </div>
+</div>
+<!-- Leaderboard — the profile's rank tile only ever showed a bare "#N / total" number with no
+     way to actually see who's ahead; this is that list, reusing the exact same points formula
+     (GET /api/leaderboard -> db.get_top_users). Public, no owner gating (points/rank are already
+     shown per-user on every profile, so this is just the aggregate view of the same numbers). -->
+<div class="sheet" id="leaderboardSheet" style="z-index:53; align-items:stretch; background:var(--bg)">
+  <div class="stopbar"><div class="stopbarTitle">🏆 Reyting jadvali</div><div class="gclose" id="leaderboardClose">✕</div></div>
+  <div class="ssheetc">
+    <div id="leaderboardItems"></div>
   </div>
 </div>
 <!-- Tap-to-enlarge for a profile avatar (own or someone else's) — centered, not full-screen, and
@@ -2921,9 +2943,34 @@ AP.audio.addEventListener('timeupdate',()=>{
 AP.audio.addEventListener('play',()=>{$('#apPlay').textContent='⏸️';});
 AP.audio.addEventListener('pause',()=>{$('#apPlay').textContent='▶️';});
 AP.audio.addEventListener('ended',()=>{ if(AP.partIdx<AP.parts.length-1)apPlayPart(AP.partIdx+1); });
+// ---- active-listening-time tracking — same shape as the PDF reader's pdfActiveTimer/
+// pdfFlushProgress (see there for the full reasoning): "active" means actually audible (tab/app
+// visible AND not paused), ticks accumulate locally and flush periodically plus on every part
+// switch/close, so a short visit still gets recorded even if it never reaches a periodic flush.
+// Tracked once per AUDIOBOOK (reset in openAudioPlayer, not on every part change) since
+// user_audiobook_progress.active_seconds is one row per (user, audio_book) — same as the PDF
+// side being one row per (user, book) regardless of which page is current. ----
+let apActiveTimer=null,apActiveAccum=0,apFlushedUpTo=0;
+const AP_FLUSH_EVERY_SEC=20;
+function apStartActiveTracking(){
+  apActiveAccum=0;apFlushedUpTo=0;
+  if(apActiveTimer)clearInterval(apActiveTimer);
+  apActiveTimer=setInterval(()=>{
+    if(document.visibilityState==='visible'&&!AP.audio.paused){
+      apActiveAccum++;
+      if(apActiveAccum-apFlushedUpTo>=AP_FLUSH_EVERY_SEC)apSaveProgress();
+    }
+  },1000);
+}
+function apStopActiveTracking(){
+  if(apActiveTimer){clearInterval(apActiveTimer);apActiveTimer=null;}
+}
 function apSaveProgress(){
   const part=AP.parts[AP.partIdx];
-  if(part)api('/api/audiobook-parts/'+encodeURIComponent(part.id)+'/progress',{method:'POST',body:JSON.stringify({part_index:part.index})}).catch(()=>{});
+  if(!part)return;
+  const delta=apActiveAccum-apFlushedUpTo;
+  apFlushedUpTo=apActiveAccum;
+  api('/api/audiobook-parts/'+encodeURIComponent(part.id)+'/progress',{method:'POST',body:JSON.stringify({part_index:part.index,active_seconds:Math.max(0,delta)})}).catch(()=>{});
 }
 async function apPlayPart(idx){
   const part=AP.parts[idx];
@@ -2965,11 +3012,13 @@ async function openAudioPlayer(id,title){
     if(!data.available||!data.parts.length){toast('Bu kitobda audio yo\'q');closeAudioPlayer();return;}
     AP.bookId=id; AP.audioBookId=data.audio_book_id; AP.parts=data.parts;
     const startIdx=data.resume_part_index!=null?Math.min(data.resume_part_index,data.parts.length-1):0;
+    apStartActiveTracking();
     apPlayPart(startIdx);
   }catch(e){toast('Audio yuklanmadi');closeAudioPlayer();}
 }
 function closeAudioPlayer(){
   AP.audio.pause();
+  apStopActiveTracking();
   if(AP.parts.length)apSaveProgress();
   $('#audioPlayer').classList.remove('show');
   apUpdateSpacer();
@@ -3675,7 +3724,7 @@ function loadProfile(){
       <div class="statgrid">
         <div class="st"><div class="sv">🪙 ${fmtNum(r.points||0)}</div><div class="sl">ball hisobi</div></div>
         <div class="st"><div class="sv">${fmtNum(toMin(rt.total_seconds))}</div><div class="sl">daqiqa o'qildi</div></div>
-        <div class="st"><div class="sv">${rankText}</div><div class="sl">reyting o'rni</div></div>
+        <div class="st" id="pRankTile" style="cursor:pointer"><div class="sv">${rankText}</div><div class="sl">reyting o'rni ›</div></div>
         <div class="st"><div class="sv">${fmtNum(toMin(rt.last_7_days_seconds))}</div><div class="sl">so'nggi 7 kun (daq)</div></div>
       </div>
       <div class="statgrid">
@@ -3684,6 +3733,7 @@ function loadProfile(){
         <div class="st"><div class="sv">${st.comments}</div><div class="sl">izohlar</div></div>
         <div class="st"><div class="sv">${s.best_streak}</div><div class="sl">eng uzun seriya</div></div>
       </div>`;
+    $('#pRankTile').onclick=()=>openLeaderboard();
     // Badges are already fetched above (myBadgesCache) — the Yutuqlar tab renders from that
     // cache instead of a second round trip, unless it's opened before this resolves.
     if(document.querySelector('#pTabs .ptab[data-pt="yutuq"]')?.classList.contains('on'))badgesTabHtml(myBadgesCache||[],'pTabContent');
@@ -3882,7 +3932,7 @@ function loadUserProfileStats(userId){
       <div class="statgrid">
         <div class="st"><div class="sv">🪙 ${fmtNum(r.points||0)}</div><div class="sl">ball hisobi</div></div>
         <div class="st"><div class="sv">${fmtNum(toMin(rt.total_seconds))}</div><div class="sl">daqiqa o'qildi</div></div>
-        <div class="st"><div class="sv">${rankText}</div><div class="sl">reyting o'rni</div></div>
+        <div class="st" id="uRankTile" style="cursor:pointer"><div class="sv">${rankText}</div><div class="sl">reyting o'rni ›</div></div>
         <div class="st"><div class="sv">${fmtNum(toMin(rt.last_7_days_seconds))}</div><div class="sl">so'nggi 7 kun (daq)</div></div>
       </div>
       <div class="statgrid">
@@ -3891,6 +3941,7 @@ function loadUserProfileStats(userId){
         <div class="st"><div class="sv">${st.comments}</div><div class="sl">izohlar</div></div>
         <div class="st"><div class="sv">${s.best_streak}</div><div class="sl">eng uzun seriya</div></div>
       </div>`;
+    $('#uRankTile').onclick=()=>openLeaderboard();
     if($('#uTabs').querySelector('.ptab[data-pt="yutuq"]')?.classList.contains('on'))badgesTabHtml(r.badges,'uTabContent');
   }).catch(()=>{$('#uBody').innerHTML='<p class="hint">Ma\'lumot yuklanmadi.</p>';});
 }
@@ -4258,6 +4309,12 @@ function openUsersList(){
   haptic();
   usersListQuery='';
   $('#usersListSearch').value='';
+  // Always reopen on the Foydalanuvchilar tab — landing back on whichever tab was last viewed
+  // would be a bit surprising for an owner-only tool opened infrequently.
+  $('#ownerPanelTabs').querySelectorAll('.tw').forEach(t=>t.classList.toggle('on',t.dataset.tab==='users'));
+  $('#ownerUsersSearchRow').style.display='';
+  $('#ownerUsersBody').style.display='';
+  $('#ownerStatsBody').style.display='none';
   $('#usersListSheet').classList.add('open');
   tg?.BackButton?.show();
   loadUsersList(true);
@@ -4272,6 +4329,76 @@ $('#usersListSearch').oninput=e=>{
   const val=e.target.value;
   _usersSearchDeb=setTimeout(()=>{usersListQuery=val.trim();loadUsersList(true);},300);
 };
+$('#ownerPanelTabs').querySelectorAll('.tw').forEach(el=>el.onclick=()=>{
+  const tab=el.dataset.tab;
+  if(el.classList.contains('on'))return;
+  haptic();
+  $('#ownerPanelTabs').querySelectorAll('.tw').forEach(t=>t.classList.toggle('on',t===el));
+  $('#ownerUsersSearchRow').style.display=tab==='users'?'':'none';
+  $('#ownerUsersBody').style.display=tab==='users'?'':'none';
+  $('#ownerStatsBody').style.display=tab==='stats'?'':'none';
+  if(tab==='stats')loadOwnerStats();
+});
+// ---- owner stats tab: real-user performance numbers (previously only reachable via the /rum
+// bot command) + a quick link into the existing live-activity feed, so all three owner-only
+// surfaces (users, RUM stats, live feed) are reachable from this one panel. ----
+let ownerStatsLoaded=false;
+function fmtMs(v){return (v===null||v===undefined)?'–':Math.round(v)+' ms';}
+function loadOwnerStats(){
+  const c=$('#ownerStatsBody');
+  c.innerHTML='Yuklanmoqda...';
+  api('/api/admin/rum-summary?hours=24').then(r=>{
+    ownerStatsLoaded=true;
+    const conn=(r.connection_breakdown||[]).map(x=>`<div class="lrow"><span class="lrowIcon">📶</span><div class="lrowBody"><div class="lrowT">${esc(x.connection_type||"noma'lum")}</div><div class="lrowN">${x.n} ta namuna</div></div></div>`).join('')||'<p class="hint">Hali namuna yo\'q</p>';
+    c.innerHTML=`
+      <p class="hint" style="margin:0 0 10px">So'nggi 24 soat · ${r.n||0} ta haqiqiy seans o'lchovi</p>
+      <div class="statgrid">
+        <div class="st"><div class="sv">${fmtMs(r.lcp_p50)}</div><div class="sl">LCP (o'rtacha)</div></div>
+        <div class="st"><div class="sv">${fmtMs(r.lcp_p95)}</div><div class="sl">LCP (eng yomon 5%)</div></div>
+        <div class="st"><div class="sv">${fmtMs(r.ttfb_p50)}</div><div class="sl">Server javobi</div></div>
+        <div class="st"><div class="sv">${r.cls_avg!=null?Number(r.cls_avg).toFixed(3):'–'}</div><div class="sl">Sahifa siljishi (CLS)</div></div>
+        <div class="st"><div class="sv">${fmtMs(r.books_json_p50)}</div><div class="sl">Katalog yuklanishi</div></div>
+        <div class="st"><div class="sv">${fmtMs(r.boot_p50)}</div><div class="sl">Ilova tayyor bo'lishi</div></div>
+      </div>
+      <h4 style="margin:16px 0 8px">Ulanish turi</h4>
+      ${conn}
+      <div class="lrow" id="ownerStatsLiveLink" style="margin-top:14px; cursor:pointer">
+        <span class="lrowIcon">🔴</span>
+        <div class="lrowBody"><div class="lrowT">Jonli faollik</div><div class="lrowN">Real vaqtdagi qidiruv/yuklab olishlar</div></div>
+        <span class="lrowChev">›</span>
+      </div>`;
+    $('#ownerStatsLiveLink').onclick=()=>{closeUsersList();openLiveSheet();};
+  }).catch(()=>{c.innerHTML='<p class="hint">Yuklab bo\'lmadi</p>';});
+}
+// ---- leaderboard (#leaderboardSheet) — top-100 by the same points formula every profile's own
+// rank tile already uses (GET /api/leaderboard -> db.get_top_users), reusing authorAvatarHtml/
+// openUserProfile the same way followRowHtml does for the followers/following list. ----
+function leaderboardRowHtml(u,myId){
+  const isMe=myId!=null&&Number(u.user_id)===Number(myId);
+  const medal=u.rank===1?'🥇':u.rank===2?'🥈':u.rank===3?'🥉':('#'+u.rank);
+  return `<div class="lrow${isMe?' lbMe':''}" data-user="${esc(u.user_id)}">
+    <span class="lbRank">${medal}</span>
+    ${authorAvatarHtml(u.user_id,u.avatar_version,u.display_name,36)}
+    <div class="lrowBody"><div class="lrowT">${esc(u.display_name)}${isMe?' (Siz)':''}</div></div>
+    <span class="lbPoints">🪙 ${fmtNum(u.points)}</span>
+  </div>`;
+}
+function openLeaderboard(){
+  haptic();
+  const c=$('#leaderboardItems');
+  c.innerHTML='Yuklanmoqda...';
+  $('#leaderboardSheet').classList.add('open');
+  tg?.BackButton?.show();
+  const myId=canAct()?myUid():null;
+  api('/api/leaderboard?limit=100').then(r=>{
+    const items=r.items||[];
+    c.innerHTML=items.length?items.map(u=>leaderboardRowHtml(u,myId)).join(''):'<p class="hint">Hali ma\'lumot yo\'q</p>';
+    c.querySelectorAll('[data-user]').forEach(el=>el.onclick=()=>{closeLeaderboard();openUserProfile(el.dataset.user);});
+  }).catch(()=>{c.innerHTML='<p class="hint">Yuklab bo\'lmadi</p>';});
+}
+function closeLeaderboard(){$('#leaderboardSheet').classList.remove('open');tg?.BackButton?.hide();}
+$('#leaderboardClose').onclick=closeLeaderboard;
+$('#leaderboardSheet').onclick=e=>{if(e.target.id==='leaderboardSheet')closeLeaderboard();};
 // ---- first-run welcome tour (#onboardTourSheet) — button/dot navigation only, not a swipe
 // gesture: the app already has one carefully-tuned touch gesture (pull-to-refresh) and adding a
 // second, overlapping one for a one-time screen isn't worth the extra edge cases. ----
@@ -4322,7 +4449,7 @@ const SHEET_CLOSERS={
   listSheet:closeListSheet, liveSheet:closeLiveSheet, sheet:closeSheet,
   userProfileSheet:closeUserProfile, followListSheet:closeFollowList, themeMenuSheet:closeThemeMenu,
   onboardTourSheet:closeOnboardTour, notifSheet:closeNotifications, avatarViewSheet:closeAvatarView,
-  usersListSheet:closeUsersList,
+  usersListSheet:closeUsersList, leaderboardSheet:closeLeaderboard,
   // closeGlobe lives in the separate type="module" script below (Three.js globe) and only
   // becomes a real global once that deferred module finishes running — referencing it bare HERE
   // (evaluated immediately, before the module has loaded) throws ReferenceError. Wrapping it in
