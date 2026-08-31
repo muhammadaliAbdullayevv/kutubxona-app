@@ -2936,6 +2936,15 @@ async function openPdfReader(id,title){
     }catch(e){/* no saved progress yet — start from page 1 */}
     await pdfRenderPage(resumePage);
     if(resumePage>1)toast(`📖 ${resumePage}-betdan davom etilmoqda`);
+    // Marks this book as "currently being read" the instant it's actually open — the active-time
+    // flush (pdfFlushProgress) only ever posts once real accumulated seconds exist (every 20s, or
+    // on close), so opening a book and closing it again quickly — or just opening it, before 20s
+    // has passed — never touched last_read_at at all. That's exactly what the "🔴 N o'qimoqda"
+    // live count and today's reading-activity/streak are keyed off, so without this, a real,
+    // genuine open of the book wasn't being counted as one. active_seconds:0 is deliberate — this
+    // call exists purely to stamp last_read_at=NOW() (record_book_progress's SQL always does that
+    // unconditionally) and log today's activity, not to report any elapsed time.
+    api('/api/books/'+encodeURIComponent(id)+'/progress',{method:'POST',body:JSON.stringify({current_page:resumePage,total_pages:pdfPageCount,active_seconds:0})}).catch(()=>{});
     pdfStartActiveTracking();
   }catch(e){
     pdfSetLoading(false);
