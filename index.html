@@ -407,7 +407,7 @@
   .liveBadgeRight{display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700; opacity:.92}
   /* The panel is a full page (like the PDF reader), not a bottom drawer — a "footer" card reads
      as a minor add-on; a whole page reads as what it actually is, the app's stats dashboard. */
-  #liveSheet,#listSheet,#shelvesSheet,#reviewsSheet,#writeReviewSheet,#profileEditSheet,#avatarCropSheet,#bannerCropSheet,#davraComposeSheet,#davraThreadSheet,#userProfileSheet,#followListSheet,#notifSheet,#usersListSheet,#leaderboardSheet{flex-direction:column}
+  #liveSheet,#listSheet,#shelvesSheet,#reviewsSheet,#writeReviewSheet,#profileEditSheet,#avatarCropSheet,#bannerCropSheet,#davraComposeSheet,#davraThreadSheet,#userProfileSheet,#followListSheet,#notifSheet,#usersListSheet,#leaderboardSheet,#certDetailSheet{flex-direction:column}
   /* Generalized from the Statistika panel's own topbar so new full-page sheets (Reading Room's
      drill-in lists, Javon) get the same "whole page, not a bottom drawer" treatment for free. */
   #liveTopbar,.stopbar{flex-shrink:0; display:flex; align-items:center; justify-content:space-between; gap:12px;
@@ -773,6 +773,7 @@
   .badgeProgText{font-size:9.5px; color:var(--muted); margin-top:3px; font-weight:700; font-variant-numeric:tabular-nums}
   .certList{display:flex; flex-direction:column; gap:10px}
   .certCard{display:flex; gap:12px; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px 14px; align-items:center}
+  .certCard.achieved{cursor:pointer}
   .certCard.locked{opacity:.55}
   .certIcon{font-size:26px; flex-shrink:0}
   .certBody{flex:1; min-width:0}
@@ -1036,6 +1037,17 @@
   <div class="stopbar"><div class="stopbarTitle">🏆 Reyting jadvali</div><div class="gclose" id="leaderboardClose">✕</div></div>
   <div class="ssheetc">
     <div id="leaderboardItems"></div>
+  </div>
+</div>
+<!-- Certificate detail — a real server-rendered "diploma" PNG (/api/users/{id}/certificates/{code}/image,
+     Pillow-drawn), shown large, with a share/download button. The image itself IS the design —
+     no separate HTML rendition to keep in sync with it. -->
+<div class="sheet" id="certDetailSheet" style="z-index:57; align-items:stretch; background:var(--bg)">
+  <div class="stopbar"><div class="stopbarTitle">🎓 Sertifikat</div><div class="gclose" id="certDetailClose">✕</div></div>
+  <div class="ssheetc" style="text-align:center">
+    <img id="certDetailImg" style="width:100%; max-width:420px; border-radius:16px; box-shadow:var(--shadow)" alt="Sertifikat">
+    <button class="btn primary" id="certShareBtn" style="width:100%; max-width:420px; margin-top:18px">📤 Ulashish</button>
+    <p class="hint" style="margin-top:10px">Rasmni saqlash uchun uzoq bosib turing</p>
   </div>
 </div>
 <!-- Tap-to-enlarge for a profile avatar (own or someone else's) — centered, not full-screen, and
@@ -3966,12 +3978,15 @@ function badgesTabHtml(badges,containerId){
 function certificatesTabHtml(userId,containerId){
   const c=$('#'+containerId);
   c.innerHTML='Yuklanmoqda...';
+  // The image route needs a real user id regardless of whose profile this is — myUid() fills
+  // in for the "my own profile" case (userId is null there, same convention shelvesTabHtml uses).
+  const effectiveUserId=userId||myUid();
   const path=userId?`/api/users/${userId}/certificates`:'/api/profile/certificates';
   api(path).then(r=>{
     const items=r.items||[];
     c.innerHTML=`<div class="certList">${items.map(cert=>{
       const pct=Math.min(100,Math.round((cert.progress/cert.threshold)*100));
-      return `<div class="certCard${cert.achieved?'':' locked'}">
+      return `<div class="certCard${cert.achieved?' achieved':' locked'}"${cert.achieved?` data-cert="${esc(cert.code)}"`:''}>
         <div class="certIcon">${cert.achieved?'🎓':'🔒'}</div>
         <div class="certBody">
           <div class="certTitle">${esc(cert.title)}</div>
@@ -3980,9 +3995,78 @@ function certificatesTabHtml(userId,containerId){
             ?`<div class="certEarned">✅ ${new Date(cert.earned_at).toLocaleDateString('uz-UZ',{day:'numeric',month:'short',year:'numeric'})}</div>`
             :`<div class="certProg"><div class="certProgBar" style="width:${pct}%"></div></div><div class="certProgText">${fmtNum(cert.progress)}/${fmtNum(cert.threshold)}</div>`}
         </div>
+        ${cert.achieved?'<span class="lrowChev">›</span>':''}
       </div>`;
     }).join('')}</div>`;
+    c.querySelectorAll('[data-cert]').forEach(el=>{
+      const cert=items.find(x=>x.code===el.dataset.cert);
+      if(cert)el.onclick=()=>openCertDetail(effectiveUserId,cert);
+    });
+    // Celebrate newly-earned certificates the same way checkMilestones already does for badges
+    // — but only on the SELF view (userId falsy): a third party opening someone else's profile
+    // must never trigger a celebration/toast on their own screen for an achievement that isn't
+    // theirs. Kept here (not in checkMilestones, which only sees /api/profile/me's response) since
+    // certificates are lazy-loaded on tab-open, not fetched eagerly on every profile load.
+    if(!userId){
+      const achieved=items.filter(x=>x.achieved).map(x=>x.code);
+      const prevRaw=localStorage.getItem('achievedCertificates');
+      if(prevRaw!=null){
+        const prevSet=new Set(JSON.parse(prevRaw));
+        const fresh=achieved.filter(code=>!prevSet.has(code));
+        if(fresh.length){
+          celebrate();
+          const cert=items.find(x=>x.code===fresh[0]);
+          toast(`🎓 Yangi sertifikat: ${cert?cert.title:fresh[0]}!`);
+        }
+      }
+      localStorage.setItem('achievedCertificates',JSON.stringify(achieved));
+    }
   }).catch(()=>{c.innerHTML='<p class="hint">Yuklab bo\'lmadi</p>';});
+}
+// ---- certificate detail (#certDetailSheet) — the server-rendered PNG shown large, with a
+// share/download button that tries navigator.share (native share sheet, image attached) first,
+// falling back to a synthetic download link, with the image itself always visible large enough
+// to long-press-save manually as the one guaranteed-everywhere floor (Telegram's own embedded
+// WebView is known to be inconsistent about programmatic file share/download across platforms). ----
+function certImageUrl(userId,code){
+  return COMMUNITY_API_BASE+'/api/users/'+encodeURIComponent(userId)+'/certificates/'+encodeURIComponent(code)+'/image';
+}
+function openCertDetail(userId,cert){
+  haptic();
+  $('#certDetailImg').src=certImageUrl(userId,cert.code);
+  $('#certDetailSheet').classList.add('open');
+  tg?.BackButton?.show();
+  $('#certShareBtn').onclick=()=>shareCertificate(userId,cert);
+}
+function closeCertDetail(){$('#certDetailSheet').classList.remove('open');tg?.BackButton?.hide();}
+$('#certDetailClose').onclick=closeCertDetail;
+$('#certDetailSheet').onclick=e=>{if(e.target.id==='certDetailSheet')closeCertDetail();};
+async function shareCertificate(userId,cert){
+  haptic('medium');
+  const btn=$('#certShareBtn');
+  const label=btn.textContent;
+  btn.disabled=true;btn.textContent='Tayyorlanmoqda...';
+  try{
+    const resp=await fetch(certImageUrl(userId,cert.code));
+    if(!resp.ok)throw new Error('fetch failed');
+    const blob=await resp.blob();
+    const file=new File([blob],'sertifikat.png',{type:'image/png'});
+    const text=`🎓 "${cert.title}" sertifikatini oldim! — Kutubxona`;
+    if(navigator.canShare&&navigator.canShare({files:[file]})){
+      await navigator.share({files:[file],title:cert.title,text});
+    }else{
+      const blobUrl=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=blobUrl;a.download='sertifikat.png';
+      document.body.appendChild(a);a.click();a.remove();
+      setTimeout(()=>URL.revokeObjectURL(blobUrl),4000);
+    }
+  }catch(e){
+    // AbortError means the user just closed the native share sheet — not a real failure.
+    if(e&&e.name!=='AbortError')toast('Ulashib bo\'lmadi — rasmni uzoq bosib saqlang');
+  }finally{
+    btn.disabled=false;btn.textContent=label;
+  }
 }
 // Closes any open sheet (profile, follower list, davra thread, ...) before switching the main
 // view — otherwise a still-open overlay would sit on top of whatever this just switched to,
@@ -4598,7 +4682,7 @@ const SHEET_CLOSERS={
   listSheet:closeListSheet, liveSheet:closeLiveSheet, sheet:closeSheet,
   userProfileSheet:closeUserProfile, followListSheet:closeFollowList, themeMenuSheet:closeThemeMenu,
   onboardTourSheet:closeOnboardTour, notifSheet:closeNotifications, avatarViewSheet:closeAvatarView,
-  usersListSheet:closeUsersList, leaderboardSheet:closeLeaderboard,
+  usersListSheet:closeUsersList, leaderboardSheet:closeLeaderboard, certDetailSheet:closeCertDetail,
   // closeGlobe lives in the separate type="module" script below (Three.js globe) and only
   // becomes a real global once that deferred module finishes running — referencing it bare HERE
   // (evaluated immediately, before the module has loaded) throws ReferenceError. Wrapping it in
