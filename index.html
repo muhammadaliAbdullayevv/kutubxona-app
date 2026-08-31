@@ -4379,9 +4379,18 @@ async function boot(){
     navigator.serviceWorker.addEventListener('controllerchange',()=>{pendingSwReload=true;});
   });
   // Most first loads land on the home view, not a filtered grid — show shimmer shelves
-  // (matching what will actually render) instead of a generic grid skeleton.
+  // (matching what will actually render) instead of a generic grid skeleton. Sized to roughly
+  // match renderHome()'s typical real output (hero + ~4 shelf-shaped sections is the common
+  // case: newest, trending, most-read are unconditional; audio/"for you" are conditional but
+  // usually present) — a real-device CLS trace (PerformanceObserver 'layout-shift', see the RUM
+  // pipeline) showed #home jumping ~312px taller once books.json landed and the real content
+  // replaced this skeleton, which was consistently triggering a scrollbar to appear mid-load and
+  // shifting the whole bottom nav sideways — a plain visible symptom of the height jump itself,
+  // not a separate bug. This won't match exactly (the real page varies with how many conditional
+  // sections a given catalog/user has), but it gets the FIRST paint in the right ballpark instead
+  // of ~2 shelves' worth short, which is what CLS actually measures — closer, not pixel-perfect.
   $('#home').style.display='block';
-  $('#home').innerHTML=skeletonShelf()+skeletonShelf();
+  $('#home').innerHTML=heroSkeletonHtml()+skeletonShelf()+skeletonShelf()+skeletonShelf()+skeletonShelf();
   $('.bar').style.display='none';
   const _rumBooksJsonStart=performance.now();
   try{
