@@ -2920,7 +2920,15 @@ function authorAvatarHtml(userId,avatarVersion,name,size){
 function renderProfileCard(){
   const card=$('#pProfileCard');if(!card||!canAct())return;
   const uid=myUid();
-  api('/api/profile/settings').then(p=>{
+  // Both requests fire in parallel now — this used to be a waterfall (settings, THEN a second
+  // round trip just for joined-date/follower counts), which is exactly why those two fields
+  // visibly lagged behind the rest of the card by a whole extra request's worth of latency.
+  // allSettled (not all) so a hiccup on the smaller follow-stats call doesn't wipe out an
+  // otherwise-successful settings fetch — it just leaves those two fields blank, same as before.
+  Promise.allSettled([api('/api/profile/settings'),api('/api/users/'+uid+'/profile')]).then(([settingsResult,profileResult])=>{
+    if(settingsResult.status!=='fulfilled'){card.innerHTML='';return;}
+    const p=settingsResult.value;
+    const fp=profileResult.status==='fulfilled'?profileResult.value:null;
     myProfileCache=p;
     const name=p.display_name||'Foydalanuvchi';
     const sub=p.tahallus?('@'+p.tahallus):'Profilni to\'ldirish uchun bosing';
@@ -2946,12 +2954,12 @@ function renderProfileCard(){
         <div class="pHeroIdentity">
           <div class="pHeroName">${esc(name)}</div>
           <div class="pHeroSub" id="pHeroSubBtn">${esc(sub)}</div>
-          <div class="pHeroJoined" id="pHeroJoined"></div>
+          <div class="pHeroJoined" id="pHeroJoined">${fp?formatJoinedYear(fp.joined_date):''}</div>
         </div>
       </div>
       <div class="pFollowRow">
-        <span class="pFollowStat" id="pFollowersStat"><b>–</b><span>obunachi</span></span>
-        <span class="pFollowStat" id="pFollowingStat"><b>–</b><span>obuna</span></span>
+        <span class="pFollowStat" id="pFollowersStat"><b>${fp?fmtNum(fp.followers):'–'}</b><span>obunachi</span></span>
+        <span class="pFollowStat" id="pFollowingStat"><b>${fp?fmtNum(fp.following):'–'}</b><span>obuna</span></span>
       </div>
       ${p.bio?`<div class="pHeroBio">${esc(p.bio)}</div>`:''}
     </div>`;
@@ -2962,13 +2970,7 @@ function renderProfileCard(){
     $('#pHeroSubBtn').onclick=()=>openProfileEdit();
     $('#pFollowersStat').onclick=()=>openFollowList(uid,'followers');
     $('#pFollowingStat').onclick=()=>openFollowList(uid,'following');
-    api('/api/users/'+uid+'/profile').then(fp=>{
-      const jd=$('#pHeroJoined');if(jd)jd.textContent=formatJoinedYear(fp.joined_date);
-      const fs=$('#pFollowersStat b'),gs=$('#pFollowingStat b');
-      if(fs)fs.textContent=fmtNum(fp.followers);
-      if(gs)gs.textContent=fmtNum(fp.following);
-    }).catch(()=>{});
-  }).catch(()=>{card.innerHTML='';});
+  });
 }
 function formatJoinedYear(iso){return iso?`📅 ${iso.slice(0,4)}-yil qo'shilgan`:'';}
 // ---- birth-date wheel picker: 3 independent scroll-snap columns (day/month/year), matching the
