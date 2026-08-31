@@ -5,6 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Kutubxona</title>
 <meta name="description" content="6000+ o'zbek va jahon kitoblari — qidiruv, mavzular, audiokitoblar.">
+<!-- The whole app is inert until books.json is in (search, every shelf, and Davra's book-card
+     embeds are all resolved from the client-side DB.books/byId built from it) — but the classic
+     script below doesn't kick off that fetch until AFTER it's fully downloaded and starts running,
+     which happens only once the browser has already parsed past this whole document. A preload
+     hint lets the browser start that (largest, slowest — real-world ~3-5s even after trimming it
+     down, see export_data.py) download the moment it discovers this tag, in parallel with
+     everything else, instead of serially after. crossorigin is required on preload — fetch()
+     requests this same-origin JSON in "cors" mode, and Chrome only reuses a preloaded response
+     when the request modes match; without it this would silently double-download the file. A
+     preconnect for the community API origin gets its DNS/TLS handshake started early too, since
+     several of its own requests (profile/continue/notifications) fire moments after boot. -->
+<link rel="preload" href="books.json" as="fetch" crossorigin="anonymous">
+<link rel="preconnect" href="https://pdf-audio-kitoblar.site">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="icon" href="favicon-32.png" type="image/png">
