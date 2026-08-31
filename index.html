@@ -828,9 +828,30 @@
   #ptr.spin{animation:ptrspin .7s linear infinite}
   @keyframes ptrspin{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion: reduce){#ptr.spin{animation:none!important}}
+  #bootSplash{position:fixed; inset:0; z-index:999; background:var(--bg); display:flex; align-items:center; justify-content:center; transition:opacity .4s ease}
+  #bootSplash.hide{opacity:0; pointer-events:none}
+  #bootSplashInner{display:flex; flex-direction:column; align-items:center; gap:8px}
+  #bootSplashInner img{width:96px; height:96px; border-radius:50%; object-fit:cover; box-shadow:var(--shadow); animation:bootPulse 1.6s ease-in-out infinite}
+  #bootSplashName{font-size:19px; font-weight:800; color:var(--text); margin-top:6px}
+  #bootSplashHint{font-size:13px; color:var(--muted)}
+  @keyframes bootPulse{0%,100%{transform:scale(1); opacity:1}50%{transform:scale(1.06); opacity:.85}}
+  @media (prefers-reduced-motion: reduce){#bootSplashInner img{animation:none}}
 </style>
 </head>
 <body>
+<!-- First-paint splash — covers the header/skeleton/everything until boot() has real content
+     ready to show (books.json fetched, home rendered), instead of the raw progressive reveal
+     (bare header, then shimmer shelves, then content popping in piece by piece) that used to be
+     the very first thing every visitor saw. Removed by hideSplash() in boot() below; the
+     skeleton-shelf system underneath is untouched (still needed as this splash's own fallback if
+     JS is slow to run, and as the real CLS-safety net it was already built for). -->
+<div id="bootSplash">
+  <div id="bootSplashInner">
+    <img src="ptr-logo.png" alt="Kutubxona" width="96" height="96">
+    <div id="bootSplashName">Kutubxona</div>
+    <div id="bootSplashHint">Yuklanmoqda...</div>
+  </div>
+</div>
 <div id="ptr"><img src="ptr-logo.png" alt="" width="22" height="22"></div>
 <div class="wrap">
   <header>
@@ -4784,6 +4805,20 @@ function refreshCurrentView(){
     }
   },{passive:true});
 })();
+// Shown a minimum floor (350ms) even on an instant cached load — otherwise the splash would
+// flash on-then-off in well under a frame on a fast connection, reading as a glitch rather than
+// a deliberate loading moment. Called from both boot()'s success path and its books.json-failure
+// path, so a real error still surfaces instead of leaving the user stuck behind the splash.
+const _bootSplashShownAt=performance.now();
+function hideSplash(){
+  const el=$('#bootSplash');
+  if(!el)return;
+  const wait=Math.max(0,350-(performance.now()-_bootSplashShownAt));
+  setTimeout(()=>{
+    el.classList.add('hide');
+    setTimeout(()=>el.remove(),450); // past the .4s CSS opacity transition, then it's dead weight
+  },wait);
+}
 async function boot(){
   if(tg){tg.ready();tg.expand();tg.disableVerticalSwipes?.();tg.BackButton?.onClick(()=>{closeTopmostSheet();});applyThemeMode();tg.onEvent?.('themeChanged',()=>{if(themeMode==='system')applyThemeMode();});}
   if('serviceWorker' in navigator)window.addEventListener('load',()=>{
@@ -4860,9 +4895,10 @@ async function boot(){
     _rumMarkBooksJson(Math.round(performance.now()-_rumBooksJsonStart));
     byId={};for(const b of DB.books){byId[b.i]=b;indexBook(b);}
     buildHome();
-  }catch(e){$('#count').textContent='';$('#grid').innerHTML='';$('#empty').style.display='block';$('#empty').innerHTML='<span class="em">⚠️</span>Ma\'lumot yuklanmadi';return;}
+  }catch(e){$('#count').textContent='';$('#grid').innerHTML='';$('#empty').style.display='block';$('#empty').innerHTML='<span class="em">⚠️</span>Ma\'lumot yuklanmadi';hideSplash();return;}
   await loadFavs();
   renderChips();run();
+  hideSplash();
   // Deep-linked here from a shared "profile_<id>" bot message's web_app button (see
   // shareProfile() / bot.py's profile_ start-payload handler) — open straight to that profile
   // instead of the normal home screen.
