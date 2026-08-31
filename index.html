@@ -1160,6 +1160,54 @@ function trackEvent(type){
   api('/api/track/event',{method:'POST',body:JSON.stringify({type})}).catch(()=>{});
 }
 window.trackEvent=trackEvent;
+// ---- real-user monitoring (RUM) — actual field measurements from real sessions on real
+// networks, instead of guessing from synthetic curl/headless-Chrome tests. Deliberately works
+// with NO auth (unlike trackEvent above): a brand-new visitor's very first load, before they've
+// ever started the bot, is exactly the load most worth measuring, and gating this on canAct()
+// would silently exclude it. LCP/CLS come from PerformanceObserver (wrapped in try/catch —
+// support varies, and an unsupported entry type throws synchronously on .observe()); books_json_ms
+// and boot_ms are this app's own critical-path marks, set from within boot() itself, and are the
+// two numbers most directly tied to the "slow main screen" problem this was built to diagnose. ----
+let _rumLcp=null,_rumCls=0,_rumBooksJsonMs=null,_rumBootMs=null,_rumSent=false;
+try{
+  new PerformanceObserver(list=>{
+    const entries=list.getEntries();
+    const last=entries[entries.length-1];
+    if(last)_rumLcp=Math.round(last.startTime);
+  }).observe({type:'largest-contentful-paint',buffered:true});
+}catch(e){}
+try{
+  new PerformanceObserver(list=>{
+    for(const entry of list.getEntries())if(!entry.hadRecentInput)_rumCls+=entry.value;
+  }).observe({type:'layout-shift',buffered:true});
+}catch(e){}
+function _rumMarkBooksJson(ms){_rumBooksJsonMs=ms;}
+function _rumMarkBootComplete(ms){_rumBootMs=ms;}
+function _rumSendOnce(){
+  if(_rumSent)return;_rumSent=true;
+  try{
+    const nav=performance.getEntriesByType('navigation')[0];
+    const payload=JSON.stringify({
+      lcp_ms:_rumLcp,
+      cls:_rumCls>0?Math.round(_rumCls*1000)/1000:0,
+      ttfb_ms:nav?Math.round(nav.responseStart):null,
+      dcl_ms:nav?Math.round(nav.domContentLoadedEventEnd):null,
+      load_ms:(nav&&nav.loadEventEnd)?Math.round(nav.loadEventEnd):null,
+      books_json_ms:_rumBooksJsonMs,
+      boot_ms:_rumBootMs,
+      connection_type:navigator.connection?.effectiveType||null,
+    });
+    // sendBeacon survives page hide/unload reliably (the whole reason to use it here) — fetch
+    // with keepalive is the fallback for the rare browser without it, not the primary path.
+    if(navigator.sendBeacon)navigator.sendBeacon(COMMUNITY_API_BASE+'/api/rum',new Blob([payload],{type:'application/json'}));
+    else fetch(COMMUNITY_API_BASE+'/api/rum',{method:'POST',body:payload,headers:{'Content-Type':'application/json'},keepalive:true}).catch(()=>{});
+  }catch(e){}
+}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')_rumSendOnce();});
+window.addEventListener('pagehide',_rumSendOnce);
+// Fallback for a session that just sits open past any reasonable boot window — otherwise a long
+// visit that's never backgrounded would never report at all.
+setTimeout(_rumSendOnce,15000);
 function livePresenceTick(){
   if(!canAct()||document.visibilityState!=='visible')return;
   api('/api/presence/ping',{method:'POST'}).catch(()=>{});
@@ -4328,8 +4376,10 @@ async function boot(){
   $('#home').style.display='block';
   $('#home').innerHTML=skeletonShelf()+skeletonShelf();
   $('.bar').style.display='none';
+  const _rumBooksJsonStart=performance.now();
   try{
     const r=await fetch('./books.json',{cache:'no-cache'});DB=await r.json();
+    _rumMarkBooksJson(Math.round(performance.now()-_rumBooksJsonStart));
     byId={};for(const b of DB.books){byId[b.i]=b;indexBook(b);}
     buildHome();
   }catch(e){$('#count').textContent='';$('#grid').innerHTML='';$('#empty').style.display='block';$('#empty').innerHTML='<span class="em">⚠️</span>Ma\'lumot yuklanmadi';return;}
@@ -4361,6 +4411,7 @@ async function boot(){
   refreshNotifDot();
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refreshNotifDot();});
   setInterval(()=>{if(document.visibilityState==='visible')refreshNotifDot();},45000);
+  _rumMarkBootComplete(Math.round(performance.now()));
 }
 boot();
 </script>
