@@ -1187,7 +1187,7 @@ function _rumSendOnce(){
   if(_rumSent)return;_rumSent=true;
   try{
     const nav=performance.getEntriesByType('navigation')[0];
-    const payload=JSON.stringify({
+    const fields={
       lcp_ms:_rumLcp,
       cls:_rumCls>0?Math.round(_rumCls*1000)/1000:0,
       ttfb_ms:nav?Math.round(nav.responseStart):null,
@@ -1196,11 +1196,18 @@ function _rumSendOnce(){
       books_json_ms:_rumBooksJsonMs,
       boot_ms:_rumBootMs,
       connection_type:navigator.connection?.effectiveType||null,
-    });
+    };
+    // Sent as application/x-www-form-urlencoded (URLSearchParams as sendBeacon's payload gets
+    // that content type automatically), NOT JSON — a CORS-"simple" content type means no
+    // preflight, which matters specifically because sendBeacon never waits for one. A JSON Blob
+    // body was the original approach here, confirmed live to silently fail: the OPTIONS preflight
+    // reached the server, the actual POST never followed once the tab had already torn down.
+    const params=new URLSearchParams();
+    for(const k in fields){const v=fields[k];if(v!==null&&v!==undefined&&v!=='')params.set(k,String(v));}
     // sendBeacon survives page hide/unload reliably (the whole reason to use it here) — fetch
     // with keepalive is the fallback for the rare browser without it, not the primary path.
-    if(navigator.sendBeacon)navigator.sendBeacon(COMMUNITY_API_BASE+'/api/rum',new Blob([payload],{type:'application/json'}));
-    else fetch(COMMUNITY_API_BASE+'/api/rum',{method:'POST',body:payload,headers:{'Content-Type':'application/json'},keepalive:true}).catch(()=>{});
+    if(navigator.sendBeacon)navigator.sendBeacon(COMMUNITY_API_BASE+'/api/rum',params);
+    else fetch(COMMUNITY_API_BASE+'/api/rum',{method:'POST',body:params,keepalive:true}).catch(()=>{});
   }catch(e){}
 }
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')_rumSendOnce();});
