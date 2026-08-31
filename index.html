@@ -762,9 +762,15 @@
   #pTabContent{padding:14px 0 6px}
   .badgeGrid{display:grid; grid-template-columns:repeat(3,1fr); gap:10px}
   .badgeCard{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px 8px; text-align:center}
-  .badgeCard.locked{opacity:.35}
+  /* Locked was opacity:.35 with nothing else — now it also shows a real progress bar, which
+     needs to stay legible, so the dimming backs off a bit from "barely visible" to "muted". */
+  .badgeCard.locked{opacity:.6}
+  .badgeCard.achieved{background:linear-gradient(135deg, color-mix(in srgb, var(--accent) 14%, var(--card)), color-mix(in srgb, var(--accent2) 14%, var(--card))); border-color:color-mix(in srgb, var(--accent) 40%, var(--line))}
   .badgeEmoji{font-size:26px; margin-bottom:6px}
   .badgeLabel{font-size:12px; font-weight:700}
+  .badgeProg{height:4px; border-radius:3px; background:var(--line); margin-top:8px; overflow:hidden}
+  .badgeProgBar{height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2)); border-radius:3px}
+  .badgeProgText{font-size:9.5px; color:var(--muted); margin-top:3px; font-weight:700; font-variant-numeric:tabular-nums}
   .certList{display:flex; flex-direction:column; gap:10px}
   .certCard{display:flex; gap:12px; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px 14px; align-items:center}
   .certCard.locked{opacity:.55}
@@ -3177,6 +3183,11 @@ const _BADGE_META={
   bookworm:{emoji:'📚',label:'Kitobxon'},
   collector:{emoji:'⭐',label:"To'plovchi"},
   voice:{emoji:'💬',label:"Faol a'zo"},
+  listener:{emoji:'🎧',label:'Faol tinglovchi'},
+  davra_voice:{emoji:'📣',label:'Davra a\'zosi'},
+  explorer:{emoji:'🧭',label:'Janr izlovchisi'},
+  social:{emoji:'🤝',label:'Ijtimoiy'},
+  curator:{emoji:'🗂',label:'Kutubxonachi'},
 };
 const myUid=()=>tg?.initDataUnsafe?.user?.id;
 function avatarUrl(uid,v){return COMMUNITY_API_BASE+'/api/profile/avatar/'+encodeURIComponent(uid)+(v?'?v='+v:'?v=0');}
@@ -3939,7 +3950,17 @@ function shelvesTabHtml(userId,containerId){
 function badgesTabHtml(badges,containerId){
   $('#'+containerId).innerHTML=`<div class="badgeGrid">${badges.map(b=>{
     const m=_BADGE_META[b.code]||{emoji:'🏅',label:b.code};
-    return `<div class="badgeCard${b.achieved?'':' locked'}"><div class="badgeEmoji">${m.emoji}</div><div class="badgeLabel">${esc(m.label)}</div></div>`;
+    // Locked badges used to just sit dimmed with zero indication of how close they were —
+    // now they show real progress (the API already returns progress/threshold, same shape
+    // certificates use), so "almost there" reads differently from "barely started".
+    const pct=b.threshold?Math.min(100,Math.round((b.progress/b.threshold)*100)):0;
+    // 'listener' is tracked in raw seconds on the backend (consistent with every other
+    // active-time column in the app) — "207/3600" reads as nonsense without a unit, so this is
+    // the one badge whose progress numbers get converted to minutes just for display.
+    const isSeconds=b.code==='listener';
+    const progText=isSeconds?`${fmtNum(Math.round(b.progress/60))}/${fmtNum(Math.round(b.threshold/60))} daq`:`${fmtNum(b.progress)}/${fmtNum(b.threshold)}`;
+    const prog=b.achieved?'':`<div class="badgeProg"><div class="badgeProgBar" style="width:${pct}%"></div></div><div class="badgeProgText">${progText}</div>`;
+    return `<div class="badgeCard${b.achieved?' achieved':' locked'}"><div class="badgeEmoji">${m.emoji}</div><div class="badgeLabel">${esc(m.label)}</div>${prog}</div>`;
   }).join('')}</div>`;
 }
 function certificatesTabHtml(userId,containerId){
