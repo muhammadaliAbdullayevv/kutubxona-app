@@ -165,8 +165,12 @@
   .mqtrack{display:flex; gap:12px; width:max-content; padding:0 14px}
   .authchips{display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; padding:2px 14px 4px; margin:0 -14px}
   .authchips::-webkit-scrollbar{display:none}
-  .authchip{flex:0 0 auto; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:9px 13px; cursor:pointer; display:flex; flex-direction:column; gap:1px; min-width:110px}
-  .authchip .an{font-size:13px; font-weight:700; white-space:nowrap}
+  .authchip{flex:0 0 auto; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:8px 13px 8px 8px; cursor:pointer; display:flex; align-items:center; gap:9px; min-width:130px}
+  /* No real author photos in the data, so the same gradient+initials fallback book covers/avatars
+     already use everywhere — a small round chip, not a claim of an actual portrait. */
+  .authchip .aav{flex-shrink:0; width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#fff; font-size:13px; font-weight:800}
+  .authchip .atext{display:flex; flex-direction:column; gap:1px; min-width:0}
+  .authchip .an{font-size:13px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
   .authchip .ac{font-size:11px; color:var(--muted)}
   .genretiles{display:grid; grid-template-columns:1fr 1fr; gap:10px}
   .gtile{border-radius:14px; padding:14px; cursor:pointer; color:#fff; font-weight:800; font-size:15px; min-height:66px; display:flex; flex-direction:column; justify-content:center; box-shadow:var(--shadow)}
@@ -1639,7 +1643,7 @@ var byId={};
 // reasoning as DB/byId above) makes them real globals every script on the page can see.
 var openedFromGlobe=false;
 let state={q:'',genre:'',audience:'',type:'',sort:'relevance',view:'browse',shown:24,result:[],all:false};
-let HOME={newest:[],audio:[],authors:[],continue:[],continueLoaded:false,topics:[],trending:[]};
+let HOME={newest:[],audio:[],authors:[],continue:[],continueLoaded:false,topics:[],trending:[],mostRead:[]};
 let favs=new Set();
 const PAGE=24;
 
@@ -2076,6 +2080,11 @@ $('#shelvesSheet').onclick=e=>{if(e.target.id==='shelvesSheet')closeShelvesSheet
 function buildHome(){
   HOME.newest=DB.books.slice(0,18);
   HOME.audio=DB.books.filter(b=>b.ha).slice(0,18);
+  // All-time most-downloaded — distinct from the "Top kitoblar" trending shelf (which windows to
+  // day/week/month via the live /api/books/trending endpoint): this is a pure client-side sort
+  // over the already-loaded catalog, no backend involved, surfacing the classics that stay
+  // popular over the long run rather than only what's active right now.
+  HOME.mostRead=DB.books.slice().sort((a,b)=>(b.dl||0)-(a.dl||0)).slice(0,18);
   const ac={};
   for(const b of DB.books){const a=(b.a||'').trim();if(a&&a.length>1&&!/noma'?lum/i.test(a))ac[a]=(ac[a]||0)+1;}
   HOME.authors=Object.entries(ac).filter(([a,c])=>c>=2).sort((x,y)=>y[1]-x[1]).slice(0,16).map(([a,c])=>({a,c}));
@@ -2244,9 +2253,10 @@ function renderHome(){
   const forYou=computeForYou();
   if(forYou.length)html+=shelf("✨ Siz uchun",forYou);
   if(HOME.newest.length)html+=marqueeShelf("🆕 Yangi qo'shilgan",HOME.newest,'data-see="newest"');
-  if(HOME.authors.length)html+=`<div class="section"><div class="shead"><h2>✍️ Mashhur mualliflar</h2></div><div class="authchips">${HOME.authors.map(a=>`<div class="authchip" data-auth="${esc(a.a)}"><span class="an">${esc(a.a)}</span><span class="ac">${a.c} ta kitob</span></div>`).join('')}</div></div>`;
+  if(HOME.authors.length)html+=`<div class="section"><div class="shead"><h2>✍️ Mashhur mualliflar</h2></div><div class="authchips">${HOME.authors.map(a=>{const[c1,c2]=coverFor(a.a);return `<div class="authchip" data-auth="${esc(a.a)}"><span class="aav" style="background:linear-gradient(135deg,${c1},${c2})">${esc(initials(a.a))}</span><span class="atext"><span class="an">${esc(a.a)}</span><span class="ac">${a.c} ta kitob</span></span></div>`;}).join('')}</div></div>`;
   if(HOME.audio.length)html+=shelf("🎧 Audiokitoblar",HOME.audio,'data-see="audio"');
   html+=trendingShelf(HOME.trending);
+  if(HOME.mostRead.length)html+=shelf("📈 Eng ko'p yuklab olingan",HOME.mostRead);
   h.innerHTML=html;
   h.querySelectorAll('.si').forEach(el=>el.onclick=()=>openDetail(el.dataset.id));
   _wireFmtButtons(h);
@@ -4273,11 +4283,15 @@ async function boot(){
   setInterval(liveRefreshPublicStats,6000);
   livePresenceTick();
   setInterval(livePresenceTick,25000);
-  // Unread badge: checked at boot, then re-checked whenever the app comes back to the foreground
-  // (visibilitychange) rather than a tight poll interval — this is a low-urgency "do you have
-  // something new" indicator, not a live feed, so it doesn't need the 6s cadence live stats use.
+  // Unread badge: checked at boot, on every foreground return (visibilitychange), and every 45s
+  // while actually visible — this is a low-urgency "do you have something new" indicator, not a
+  // live feed, so it doesn't need the 6s cadence live stats use, but a session left open for a
+  // while (reading, browsing Davra) would otherwise never notice a new follower/like/reply until
+  // backgrounded and reopened. The visibility check inside the interval (not just at setup) is
+  // what actually saves the requests while backgrounded — setInterval itself keeps firing either way.
   refreshNotifDot();
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refreshNotifDot();});
+  setInterval(()=>{if(document.visibilityState==='visible')refreshNotifDot();},45000);
 }
 boot();
 </script>
