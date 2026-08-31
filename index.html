@@ -376,6 +376,13 @@
      happening" signal distinct from "40% downloaded and just sitting there". */
   #apBufferBar.loading b{width:100% !important; background:linear-gradient(90deg, color-mix(in srgb, var(--accent) 18%, var(--line)) 25%, color-mix(in srgb, var(--accent) 55%, var(--line)) 50%, color-mix(in srgb, var(--accent) 18%, var(--line)) 75%); background-size:200% 100%; animation:apLoadingPulse 1.1s linear infinite}
   @keyframes apLoadingPulse{0%{background-position:200% 0}100%{background-position:-200% 0}}
+  /* #apPlayedBar is the actual "as it plays, the line fills with a brighter color" indicator —
+     drawn by us on every timeupdate rather than relying on the native range's own accent-color
+     fill, which some mobile WebKit builds don't render once the track's own background has been
+     made transparent above (needed so #apBufferBar is visible at all). Sits on top of
+     #apBufferBar (buffered so far) but below the native #apSeek thumb, so dragging still works. */
+  #apPlayedBar{position:absolute; left:0; right:0; height:4px; border-radius:3px; pointer-events:none}
+  #apPlayedBar b{display:block; height:100%; width:0%; background:var(--accent); border-radius:3px}
   #apSeek{position:relative; z-index:1; width:100%; margin:0; accent-color:var(--accent); background:transparent}
   #apSeek::-webkit-slider-runnable-track{background:transparent}
   #apSeek::-moz-range-track{background:transparent}
@@ -1160,14 +1167,13 @@
   </div>
   <div id="apSeekWrap">
     <div id="apBufferBar"><b></b></div>
+    <div id="apPlayedBar"><b></b></div>
     <input type="range" id="apSeek" min="0" max="1000" value="0">
   </div>
   <div id="apTimeRow"><span id="apTimeCur">0:00</span><span id="apTimeDur">–:–</span></div>
   <div id="apControls">
     <button id="apPrevPart" type="button">⏮</button>
-    <button id="apBack" type="button">⏪</button>
     <button id="apPlay" type="button">▶️</button>
-    <button id="apFwd" type="button">⏩</button>
     <button id="apNextPart" type="button">⏭</button>
     <button id="apSpeed" type="button">1x</button>
   </div>
@@ -2977,7 +2983,9 @@ function apUpdateBuffered(){
 AP.audio.addEventListener('progress',apUpdateBuffered);
 AP.audio.addEventListener('timeupdate',()=>{
   if(!AP.audio.duration)return;
-  $('#apSeek').value=Math.round((AP.audio.currentTime/AP.audio.duration)*1000);
+  const pct=AP.audio.currentTime/AP.audio.duration;
+  $('#apSeek').value=Math.round(pct*1000);
+  $('#apPlayedBar b').style.width=Math.min(100,pct*100)+'%';
   $('#apTimeCur').textContent=fmtApTime(AP.audio.currentTime);
 });
 AP.audio.addEventListener('loadedmetadata',()=>{$('#apTimeDur').textContent=fmtApTime(AP.audio.duration);apUpdateBuffered();});
@@ -3023,13 +3031,18 @@ async function apPlayPart(idx){
   const part=AP.parts[idx];
   if(!part)return;
   AP.partIdx=idx;
-  $('#apPart').textContent='Qism '+(part.index+1)+' / '+AP.parts.length+(part.title?(' — '+part.title):'');
+  // idx+1, NOT part.index+1 — part.index is the raw DB part_index value, which every existing
+  // audiobook in the catalog stores 1-based (1..N, not 0..N-1); idx is this array's own 0-based
+  // position, already correct as-is for a human-facing "part X of Y" count regardless of
+  // whatever numbering convention the DB field happens to use.
+  $('#apPart').textContent='Qism '+(idx+1)+' / '+AP.parts.length+(part.title?(' — '+part.title):'');
   $('#apPrevPart').disabled=idx<=0; $('#apNextPart').disabled=idx>=AP.parts.length-1;
   // Loading state goes on immediately, before the token round-trip / stream even starts — the
   // gap between tapping a part and the browser's own 'waiting' event firing is exactly the
   // window where a silent player looks broken rather than "working on it".
   $('#apBufferBar').classList.add('loading');
   $('#apBufferBar b').style.width='0%';
+  $('#apPlayedBar b').style.width='0%';
   $('#apTimeCur').textContent='0:00';
   $('#apTimeDur').textContent='Yuklanmoqda...';
   try{
@@ -3065,7 +3078,18 @@ async function openAudioPlayer(id,title){
     const data=await api('/api/books/'+encodeURIComponent(id)+'/audiobook');
     if(!data.available||!data.parts.length){toast('Bu kitobda audio yo\'q');closeAudioPlayer();return;}
     AP.bookId=id; AP.audioBookId=data.audio_book_id; AP.parts=data.parts;
-    const startIdx=data.resume_part_index!=null?Math.min(data.resume_part_index,data.parts.length-1):0;
+    // Resolve resume position by matching resume_part_id (the actual saved part's real id) to
+    // its ARRAY position here — NOT by using resume_part_index directly as an array index. That
+    // used to silently skip ahead one-or-more parts on every resume: every audiobook in the
+    // catalog stores part_index 1-based (1..N), but data.parts[i] is 0-based, so "resume at
+    // part_index 1" (the correct value for the FIRST part) was looked up as data.parts[1] — the
+    // SECOND part — and so on, one part further each time. Matching by id sidesteps whatever
+    // numbering convention the DB field happens to use entirely.
+    let startIdx=0;
+    if(data.resume_part_id){
+      const found=data.parts.findIndex(p=>p.id===data.resume_part_id);
+      if(found>=0)startIdx=found;
+    }
     apStartActiveTracking();
     apPlayPart(startIdx);
   }catch(e){toast('Audio yuklanmadi');closeAudioPlayer();}
@@ -3082,10 +3106,11 @@ $('#apClose').onclick=()=>closeAudioPlayer();
 $('#apPlay').onclick=()=>{ if(AP.audio.paused)AP.audio.play();else AP.audio.pause(); };
 $('#apPrevPart').onclick=()=>{if(AP.partIdx>0)apPlayPart(AP.partIdx-1);};
 $('#apNextPart').onclick=()=>{if(AP.partIdx<AP.parts.length-1)apPlayPart(AP.partIdx+1);};
-$('#apBack').onclick=()=>{AP.audio.currentTime=Math.max(0,AP.audio.currentTime-15);};
-$('#apFwd').onclick=()=>{AP.audio.currentTime=Math.min(AP.audio.duration||0,AP.audio.currentTime+30);};
 $('#apSeek').addEventListener('input',()=>{
-  if(AP.audio.duration)AP.audio.currentTime=($('#apSeek').value/1000)*AP.audio.duration;
+  if(!AP.audio.duration)return;
+  AP.audio.currentTime=($('#apSeek').value/1000)*AP.audio.duration;
+  // Instant feedback while dragging, rather than waiting for the next 'timeupdate' tick.
+  $('#apPlayedBar b').style.width=($('#apSeek').value/1000*100)+'%';
 });
 $('#apSpeed').onclick=()=>{
   const cur=AP.audio.playbackRate;
