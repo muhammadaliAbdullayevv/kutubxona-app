@@ -799,13 +799,17 @@
     border-radius:50%; background:var(--card); border:1px solid var(--line); box-shadow:var(--shadow);
     display:flex; align-items:center; justify-content:center; font-size:16px; z-index:40; opacity:0;
     transition:transform .15s, opacity .15s}
+  /* The app's own icon (same file as the PWA install icon, already shell-cached by sw.js) rather
+     than a generic spinner glyph — recognizable at a glance as "this app is working on it",
+     matching the ask that this loading moment read as the app's own identity, not a bare icon. */
+  #ptr img{width:20px; height:20px; border-radius:6px; display:block; pointer-events:none}
   #ptr.spin{animation:ptrspin .7s linear infinite}
   @keyframes ptrspin{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion: reduce){#ptr.spin{animation:none!important}}
 </style>
 </head>
 <body>
-<div id="ptr">↓</div>
+<div id="ptr"><img src="icon-192.png" alt="" width="20" height="20"></div>
 <div class="wrap">
   <header>
     <div id="homeHeader">
