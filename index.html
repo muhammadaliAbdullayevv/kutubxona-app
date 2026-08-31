@@ -407,7 +407,7 @@
   .liveBadgeRight{display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700; opacity:.92}
   /* The panel is a full page (like the PDF reader), not a bottom drawer — a "footer" card reads
      as a minor add-on; a whole page reads as what it actually is, the app's stats dashboard. */
-  #liveSheet,#listSheet,#shelvesSheet,#reviewsSheet,#writeReviewSheet,#profileEditSheet,#avatarCropSheet,#bannerCropSheet,#davraComposeSheet,#davraThreadSheet,#userProfileSheet,#followListSheet,#notifSheet,#usersListSheet,#leaderboardSheet,#certDetailSheet,#readingTimeSheet{flex-direction:column}
+  #liveSheet,#listSheet,#shelvesSheet,#reviewsSheet,#writeReviewSheet,#profileEditSheet,#avatarCropSheet,#bannerCropSheet,#davraComposeSheet,#davraThreadSheet,#userProfileSheet,#followListSheet,#notifSheet,#usersListSheet,#leaderboardSheet,#certDetailSheet{flex-direction:column}
   /* Generalized from the Statistika panel's own topbar so new full-page sheets (Reading Room's
      drill-in lists, Javon) get the same "whole page, not a bottom drawer" treatment for free. */
   #liveTopbar,.stopbar{flex-shrink:0; display:flex; align-items:center; justify-content:space-between; gap:12px;
@@ -544,13 +544,6 @@
   .glegend .lg-row{display:flex; align-items:center; gap:6px; white-space:nowrap; text-shadow:0 1px 3px var(--bg)}
   .glegend .lg-row b{color:var(--text)}
   .glegend .lg-dot{width:8px; height:8px; border-radius:50%; flex:0 0 auto}
-  /* Was just bare text sitting on the page background — no card, no color, nothing marking a
-     multi-day streak as an actual achievement rather than an ordinary stat. */
-  .streakbig{display:flex; align-items:center; gap:14px; padding:16px 18px; margin:4px 0 14px; border-radius:16px; background:linear-gradient(135deg, color-mix(in srgb, #ff7a45 20%, var(--card)), color-mix(in srgb, #ffb84d 14%, var(--card))); border:1px solid color-mix(in srgb, #ff7a45 38%, var(--line))}
-  .streakFlame{font-size:34px; line-height:1; filter:drop-shadow(0 2px 4px rgba(255,122,69,.35))}
-  .streakText{display:flex; flex-direction:column}
-  .streakbig .n{font-size:32px; font-weight:800; line-height:1.15; color:#ff6a2c}
-  .streakbig .u{font-size:13px; color:var(--muted); font-weight:600; margin-top:2px}
   .statgrid{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:14px 0}
   .statgrid .st{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px 12px}
   .statgrid .st .sv{font-size:18px; font-weight:800; font-variant-numeric:tabular-nums}
@@ -1074,15 +1067,6 @@
     <img id="certDetailImg" style="width:100%; max-width:420px; border-radius:16px; box-shadow:var(--shadow)" alt="Sertifikat">
     <button class="btn primary" id="certShareBtn" style="width:100%; max-width:420px; margin-top:18px">📤 Ulashish</button>
     <p class="hint" style="margin-top:10px">Rasmni saqlash uchun uzoq bosib turing</p>
-  </div>
-</div>
-<!-- Reading-time detail — the main profile tile only ever showed one number (used to be the
-     all-time total, now today's minutes); this is where the week/month/all-time breakdown lives
-     instead of cluttering the main grid with tiles for every window. -->
-<div class="sheet" id="readingTimeSheet" style="z-index:57; align-items:stretch; background:var(--bg)">
-  <div class="stopbar"><div class="stopbarTitle">⏱ O'qish vaqti</div><div class="gclose" id="readingTimeClose">✕</div></div>
-  <div class="ssheetc">
-    <div class="statgrid" id="readingTimeGrid"></div>
   </div>
 </div>
 <!-- Tap-to-enlarge for a profile avatar (own or someone else's) — centered, not full-screen, and
@@ -3902,23 +3886,24 @@ function loadProfile(){
   api('/api/profile/me').then(r=>{
     myBadgesCache=r.badges;
     checkMilestones(r);
-    const s=r.streak,rt=r.reading_time||{total_seconds:0,today_seconds:0,last_7_days_seconds:0,last_30_days_seconds:0};
+    const rt=r.reading_time||{total_seconds:0,today_seconds:0,last_7_days_seconds:0,last_30_days_seconds:0};
     const toMin=sec=>Math.round((sec||0)/60);
     const rankText=r.rank?`#${fmtNum(r.rank.position)} / ${fmtNum(r.rank.total_users)}`:'—';
     // Opened-books/favorites/comments/longest-streak used to fill a whole second statgrid —
     // trimmed since they weren't actually useful at a glance here (favorites/comments already
     // live in their own real sections; total_opens and best_streak are trivia, not something a
-    // returning visitor needs to see on every single profile load).
+    // returning visitor needs to see on every single profile load). The streak card and the
+    // tap-to-see-week/month reading-time popup were both tried and then explicitly asked back
+    // out again — reading time is just two plain, separate tiles (last 7 days / all-time), no
+    // click-through.
     body.innerHTML=`
-      <div class="streakbig"><span class="streakFlame">🔥</span><div class="streakText"><span class="n">${s.current_streak}</span><span class="u">kunlik seriya${s.active_today?' · bugun faol':''}</span></div></div>
       <div class="statgrid">
         <div class="st"><div class="sv">🪙 ${fmtNum(r.points||0)}</div><div class="sl">ball hisobi</div></div>
-        <div class="st" id="pReadingTimeTile" style="cursor:pointer"><div class="sv">${fmtNum(toMin(rt.today_seconds))}</div><div class="sl">bugun o'qildi (daq) ›</div></div>
+        <div class="st"><div class="sv">${fmtNum(toMin(rt.total_seconds))}</div><div class="sl">jami o'qildi (daq)</div></div>
         <div class="st" id="pRankTile" style="cursor:pointer"><div class="sv">${rankText}</div><div class="sl">reyting o'rni ›</div></div>
         <div class="st"><div class="sv">${fmtNum(toMin(rt.last_7_days_seconds))}</div><div class="sl">so'nggi 7 kun (daq)</div></div>
       </div>`;
     $('#pRankTile').onclick=()=>openLeaderboard();
-    $('#pReadingTimeTile').onclick=()=>openReadingTimeDetail(rt);
     // Badges are already fetched above (myBadgesCache) — the Yutuqlar tab renders from that
     // cache instead of a second round trip, unless it's opened before this resolves.
     if(document.querySelector('#pTabs .ptab[data-pt="yutuq"]')?.classList.contains('on'))badgesTabHtml(myBadgesCache||[],'pTabContent');
@@ -4191,19 +4176,17 @@ function loadUserProfileHero(userId){
 function loadUserProfileStats(userId){
   api('/api/users/'+userId+'/stats').then(r=>{
     $('#userProfileSheet').__badgesCache=r.badges;
-    const s=r.streak,rt=r.reading_time||{total_seconds:0,today_seconds:0,last_7_days_seconds:0,last_30_days_seconds:0};
+    const rt=r.reading_time||{total_seconds:0,today_seconds:0,last_7_days_seconds:0,last_30_days_seconds:0};
     const toMin=sec=>Math.round((sec||0)/60);
     const rankText=r.rank?`#${fmtNum(r.rank.position)} / ${fmtNum(r.rank.total_users)}`:'—';
     $('#uBody').innerHTML=`
-      <div class="streakbig"><span class="streakFlame">🔥</span><div class="streakText"><span class="n">${s.current_streak}</span><span class="u">kunlik seriya${s.active_today?' · bugun faol':''}</span></div></div>
       <div class="statgrid">
         <div class="st"><div class="sv">🪙 ${fmtNum(r.points||0)}</div><div class="sl">ball hisobi</div></div>
-        <div class="st" id="uReadingTimeTile" style="cursor:pointer"><div class="sv">${fmtNum(toMin(rt.today_seconds))}</div><div class="sl">bugun o'qildi (daq) ›</div></div>
+        <div class="st"><div class="sv">${fmtNum(toMin(rt.total_seconds))}</div><div class="sl">jami o'qildi (daq)</div></div>
         <div class="st" id="uRankTile" style="cursor:pointer"><div class="sv">${rankText}</div><div class="sl">reyting o'rni ›</div></div>
         <div class="st"><div class="sv">${fmtNum(toMin(rt.last_7_days_seconds))}</div><div class="sl">so'nggi 7 kun (daq)</div></div>
       </div>`;
     $('#uRankTile').onclick=()=>openLeaderboard();
-    $('#uReadingTimeTile').onclick=()=>openReadingTimeDetail(rt);
     if($('#uTabs').querySelector('.ptab[data-pt="yutuq"]')?.classList.contains('on'))badgesTabHtml(r.badges,'uTabContent');
   }).catch(()=>{$('#uBody').innerHTML='<p class="hint">Ma\'lumot yuklanmadi.</p>';});
 }
@@ -4661,24 +4644,6 @@ function openLeaderboard(){
 function closeLeaderboard(){$('#leaderboardSheet').classList.remove('open');tg?.BackButton?.hide();}
 $('#leaderboardClose').onclick=closeLeaderboard;
 $('#leaderboardSheet').onclick=e=>{if(e.target.id==='leaderboardSheet')closeLeaderboard();};
-// ---- reading-time detail (#readingTimeSheet) — the main profile tile shows just today's
-// minutes (see loadProfile/loadUserProfileStats); this is the week/month/all-time breakdown,
-// reusing the same rt object already fetched for that tile so no second API call is needed. ----
-function openReadingTimeDetail(rt){
-  haptic();
-  rt=rt||{};
-  const toMin=sec=>Math.round((sec||0)/60);
-  $('#readingTimeGrid').innerHTML=`
-    <div class="st"><div class="sv">${fmtNum(toMin(rt.today_seconds))}</div><div class="sl">Bugun (daq)</div></div>
-    <div class="st"><div class="sv">${fmtNum(toMin(rt.last_7_days_seconds))}</div><div class="sl">So'nggi hafta (daq)</div></div>
-    <div class="st"><div class="sv">${fmtNum(toMin(rt.last_30_days_seconds))}</div><div class="sl">So'nggi oy (daq)</div></div>
-    <div class="st"><div class="sv">${fmtNum(toMin(rt.total_seconds))}</div><div class="sl">Jami (daq)</div></div>`;
-  $('#readingTimeSheet').classList.add('open');
-  tg?.BackButton?.show();
-}
-function closeReadingTimeDetail(){$('#readingTimeSheet').classList.remove('open');tg?.BackButton?.hide();}
-$('#readingTimeClose').onclick=closeReadingTimeDetail;
-$('#readingTimeSheet').onclick=e=>{if(e.target.id==='readingTimeSheet')closeReadingTimeDetail();};
 // ---- first-run welcome tour (#onboardTourSheet) — button/dot navigation only, not a swipe
 // gesture: the app already has one carefully-tuned touch gesture (pull-to-refresh) and adding a
 // second, overlapping one for a one-time screen isn't worth the extra edge cases. ----
@@ -4729,7 +4694,7 @@ const SHEET_CLOSERS={
   listSheet:closeListSheet, liveSheet:closeLiveSheet, sheet:closeSheet,
   userProfileSheet:closeUserProfile, followListSheet:closeFollowList, themeMenuSheet:closeThemeMenu,
   onboardTourSheet:closeOnboardTour, notifSheet:closeNotifications, avatarViewSheet:closeAvatarView,
-  usersListSheet:closeUsersList, leaderboardSheet:closeLeaderboard, certDetailSheet:closeCertDetail, readingTimeSheet:closeReadingTimeDetail,
+  usersListSheet:closeUsersList, leaderboardSheet:closeLeaderboard, certDetailSheet:closeCertDetail,
   // closeGlobe lives in the separate type="module" script below (Three.js globe) and only
   // becomes a real global once that deferred module finishes running — referencing it bare HERE
   // (evaluated immediately, before the module has loaded) throws ReferenceError. Wrapping it in
