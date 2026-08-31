@@ -1337,12 +1337,24 @@ function wireDavraPostItems(scope){
 let davraFeedMode='all';
 function loadDavraFeed(reset){
   if(davraLoading||(davraDone&&!reset))return;
-  if(reset){davraCursor=null;davraDone=false;$('#davraList').innerHTML='';}
+  // A fresh load previously left #davraList (and the empty-state message, which only ever gets
+  // set inside the response handler below) completely blank until the fetch resolved — on a slow
+  // connection that reads as "Davra just isn't switching" rather than "still loading", since
+  // nothing on screen changes at all. Same "Yuklanmoqda..." convention already used for every
+  // other loading gap in this app (profile edit, certificates, ...).
+  if(reset){davraCursor=null;davraDone=false;$('#davraList').innerHTML='<p class="hint" id="davraLoadingHint">Yuklanmoqda...</p>';}
   davraLoading=true;
   $('#davraMore').style.display='none';
   const endpoint=davraFeedMode==='following'?'/api/davra/following-feed':'/api/davra/feed';
   const path=endpoint+'?limit=20'+(davraCursor?'&before='+encodeURIComponent(davraCursor):'');
+  // The loading hint above is a real child of #davraList (has to be, there's nowhere else to put
+  // visible feedback before any post exists) — it MUST come out before the empty-state check
+  // below, or its own presence as a phantom child permanently hides the real "hech narsa yo'q"
+  // message. Removed unconditionally on both success and failure; a no-op on a "load more" call
+  // (reset=false), since that one never added the hint in the first place.
+  const clearLoadingHint=()=>{const el=$('#davraLoadingHint');if(el)el.remove();};
   api(path).then(r=>{
+    clearLoadingHint();
     const items=r.items||[];
     if(items.length){
       $('#davraList').insertAdjacentHTML('beforeend',items.map(it=>davraPostHtml(it,false)).join(''));
@@ -1358,7 +1370,7 @@ function loadDavraFeed(reset){
         :'<span class="em">💬</span>Hali hech narsa yo\'q — birinchi bo\'lib kitob haqida yozing!';
     }
     $('#davraMore').style.display=davraDone?'none':'block';
-  }).catch(()=>{$('#davraEmpty').style.display=$('#davraList').children.length===0?'block':'none';}).finally(()=>{davraLoading=false;});
+  }).catch(()=>{clearLoadingHint();$('#davraEmpty').style.display=$('#davraList').children.length===0?'block':'none';}).finally(()=>{davraLoading=false;});
 }
 $('#davraMore').onclick=()=>loadDavraFeed(false);
 $('#davraFeedToggle').querySelectorAll('.tw').forEach(el=>el.onclick=()=>{
@@ -1903,6 +1915,12 @@ function renderReading(){
   const cur=$('#rrCurrent');
   if(!canAct()){
     cur.innerHTML='<p class="hint">Kuzatish uchun botni Telegram ichida oching</p>';
+  }else if(!HOME.continueLoaded){
+    // HOME.continueLoaded exists specifically to tell "still loading" apart from "genuinely
+    // nothing in progress" (see loadContinueReading) — this just wasn't checking it, so switching
+    // here before that fetch resolved showed the wrong message ("nothing in progress") for a
+    // moment, self-correcting only once the real data arrived a beat later.
+    cur.innerHTML='<p class="hint">Yuklanmoqda...</p>';
   }else if(!HOME.continue.length){
     cur.innerHTML='<p class="hint">Hozircha o\'qilayotgan kitob yo\'q — birortasini boshlang</p>';
   }else{
@@ -2418,6 +2436,7 @@ function subsHtml(tags){
 function openDetail(id){
   const b=byId[id];if(!b)return;haptic();
   const sh=$('#sheet'),c=$('#sheetc');sh.classList.add('open');tg?.BackButton?.show();
+  sh.dataset.bookId=b.i;
   const[c1,c2]=coverFor(b.i);const fav=favs.has(b.i);
   const pill=(l,v)=>v?`<span class="pill">${l} <b>${esc(v)}</b></span>`:'';
   const audLabel=(DB.audiences.find(a=>a.v===b.au)||{}).l;
@@ -2441,7 +2460,7 @@ function openDetail(id){
         <div class="sheetWantBtn" id="sheetWant"><span id="sheetWantIcon">+</span> Albatta, o'qiyman</div>
       </div>
       ${b.sm?`<div class="sec"><h3>Qisqacha</h3><p>${esc(b.sm)}</p></div>`:''}
-      ${b.d?`<div class="sec"><h3>Tavsif</h3><p>${esc(b.d)}</p></div>`:''}
+      <div class="sec" id="dFullDescSec" style="display:none"><h3>Tavsif</h3><p id="dFullDescText"></p></div>
       ${(b.s&&b.s.length)?`<div class="sec"><h3>Mavzular</h3><div class="subs" id="subsWrap">${subsHtml(b.s)}</div></div>`:''}
       <div class="sec" id="rSec"><div class="shead"><h3>Izohlar</h3><span class="see" id="rSeeAll" style="display:none">Barcha izohlar →</span></div><div id="rBody">Yuklanmoqda...</div></div>
       ${relatedShelf(b)}
@@ -2508,6 +2527,15 @@ function openDetail(id){
   };
   loadRating(b.i);
   loadBookExtras(b.i);
+  // Full description now lives outside books.json entirely (see export_data.py) — it was ~42% of
+  // that file's raw size for text nobody sees until they're on THIS exact screen, so it's fetched
+  // here instead, on demand. Guarded by both "sheet still open" and "still the same book" — a
+  // fast tap into a second book before this resolves must not paint the first book's text over it.
+  api('/api/books/'+encodeURIComponent(b.i)+'/description').then(r=>{
+    if(!r.d||!$('#sheet').classList.contains('open')||sh.dataset.bookId!==b.i)return;
+    const sec=$('#dFullDescSec'),txt=$('#dFullDescText');
+    if(sec&&txt){txt.textContent=r.d;sec.style.display='';}
+  }).catch(()=>{});
   c.scrollTop=0;
 }
 $('#sheetMenu').addEventListener('click',e=>{
