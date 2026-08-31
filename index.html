@@ -420,6 +420,14 @@
   .lrow{display:flex; align-items:center; gap:12px; padding:14px 4px; border-top:1px solid var(--line); cursor:pointer}
   .lrow:first-of-type{border-top:1px solid var(--line); margin-top:8px}
   .lrowIcon{font-size:20px; width:28px; text-align:center; flex-shrink:0}
+  /* Javon shelf-row cover collage — same 28px slot as .lrowIcon so it drops in without disturbing
+     row alignment, just a 2x2 mosaic of the shelf's own book covers instead of a flat folder
+     emoji every shelf shared identically. */
+  .lrowCollage{width:28px; height:28px; flex-shrink:0; display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; gap:1px; border-radius:7px; overflow:hidden; background:var(--line)}
+  .lrowCollageTile{position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center}
+  .lrowCollageTile img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover}
+  .lrowCollageIni{font-size:6.5px; font-weight:800; color:#fff; line-height:1}
+  .lrowCollageEmpty{background:var(--card)}
   .lrowBody{flex:1; min-width:0}
   .lrowT{font-size:14.5px; font-weight:700}
   .lrowN{font-size:12.5px; color:var(--muted); margin-top:2px}
@@ -2170,6 +2178,27 @@ function closeShelvesSheet(){
   shelvesPickBookId=null;
   shelvesViewUserId=null;
 }
+// A shelf's cover collage — up to 4 of its most-recently-added books' own covers, tiled 2x2,
+// instead of a flat folder emoji every shelf shared identically. Same base-layer-initials +
+// on-top-image-that-self-removes-on-error resilience pattern used for every other cover render
+// in the app (siHtml/shelfCardHtml/authorAvatarHtml) — a broken/missing cover image degrades to
+// the gradient+initials tile underneath, never a blank square.
+function shelfCollageTileHtml(id){
+  const b=byId[id];
+  if(!b)return'<span class="lrowCollageTile lrowCollageEmpty"></span>';
+  const[c1,c2]=coverFor(b.i);
+  return`<span class="lrowCollageTile" style="background:linear-gradient(135deg,${c1},${c2})"><span class="lrowCollageIni">${esc(initials(b.t))}</span>${b.hc?`<img src="covers/${encodeURIComponent(b.i)}.jpg" loading="lazy" onerror="this.remove()">`:''}</span>`;
+}
+function shelfCollageHtml(previewIds){
+  const ids=(previewIds||[]).slice(0,4);
+  if(!ids.length)return'<span class="lrowIcon">📚</span>'; // empty shelf — nothing to collage
+  const tiles=ids.map(shelfCollageTileHtml);
+  while(tiles.length<4)tiles.push('<span class="lrowCollageTile lrowCollageEmpty"></span>');
+  return`<span class="lrowCollage">${tiles.join('')}</span>`;
+}
+function shelfRowHtml(s){
+  return`<div class="lrow" data-shelf="${s.id}">${shelfCollageHtml(s.preview_ids)}<div class="lrowBody"><div class="lrowT">${esc(s.name)}</div><div class="lrowN">${s.count} ta kitob</div></div><span class="lrowChev">›</span></div>`;
+}
 async function loadShelvesList(){
   $('#shelvesTitle').textContent=shelvesPickBookId?'📚 Qaysi javonga qo\'shamiz?':'📚 Javon';
   const c=$('#shelvesSheetc');
@@ -2180,7 +2209,7 @@ async function loadShelvesList(){
     const path=shelvesViewUserId?`/api/users/${shelvesViewUserId}/shelves`:'/api/profile/shelves';
     const r=await api(path);
     const items=r.items||[];
-    const rows=items.map(s=>`<div class="lrow" data-shelf="${s.id}"><span class="lrowIcon">📚</span><div class="lrowBody"><div class="lrowT">${esc(s.name)}</div><div class="lrowN">${s.count} ta kitob</div></div><span class="lrowChev">›</span></div>`).join('');
+    const rows=items.map(shelfRowHtml).join('');
     const newBtn=shelvesViewUserId?'':`<button class="btn primary" id="shelfNewBtn" style="width:100%; margin-bottom:6px">+ Yangi javon</button>`;
     c.innerHTML=`${newBtn}${items.length?rows:`<p class="hint">Hali javon yo'q${shelvesViewUserId?'':' — birinchisini yarating'}</p>`}`;
     if(!shelvesViewUserId)$('#shelfNewBtn').onclick=()=>createShelfPrompt();
@@ -2192,14 +2221,24 @@ async function loadShelvesList(){
     });
   }catch(e){c.innerHTML='<p class="hint">Yuklab bo\'lmadi</p>';}
 }
+// Same field-edit modal every other single-value input in the app already uses (name/tahallus/
+// phone/email/bio) — this used to be the one bare window.prompt() left in the whole app, a
+// jarring native browser dialog that doesn't match anything else here.
 function createShelfPrompt(onDone){
   onDone=(typeof onDone==='function')?onDone:loadShelvesList;
-  const name=(window.prompt('Javon nomi:')||'').trim();
-  if(!name)return;
-  api('/api/profile/shelves',{method:'POST',body:JSON.stringify({name})}).then(()=>{
-    toast('✅ Javon yaratildi');
-    onDone();
-  }).catch(()=>toast('Xatolik yuz berdi'));
+  openFieldEdit({
+    icon:'📚', title:'Yangi javon', subtitle:'Javon uchun nom tanlang',
+    label:'Javon nomi', type:'text', value:'', placeholder:'Masalan: Sevimlilarim', maxLength:60,
+    onConfirm:v=>{
+      const name=v.trim();
+      if(!name)return;
+      closeFieldEdit();
+      api('/api/profile/shelves',{method:'POST',body:JSON.stringify({name})}).then(()=>{
+        toast('✅ Javon yaratildi');
+        onDone();
+      }).catch(()=>toast('Xatolik yuz berdi'));
+    },
+  });
 }
 function addBookToShelf(shelfId,shelfName){
   const bid=shelvesPickBookId;
@@ -3882,7 +3921,7 @@ function shelvesTabHtml(userId,containerId){
   const path=userId?`/api/users/${userId}/shelves`:'/api/profile/shelves';
   api(path).then(r=>{
     const items=r.items||[];
-    const rows=items.map(s=>`<div class="lrow" data-shelf="${s.id}"><span class="lrowIcon">📚</span><div class="lrowBody"><div class="lrowT">${esc(s.name)}</div><div class="lrowN">${s.count} ta kitob</div></div><span class="lrowChev">›</span></div>`).join('');
+    const rows=items.map(shelfRowHtml).join('');
     const newBtn=userId?'':`<button class="btn primary" id="${containerId}ShelfNewBtn" style="width:100%; margin-bottom:6px">+ Yangi javon</button>`;
     c.innerHTML=`${newBtn}${items.length?rows:`<p class="hint">Hali javon yo'q${userId?'':' — birinchisini yarating'}</p>`}`;
     if(!userId)$('#'+containerId+'ShelfNewBtn').onclick=()=>createShelfPrompt(()=>shelvesTabHtml(userId,containerId));
