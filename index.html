@@ -765,7 +765,7 @@
 <div class="wrap">
   <header>
     <div id="homeHeader">
-      <h1>📚 Kutubxona <a href="quran.html" id="btnQuran" style="float:right; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle">📖 Qur'on</a><a id="btnNotif" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer; position:relative">🔔<span id="notifDot" class="notifDot" style="display:none"></span></a><a id="btnTheme" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer">☀️</a><a id="btnSearchIcon" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer">🔍</a></h1>
+      <h1>📚 Kutubxona <a href="quran.html" id="btnQuran" style="float:right; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle">📖 Qur'on</a><a id="btnNotif" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer; position:relative"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span id="notifDot" class="notifDot" style="display:none"></span></a><a id="btnTheme" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer">☀️</a><a id="btnSearchIcon" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer">🔍</a></h1>
       <div class="liveHeaderRow"><a id="btnLive" class="liveBadge">📊 Statistika<span class="liveBadgeRight"><span class="liveDot"></span><span id="btnLiveN">–</span> onlayn</span></a></div>
     </div>
     <!-- Search's own header: an explicit back arrow (the thing that was missing — the only way
@@ -2925,10 +2925,10 @@ function renderProfileCard(){
     const bannerHtml=`<div class="pHeroBanner${hasBanner?'':' pHeroBannerBlank'}" id="pBannerArea">${bannerImg}</div>`;
     card.innerHTML=`<div class="pHero">
       ${bannerHtml}
-      <span id="pSettingsBtn" title="Sozlamalar">☰</span>
+      <span id="pSettingsBtn" title="Sozlamalar"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg></span>
       <div class="pHeroActionsRow">
-        <span class="pHeroEditBtn" id="pProfileCardBtn">✏️ Profilni tahrirlash</span>
-        <span class="pHeroShareBtn" id="pShareBtn" title="Ulashish">📤</span>
+        <span class="pHeroEditBtn" id="pProfileCardBtn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg> Profilni tahrirlash</span>
+        <span class="pHeroShareBtn" id="pShareBtn" title="Ulashish"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v14"/></svg></span>
       </div>
       <div class="pHeroTop">
         <div class="avWrap" style="width:${avSize}px;height:${avSize}px"><div class="avInitials" style="width:${avSize}px;height:${avSize}px;font-size:30px;background:linear-gradient(135deg,${c1},${c2})">${esc(initials(name))}</div>${img}</div>
@@ -3709,9 +3709,9 @@ function loadUserProfileHero(userId){
     const bannerHtml=`<div class="pHeroBanner${p.banner_version?'':' pHeroBannerBlank'}">${bannerImg}</div>`;
     $('#uProfileCard').innerHTML=`<div class="pHero">
       ${bannerHtml}
-      <span id="uBackBtn" title="Orqaga">←</span>
+      <span id="uBackBtn" title="Orqaga"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg></span>
       <div class="pHeroActionsRow">
-        <span class="pHeroShareBtn" id="uShareBtn" title="Ulashish">📤</span>
+        <span class="pHeroShareBtn" id="uShareBtn" title="Ulashish"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v14"/></svg></span>
       </div>
       <div class="pHeroTop">
         <div class="avWrap" style="width:${avSize}px;height:${avSize}px"><div class="avInitials" style="width:${avSize}px;height:${avSize}px;font-size:30px;background:linear-gradient(135deg,${c1},${c2})">${esc(initials(p.display_name||'?'))}</div>${img}</div>
