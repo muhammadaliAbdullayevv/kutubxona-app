@@ -736,6 +736,7 @@
      rendered at all when non-empty (see renderProfileCard/loadUserProfileHero) — a null bio adds
      no empty bordered box here. */
   .pHeroBio{font-size:13.5px; color:var(--text); line-height:1.4; padding:14px; white-space:pre-wrap; border-top:1px solid var(--line)}
+  .pHeroBioLabel{font-size:10.5px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); margin-bottom:5px}
   .flRow{display:flex; align-items:center; gap:10px; padding:10px 2px; cursor:pointer}
   .flRow .falias{font-size:14px; font-weight:700; color:var(--text)}
   /* ---- notifications (#notifSheet) ---- */
@@ -3269,11 +3270,11 @@ function renderProfileCard(){
           <div class="pHeroJoined" id="pHeroJoined">${fp?formatJoinedYear(fp.joined_date):''}</div>
         </div>
       </div>
+      ${p.bio?`<div class="pHeroBio"><div class="pHeroBioLabel">Tarjimai hol</div>${esc(p.bio)}</div>`:''}
       <div class="pFollowRow">
         <span class="pFollowStat" id="pFollowersStat"><b>${fp?fmtNum(fp.followers):'–'}</b><span>obunachi</span></span>
         <span class="pFollowStat" id="pFollowingStat"><b>${fp?fmtNum(fp.following):'–'}</b><span>obuna</span></span>
       </div>
-      ${p.bio?`<div class="pHeroBio">${esc(p.bio)}</div>`:''}
     </div>`;
     $('#pSettingsBtn').onclick=()=>openThemeMenu();
     $('#pProfileCard .avWrap').onclick=()=>openAvatarView({hasPhoto:!!p.avatar_version,url:avatarUrl(uid,p.avatar_version),initials:initials(name),c1,c2});
@@ -4131,11 +4132,11 @@ function loadUserProfileHero(userId){
         </div>
       </div>
       ${followBtn?`<div class="pHeroActions">${followBtn}</div>`:''}
+      ${p.bio?`<div class="pHeroBio"><div class="pHeroBioLabel">Tarjimai hol</div>${esc(p.bio)}</div>`:''}
       <div class="pFollowRow">
         <span class="pFollowStat" id="uFollowersStat"><b>${fmtNum(p.followers)}</b><span>obunachi</span></span>
         <span class="pFollowStat" id="uFollowingStat"><b>${fmtNum(p.following)}</b><span>obuna</span></span>
       </div>
-      ${p.bio?`<div class="pHeroBio">${esc(p.bio)}</div>`:''}
     </div>`;
     $('#uBackBtn').onclick=closeUserProfile;
     $('#uProfileCard .avWrap').onclick=()=>openAvatarView({hasPhoto:!!p.avatar_version,url:avatarUrl(userId,p.avatar_version),initials:initials(p.display_name||'?'),c1,c2});
