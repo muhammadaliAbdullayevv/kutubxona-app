@@ -4603,9 +4603,19 @@ function refreshCurrentView(){
     if(dy<-CANCEL_SLACK||window.scrollY>3){hidePtr();pulling=false;lastPull=0;startY=null;return;}
     if(dy<=0)return;
     pulling=true;
-    lastPull=Math.min(MAX_PULL,dy*0.5);
+    // Rubber-band resistance (exponential ease toward MAX_PULL) instead of a flat 1:1 drag that
+    // hit a rigid wall the instant dy*0.5 crossed MAX_PULL — pulling further now yields visibly
+    // diminishing distance, an elastic "soft" feel instead of a stiff ruler being dragged down.
+    // Mathematically approaches but never exceeds MAX_PULL, so no separate clamp is needed.
+    lastPull=MAX_PULL*(1-Math.exp(-dy/90));
+    // One full turn (0->360, i.e. back to upright) completes exactly BY the point the pull is far
+    // enough to arm a refresh (THRESHOLD), then holds upright for the rest of the pull range —
+    // it used to keep rotating at a fixed rate with no relationship to THRESHOLD/MAX_PULL, so
+    // reaching the limit could leave it stopped at any arbitrary tilted angle instead of facing
+    // right-side up.
+    const rot=Math.min(1,lastPull/THRESHOLD)*360;
     ptr.style.opacity=String(Math.min(1,lastPull/THRESHOLD));
-    ptr.style.transform=`translateY(${lastPull+40}px) rotate(${lastPull*2.4}deg)`;
+    ptr.style.transform=`translateY(${lastPull+40}px) rotate(${rot}deg)`;
   },{passive:true});
   document.addEventListener('touchend',()=>{
     if(!pulling){startY=null;return;}
