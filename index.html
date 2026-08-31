@@ -468,6 +468,10 @@
   .tourActions{display:flex; align-items:center; justify-content:space-between; gap:14px}
   .tourSkip{color:var(--muted); font-size:13px; font-weight:600; cursor:pointer; padding:8px 2px}
   .tourActions .btn{flex:0 0 auto; padding:11px 24px}
+  /* ---- avatar tap-to-enlarge (#avatarViewSheet) ---- */
+  .avImgLarge{width:min(75vw,300px); height:min(75vw,300px); border-radius:24px; object-fit:cover; box-shadow:0 8px 40px rgba(0,0,0,.4); background:var(--chip); display:block; animation:cardIn .22s ease}
+  .avInitialsLarge{display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800; font-size:64px}
+  @media (prefers-reduced-motion: reduce){.avImgLarge{animation:none!important}}
   .liveHead{text-align:center; padding:6px 0 24px}
   .liveClock{font-size:40px; font-weight:800; letter-spacing:.5px; font-variant-numeric:tabular-nums; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
     background:linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; background-clip:text; color:transparent}
@@ -631,7 +635,7 @@
   /* A plain border, not border+box-shadow — the two combined were rendering as an uneven arc
      (thick on one side, nearly gone on the other) instead of a uniform ring on real devices, not
      just a headless-testing artifact. A single border on a border-radius:50% box can't do that. */
-  .pHero .avWrap{position:absolute; left:14px; top:-42px; border-radius:50%; border:3px solid var(--accent); box-sizing:content-box; background:var(--card)}
+  .pHero .avWrap{position:absolute; left:14px; top:-42px; border-radius:50%; border:3px solid var(--accent); box-sizing:content-box; background:var(--card); cursor:pointer}
   .pHero .avImg{position:absolute; top:0; left:0; border-radius:50%; object-fit:cover}
   .pHero .avInitials{border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:800; color:#fff}
   .pHeroIdentity{flex:1; min-width:0}
@@ -935,6 +939,13 @@
     <div class="reshareMenuItem" id="tmDay"><span class="rmIcon">☀️</span><div><div class="rmTitle">Kunduzgi rejim</div><div class="rmSub">Yorug' interfeys</div></div></div>
     <div class="reshareMenuItem" id="tmNight"><span class="rmIcon">🌙</span><div><div class="rmTitle">Tungi rejim</div><div class="rmSub">Qorong'i interfeys</div></div></div>
   </div>
+</div>
+<!-- Tap-to-enlarge for a profile avatar (own or someone else's) — centered, not full-screen, and
+     rounded-square rather than circular: the small hero avatar is masked to a circle, which clips
+     the corners of the actual square photo, so this is also a more accurate look at the real
+     upload, not just a bigger version of the same crop. -->
+<div class="sheet" id="avatarViewSheet" style="z-index:60; align-items:center; justify-content:center">
+  <div id="avatarViewContent"></div>
 </div>
 <!-- First-run welcome tour — shown once ever (localStorage 'onboardTourSeen'), separate from
      .onboardBanner (the ongoing "complete your profile" nudge on the home screen, which can
@@ -2945,6 +2956,7 @@ function renderProfileCard(){
       ${p.bio?`<div class="pHeroBio">${esc(p.bio)}</div>`:''}
     </div>`;
     $('#pSettingsBtn').onclick=()=>openThemeMenu();
+    $('#pProfileCard .avWrap').onclick=()=>openAvatarView({hasPhoto:!!p.avatar_version,url:avatarUrl(uid,p.avatar_version),initials:initials(name),c1,c2});
     $('#pProfileCardBtn').onclick=()=>openProfileEdit();
     $('#pShareBtn').onclick=()=>shareProfile(uid,name);
     $('#pHeroSubBtn').onclick=()=>openProfileEdit();
@@ -3729,6 +3741,7 @@ function loadUserProfileHero(userId){
       ${p.bio?`<div class="pHeroBio">${esc(p.bio)}</div>`:''}
     </div>`;
     $('#uBackBtn').onclick=closeUserProfile;
+    $('#uProfileCard .avWrap').onclick=()=>openAvatarView({hasPhoto:!!p.avatar_version,url:avatarUrl(userId,p.avatar_version),initials:initials(p.display_name||'?'),c1,c2});
     $('#uShareBtn').onclick=()=>shareProfile(userId,p.display_name);
     $('#uFollowersStat').onclick=()=>openFollowList(userId,'followers');
     $('#uFollowingStat').onclick=()=>openFollowList(userId,'following');
@@ -4105,6 +4118,19 @@ $('#tourNext').onclick=()=>{haptic();if(tourIdx>=TOUR_SLIDES-1)closeOnboardTour(
 $('#tourSkip').onclick=()=>{haptic();closeOnboardTour();};
 $('#tourDots').querySelectorAll('span').forEach((el,idx)=>el.onclick=()=>{haptic();showTourSlide(idx);});
 $('#onboardTourSheet').onclick=e=>{if(e.target.id==='onboardTourSheet')closeOnboardTour();};
+// ---- avatar tap-to-enlarge (#avatarViewSheet) — same real photo if one's uploaded, otherwise a
+// bigger render of the same gradient+initials fallback (still "the profile photo", just not a
+// real one yet) rather than disabling the tap entirely for accounts with no avatar. ----
+function openAvatarView({hasPhoto,url,initials:ini,c1,c2}){
+  haptic();
+  $('#avatarViewContent').innerHTML=hasPhoto
+    ? `<img class="avImgLarge" src="${url}" onerror="this.parentElement.innerHTML='';">`
+    : `<div class="avImgLarge avInitialsLarge" style="background:linear-gradient(135deg,${c1},${c2})">${esc(ini)}</div>`;
+  $('#avatarViewSheet').classList.add('open');
+  tg?.BackButton?.show();
+}
+function closeAvatarView(){$('#avatarViewSheet').classList.remove('open');tg?.BackButton?.hide();}
+$('#avatarViewSheet').onclick=e=>{if(e.target.id==='avatarViewSheet')closeAvatarView();};
 $('#btnTheme').onclick=toggleThemeQuick;
 document.querySelectorAll('.viewThemeBtn').forEach(el=>el.onclick=toggleThemeQuick);
 
@@ -4124,7 +4150,7 @@ const SHEET_CLOSERS={
   reviewsSheet:closeReviewsSheet, profileEditSheet:closeProfileEdit, shelvesSheet:closeShelvesSheet,
   listSheet:closeListSheet, liveSheet:closeLiveSheet, sheet:closeSheet,
   userProfileSheet:closeUserProfile, followListSheet:closeFollowList, themeMenuSheet:closeThemeMenu,
-  onboardTourSheet:closeOnboardTour, notifSheet:closeNotifications,
+  onboardTourSheet:closeOnboardTour, notifSheet:closeNotifications, avatarViewSheet:closeAvatarView,
   // closeGlobe lives in the separate type="module" script below (Three.js globe) and only
   // becomes a real global once that deferred module finishes running — referencing it bare HERE
   // (evaluated immediately, before the module has loaded) throws ReferenceError. Wrapping it in
