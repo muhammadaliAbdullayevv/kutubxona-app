@@ -951,6 +951,21 @@
   <div class="reshareMenuCard">
     <div class="reshareMenuItem" id="tmDay"><span class="rmIcon">☀️</span><div><div class="rmTitle">Kunduzgi rejim</div><div class="rmSub">Yorug' interfeys</div></div></div>
     <div class="reshareMenuItem" id="tmNight"><span class="rmIcon">🌙</span><div><div class="rmTitle">Tungi rejim</div><div class="rmSub">Qorong'i interfeys</div></div></div>
+    <!-- Owner-only — hidden by default, shown by openThemeMenu() itself once window.__isOwner is
+         known (set from /api/profile/settings' own is_owner field, real enforcement happens
+         server-side on /api/admin/users regardless of whether this row is visible). -->
+    <div class="reshareMenuItem" id="tmUsers" style="display:none"><span class="rmIcon">👥</span><div><div class="rmTitle">Foydalanuvchilar</div><div class="rmSub">Barcha foydalanuvchilar ro'yxati</div></div></div>
+  </div>
+</div>
+<!-- Owner-only "all users" browser — same avatar+name row / tap-to-profile pattern as the
+     followers/following list (#followListSheet), just backed by /api/admin/users (paginated,
+     searchable) instead of the follow-graph endpoints. -->
+<div class="sheet" id="usersListSheet" style="z-index:53; align-items:stretch; background:var(--bg)">
+  <div class="stopbar"><div class="stopbarTitle">👥 Foydalanuvchilar</div><div class="gclose" id="usersListClose">✕</div></div>
+  <div style="padding:12px 18px 0"><input type="search" id="usersListSearch" placeholder="Ism yoki username bo'yicha qidirish..." style="width:100%; box-sizing:border-box; background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 12px; font:inherit; color:var(--text)"></div>
+  <div class="ssheetc">
+    <div id="usersListItems"></div>
+    <button class="more" id="usersListMore" style="display:none">Yana yuklash</button>
   </div>
 </div>
 <!-- Tap-to-enlarge for a profile avatar (own or someone else's) — centered, not full-screen, and
@@ -3026,6 +3041,7 @@ function renderProfileCard(){
     const p=settingsResult.value;
     const fp=profileResult.status==='fulfilled'?profileResult.value:null;
     myProfileCache=p;
+    window.__isOwner=!!p.is_owner;
     const name=p.display_name||'Foydalanuvchi';
     const sub=p.tahallus?('@'+p.tahallus):'Profilni to\'ldirish uchun bosing';
     const[c1,c2]=coverFor(String(uid||'u'));
@@ -4194,11 +4210,68 @@ function toggleThemeQuick(){
 // ---- explicit day/night picker (#themeMenuSheet) — reached from the ☰ button on the own-profile
 // banner, an alternative to the quick single-tap cycle above for the one place a deliberate choice
 // (not "flip to the other one") reads better. ----
-function openThemeMenu(){haptic();$('#themeMenuSheet').classList.add('open');tg?.BackButton?.show();}
+function openThemeMenu(){haptic();$('#tmUsers').style.display=window.__isOwner?'flex':'none';$('#themeMenuSheet').classList.add('open');tg?.BackButton?.show();}
 function closeThemeMenu(){$('#themeMenuSheet').classList.remove('open');tg?.BackButton?.hide();}
 $('#themeMenuSheet').onclick=e=>{if(e.target.id==='themeMenuSheet')closeThemeMenu();};
 $('#tmDay').onclick=()=>{haptic();setThemeMode('day');toast('☀️ Kunduzgi rejim');closeThemeMenu();};
 $('#tmNight').onclick=()=>{haptic();setThemeMode('night');toast('🌙 Tungi rejim');closeThemeMenu();};
+$('#tmUsers').onclick=()=>{closeThemeMenu();openUsersList();};
+// ---- owner-only "all users" browser (#usersListSheet) — same avatar+name row / tap-to-profile
+// pattern as the followers/following list, backed by /api/admin/users (paginated, searchable).
+// Real enforcement is server-side (403 for anyone but the owner); #tmUsers above just stays
+// hidden for everyone else so it's not a dead-end button. ----
+let usersListCursor=null,usersListDone=false,usersListLoading=false,usersListQuery='';
+function usersListRowHtml(u){
+  const flag=(u.blocked||u.stopped)?` <span style="color:var(--danger)">(${u.blocked?"bloklangan":"to'xtatgan"})</span>`:'';
+  const sub=u.username?`@${esc(u.username)}`:'';
+  return `<div class="flRow" data-user="${esc(u.user_id)}">${authorAvatarHtml(u.user_id,u.avatar_version,u.display_name,36)}<span class="falias">${esc(u.display_name)}${sub?' · '+sub:''}${flag}</span></div>`;
+}
+function loadUsersList(reset){
+  if(usersListLoading||(usersListDone&&!reset))return;
+  const items=$('#usersListItems');
+  // Same "loading hint must be explicitly removed before checking for an empty list" shape as
+  // loadDavraFeed — a leftover hint node silently blocks the real empty-state message from ever
+  // showing, since it counts as a phantom child.
+  if(reset){usersListCursor=null;usersListDone=false;items.innerHTML='<p class="hint" id="usersListLoadingHint">Yuklanmoqda...</p>';}
+  usersListLoading=true;
+  $('#usersListMore').style.display='none';
+  const params=new URLSearchParams({limit:'40'});
+  if(usersListCursor)params.set('before',usersListCursor);
+  if(usersListQuery)params.set('q',usersListQuery);
+  api('/api/admin/users?'+params.toString()).then(r=>{
+    const hint=$('#usersListLoadingHint');if(hint)hint.remove();
+    const rows=r.items||[];
+    if(rows.length){
+      items.insertAdjacentHTML('beforeend',rows.map(usersListRowHtml).join(''));
+      items.querySelectorAll('[data-user]:not([data-wired])').forEach(el=>{el.dataset.wired='1';el.onclick=()=>{closeUsersList();openUserProfile(el.dataset.user);};});
+      usersListCursor=rows[rows.length-1].user_id;
+    }
+    usersListDone=rows.length<40;
+    if(items.children.length===0)items.innerHTML='<p class="hint">Hech kim topilmadi</p>';
+    $('#usersListMore').style.display=usersListDone?'none':'block';
+  }).catch(()=>{
+    const hint=$('#usersListLoadingHint');if(hint)hint.remove();
+    if(items.children.length===0)items.innerHTML='<p class="hint">Yuklab bo\'lmadi</p>';
+  }).finally(()=>{usersListLoading=false;});
+}
+function openUsersList(){
+  haptic();
+  usersListQuery='';
+  $('#usersListSearch').value='';
+  $('#usersListSheet').classList.add('open');
+  tg?.BackButton?.show();
+  loadUsersList(true);
+}
+function closeUsersList(){$('#usersListSheet').classList.remove('open');tg?.BackButton?.hide();}
+$('#usersListClose').onclick=closeUsersList;
+$('#usersListSheet').onclick=e=>{if(e.target.id==='usersListSheet')closeUsersList();};
+$('#usersListMore').onclick=()=>loadUsersList(false);
+let _usersSearchDeb=null;
+$('#usersListSearch').oninput=e=>{
+  clearTimeout(_usersSearchDeb);
+  const val=e.target.value;
+  _usersSearchDeb=setTimeout(()=>{usersListQuery=val.trim();loadUsersList(true);},300);
+};
 // ---- first-run welcome tour (#onboardTourSheet) — button/dot navigation only, not a swipe
 // gesture: the app already has one carefully-tuned touch gesture (pull-to-refresh) and adding a
 // second, overlapping one for a one-time screen isn't worth the extra edge cases. ----
@@ -4249,6 +4322,7 @@ const SHEET_CLOSERS={
   listSheet:closeListSheet, liveSheet:closeLiveSheet, sheet:closeSheet,
   userProfileSheet:closeUserProfile, followListSheet:closeFollowList, themeMenuSheet:closeThemeMenu,
   onboardTourSheet:closeOnboardTour, notifSheet:closeNotifications, avatarViewSheet:closeAvatarView,
+  usersListSheet:closeUsersList,
   // closeGlobe lives in the separate type="module" script below (Three.js globe) and only
   // becomes a real global once that deferred module finishes running — referencing it bare HERE
   // (evaluated immediately, before the module has loaded) throws ReferenceError. Wrapping it in
