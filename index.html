@@ -798,18 +798,24 @@
   #ptr{position:fixed; top:0; left:50%; width:36px; height:36px; margin-left:-18px; margin-top:-40px;
     border-radius:50%; background:var(--card); border:1px solid var(--line); box-shadow:var(--shadow);
     display:flex; align-items:center; justify-content:center; font-size:16px; z-index:40; opacity:0;
-    transition:transform .15s, opacity .15s}
-  /* The app's own icon (same file as the PWA install icon, already shell-cached by sw.js) rather
-     than a generic spinner glyph — recognizable at a glance as "this app is working on it",
-     matching the ask that this loading moment read as the app's own identity, not a bare icon. */
-  #ptr img{width:20px; height:20px; border-radius:6px; display:block; pointer-events:none}
+    transition:none}
+  /* Only applied for the "settling" moments (canceled, released, or done refreshing) — NOT
+     during an active drag, where every touchmove tick sets a new transform/opacity and a
+     transition would make the icon visibly lag a beat behind the actual finger position instead
+     of tracking it 1:1. */
+  #ptr.ease{transition:transform .3s ease-out, opacity .3s ease-out}
+  /* The bot's own circular logo (ptr-logo.png, shell-cached by sw.js — see SHELL_FILES) rather
+     than a generic spinner glyph, so this loading moment reads as the app's own identity.
+     object-fit:cover + a matching border-radius crops the source image's own square corners
+     (transparent isn't needed) down to the same circle the logo already draws itself. */
+  #ptr img{width:22px; height:22px; border-radius:50%; object-fit:cover; display:block; pointer-events:none}
   #ptr.spin{animation:ptrspin .7s linear infinite}
   @keyframes ptrspin{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion: reduce){#ptr.spin{animation:none!important}}
 </style>
 </head>
 <body>
-<div id="ptr"><img src="icon-192.png" alt="" width="20" height="20"></div>
+<div id="ptr"><img src="ptr-logo.png" alt="" width="22" height="22"></div>
 <div class="wrap">
   <header>
     <div id="homeHeader">
@@ -4575,8 +4581,15 @@ function refreshCurrentView(){
 (function(){
   const ptr=$('#ptr');
   const THRESHOLD=70,MAX_PULL=110;
+  // How far the finger has to actually move BACK UP (past a real drift, not just per-frame touch
+  // jitter or a momentary native rubber-band overscroll tick nudging window.scrollY above 0 for a
+  // instant) before the gesture is treated as abandoned. Without this tolerance, a single noisy
+  // touch sample mid-pull would hard-reset the indicator to invisible immediately — reading as
+  // "it snaps back up halfway through the swipe" even though the finger never actually let go.
+  const CANCEL_SLACK=16;
   let startY=null,pulling=false,refreshing=false,lastPull=0;
   function sheetOpen(){return !!document.querySelector('.sheet.open');}
+  function hidePtr(){ptr.style.opacity='0';ptr.style.transform='';}
   document.addEventListener('touchstart',e=>{
     if(refreshing||sheetOpen()||window.scrollY>0){startY=null;return;}
     startY=e.touches[0].clientY;pulling=false;lastPull=0;
@@ -4584,7 +4597,11 @@ function refreshCurrentView(){
   document.addEventListener('touchmove',e=>{
     if(startY==null||refreshing)return;
     const dy=e.touches[0].clientY-startY;
-    if(dy<=0||window.scrollY>0){ptr.style.opacity='0';ptr.style.transform='';pulling=false;lastPull=0;return;}
+    // A real scroll (not just overscroll bounce noise) or the finger genuinely retreating back
+    // toward/past the start point is what actually ends the gesture — a tiny negative dip within
+    // CANCEL_SLACK just holds at whatever was last drawn instead of collapsing it.
+    if(dy<-CANCEL_SLACK||window.scrollY>3){hidePtr();pulling=false;lastPull=0;startY=null;return;}
+    if(dy<=0)return;
     pulling=true;
     lastPull=Math.min(MAX_PULL,dy*0.5);
     ptr.style.opacity=String(Math.min(1,lastPull/THRESHOLD));
@@ -4597,12 +4614,18 @@ function refreshCurrentView(){
     if(pulled>=THRESHOLD){
       refreshing=true;haptic('medium');
       ptr.classList.add('spin');ptr.style.opacity='1';ptr.style.transform='translateY(50px)';
-      const minSpin=new Promise(res=>setTimeout(res,500));
+      // Held for a real, deliberate beat once a refresh has actually been triggered — 500ms
+      // barely registered as "it did something" before immediately retracting.
+      const minSpin=new Promise(res=>setTimeout(res,750));
       Promise.allSettled([Promise.resolve(refreshCurrentView()),minSpin]).finally(()=>{
-        refreshing=false;ptr.classList.remove('spin');ptr.style.opacity='0';ptr.style.transform='';
+        refreshing=false;ptr.classList.remove('spin');hidePtr();
       });
     }else{
-      ptr.style.opacity='0';ptr.style.transform='';
+      // Released short of the threshold — a brief pause before it eases away (the CSS transition
+      // on #ptr itself, bumped to .3s below, does the actual "eases away" part) instead of
+      // vanishing the instant the finger lifts, which read as far too abrupt for a gesture the
+      // user very deliberately just performed.
+      setTimeout(hidePtr,150);
     }
   },{passive:true});
 })();
