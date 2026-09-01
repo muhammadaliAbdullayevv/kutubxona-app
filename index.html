@@ -816,6 +816,13 @@
   .certActionBtn.download{background:rgba(255,255,255,.25); color:#0c2116; border:1px solid rgba(255,255,255,.35)}
   .certActionBtn:active{transform:scale(.97)}
   .certLongPressHint{margin:12px 18px 22px; color:rgba(12,33,22,.6); font-weight:600}
+  /* Per-book completion diploma badge — injected only onto cards in the "Mutolaa qilingan
+     kitoblar" list for books that actually have one (see $('#rrCompleted').onclick), not part of
+     cardHtml() itself since every other place that card renders (search, shelves, ...) has no
+     concept of "did I finish this and earn a certificate for it". */
+  .cardCertBadge{display:flex; align-items:center; gap:4px; align-self:flex-start; margin-top:2px;
+    background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; font-size:10.5px; font-weight:800;
+    padding:4px 8px; border-radius:999px; cursor:pointer}
   .rrow{padding:10px 0; border-top:1px solid var(--line)}
   .rrow:first-child{border-top:0}
   .rrow .rstars{color:#ffb100; font-size:13px}
@@ -2183,7 +2190,7 @@ function renderReading(){
   if(canAct())loadReadingRoomExtras();
   else{$('#rrWantsN').textContent='—';$('#rrCompletedN').textContent='—';$('#rrShelvesN').textContent='—';}
 }
-let RR={wants:null,completed:null,shelvesCount:null};
+let RR={wants:null,completed:null,shelvesCount:null,bookCerts:null};
 async function loadReadingRoomExtras(){
   try{
     const r=await api('/api/profile/wants');
@@ -2216,7 +2223,25 @@ $('#rrCompleted').onclick=async()=>{
   if(!canAct()){toast('Botni Telegram ichida oching');return;}
   haptic();
   if(RR.completed==null){try{const r=await api('/api/profile/completed');RR.completed=r.items||[];}catch(e){RR.completed=[];}}
+  if(RR.bookCerts==null){
+    try{const r=await api('/api/users/'+encodeURIComponent(myUid())+'/book-certificates');RR.bookCerts=r.items||[];}
+    catch(e){RR.bookCerts=[];}
+  }
   openListSheet('🏁 Mutolaa qilingan kitoblar',RR.completed.map(it=>byId[it.id]).filter(Boolean),'plain');
+  // Post-render injection (not part of cardHtml itself — see the .cardCertBadge CSS comment):
+  // a small tappable diploma badge on each card that actually has a completion certificate.
+  const certByBook=new Map(RR.bookCerts.map(c=>[c.book_id,c]));
+  $('#listSheetc').querySelectorAll('.book').forEach(el=>{
+    const cert=certByBook.get(el.dataset.id);
+    if(!cert)return;
+    const meta=el.querySelector('.meta');
+    if(!meta)return;
+    const badge=document.createElement('span');
+    badge.className='cardCertBadge';
+    badge.textContent='🎓 Sertifikat';
+    badge.onclick=e=>{e.stopPropagation();openBookCertDetail(myUid(),cert,RR.bookCerts);};
+    meta.appendChild(badge);
+  });
 };
 $('#rrFav').onclick=()=>{
   haptic();
@@ -4171,6 +4196,73 @@ async function downloadCertificate(userId,cert){
   btn.disabled=true;btn.textContent='Tayyorlanmoqda...';
   try{
     const resp=await fetch(certImageUrl(userId,cert.code));
+    if(!resp.ok)throw new Error('fetch failed');
+    const blob=await resp.blob();
+    const blobUrl=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=blobUrl;a.download='sertifikat.png';
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(blobUrl),4000);
+  }catch(e){
+    toast('Yuklab bo\'lmadi — rasmni uzoq bosib saqlang');
+  }finally{
+    btn.disabled=false;btn.textContent=label;
+  }
+}
+// ---- Per-book completion diploma — reuses #certDetailSheet's whole shell (radiating
+// background, hanging-image treatment, stat row, share/download) since the visual language is
+// identical to the milestone certificates above; only the data and image URL differ, so this
+// gets its own small set of functions rather than threading book-vs-milestone branches through
+// the existing ones. ----
+function bookCertImageUrl(userId,bookId){
+  return COMMUNITY_API_BASE+'/api/users/'+encodeURIComponent(userId)+'/book-certificates/'+encodeURIComponent(bookId)+'/image';
+}
+function openBookCertDetail(userId,cert,allBookCerts){
+  haptic();
+  $('#certDetailImg').src=bookCertImageUrl(userId,cert.book_id);
+  $('#certDetailDesc').textContent=`"${cert.title}" — ${cert.author||'Noma\'lum muallif'}`;
+  $('#certStatCount').textContent=fmtNum((allBookCerts||[]).length);
+  $('#certStatDate').textContent=cert.earned_at
+    ?new Date(cert.earned_at).toLocaleDateString('uz-UZ',{day:'numeric',month:'short',year:'numeric'})
+    :'—';
+  $('#certDetailSheet').classList.add('open');
+  tg?.BackButton?.show();
+  $('#certShareBtn').onclick=()=>shareBookCertificate(userId,cert);
+  $('#certDownloadBtn').onclick=()=>downloadBookCertificate(userId,cert);
+}
+async function shareBookCertificate(userId,cert){
+  haptic('medium');
+  const btn=$('#certShareBtn');
+  const label=btn.textContent;
+  btn.disabled=true;btn.textContent='Tayyorlanmoqda...';
+  try{
+    const resp=await fetch(bookCertImageUrl(userId,cert.book_id));
+    if(!resp.ok)throw new Error('fetch failed');
+    const blob=await resp.blob();
+    const file=new File([blob],'sertifikat.png',{type:'image/png'});
+    const text=`🎓 "${cert.title}" kitobini tugatib, sertifikat oldim! — Kutubxona`;
+    if(navigator.canShare&&navigator.canShare({files:[file]})){
+      await navigator.share({files:[file],title:cert.title,text});
+    }else{
+      const blobUrl=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=blobUrl;a.download='sertifikat.png';
+      document.body.appendChild(a);a.click();a.remove();
+      setTimeout(()=>URL.revokeObjectURL(blobUrl),4000);
+    }
+  }catch(e){
+    if(e&&e.name!=='AbortError')toast('Ulashib bo\'lmadi — rasmni uzoq bosib saqlang');
+  }finally{
+    btn.disabled=false;btn.textContent=label;
+  }
+}
+async function downloadBookCertificate(userId,cert){
+  haptic('medium');
+  const btn=$('#certDownloadBtn');
+  const label=btn.textContent;
+  btn.disabled=true;btn.textContent='Tayyorlanmoqda...';
+  try{
+    const resp=await fetch(bookCertImageUrl(userId,cert.book_id));
     if(!resp.ok)throw new Error('fetch failed');
     const blob=await resp.blob();
     const blobUrl=URL.createObjectURL(blob);
