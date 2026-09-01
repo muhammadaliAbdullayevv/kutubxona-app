@@ -757,6 +757,17 @@
   .quoteCard .qHead{display:flex; align-items:center; gap:6px; font-size:11.5px; font-weight:800; color:var(--accent); text-transform:uppercase; letter-spacing:.3px; margin-bottom:10px}
   .quoteCard .qText{font-size:15px; font-style:italic; line-height:1.5; color:var(--text)}
   .quoteCard .qMeta{font-size:12.5px; color:var(--muted); margin-top:10px; font-weight:700}
+  /* Push-notification opt-out row, top of #notifSheetc — see openNotifications(). A small,
+     reusable on/off switch (no such component existed before this) rather than a second tap-to-
+     cycle row style, since a persistent setting reads more clearly as a real switch. */
+  .notifPushRow{display:flex; align-items:center; justify-content:space-between; gap:12px; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px 14px; margin-bottom:16px}
+  .notifPushText{display:flex; flex-direction:column; gap:2px}
+  .notifPushText b{font-size:13.5px}
+  .notifPushText span{font-size:11.5px; color:var(--muted); font-weight:500}
+  .tglSwitch{position:relative; width:44px; height:26px; border-radius:999px; background:var(--line); flex-shrink:0; cursor:pointer; transition:background .2s}
+  .tglSwitch.on{background:linear-gradient(135deg,var(--accent),var(--accent2))}
+  .tglKnob{position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:#fff; transition:left .2s; box-shadow:0 1px 3px rgba(0,0,0,.3)}
+  .tglSwitch.on .tglKnob{left:21px}
   /* ---- Profil screen tabs: Javonlar / Yutuqlar / Sertifikatlar ---- */
   .ptabs{display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; margin:18px 0 4px; border-bottom:1px solid var(--line)}
   .ptabs::-webkit-scrollbar{display:none}
@@ -4431,6 +4442,25 @@ function quoteCardHtml(q){
     <div class="qMeta">${speaker}${esc(q.book_title||'')}${q.author?', '+esc(q.author):''}</div>
   </div>`;
 }
+function pushToggleHtml(enabled){
+  return `<div class="notifPushRow">
+    <div class="notifPushText"><b>🔔 Push xabarlar</b><span>Yangi obunachi va javoblar uchun Telegram xabari</span></div>
+    <span class="tglSwitch${enabled?' on':''}" id="pushToggle"><span class="tglKnob"></span></span>
+  </div>`;
+}
+function wirePushToggle(){
+  const el=$('#pushToggle');
+  if(!el)return;
+  el.onclick=()=>{
+    haptic();
+    const next=!el.classList.contains('on');
+    el.classList.toggle('on',next); // optimistic — flips immediately, reverts only on a real failure
+    api('/api/profile/push-settings',{method:'POST',body:JSON.stringify({enabled:next})}).catch(()=>{
+      el.classList.toggle('on',!next);
+      toast('Saqlanmadi, qaytadan urinib ko\'ring');
+    });
+  };
+}
 function openNotifications(){
   haptic();
   const c=$('#notifSheetc');
@@ -4441,9 +4471,11 @@ function openNotifications(){
   Promise.all([
     api('/api/notifications/quote').catch(()=>({quote:null})),
     api('/api/notifications').catch(()=>({items:[]})),
-  ]).then(([qr,nr])=>{
+    api('/api/profile/push-settings').catch(()=>({enabled:true})),
+  ]).then(([qr,nr,pr])=>{
     const items=nr.items||[];
-    c.innerHTML=quoteCardHtml(qr.quote)+(items.length?items.map(notifRowHtml).join(''):'<p class="hint">Hozircha bildirishnoma yo\'q</p>');
+    c.innerHTML=pushToggleHtml(pr.enabled!==false)+quoteCardHtml(qr.quote)+(items.length?items.map(notifRowHtml).join(''):'<p class="hint">Hozircha bildirishnoma yo\'q</p>');
+    wirePushToggle();
     const qc=$('#notifQuoteCard');
     if(qc)qc.onclick=()=>{const b=byId[qc.dataset.book];closeNotifications();if(b)openDetail(b.i);};
     c.querySelectorAll('[data-type]').forEach(el=>el.onclick=()=>{
