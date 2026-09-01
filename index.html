@@ -1419,7 +1419,12 @@ function liveTickClock(){
   const d=new Date(),p=(n,w=2)=>String(n).padStart(w,'0');
   el.textContent=`${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}.${p(d.getMilliseconds(),3)}`;
 }
-function fmtAgo(tsSec){
+// Named distinctly from fmtAgo(iso) below (Davra/notifications' ISO-string variant) — they used
+// to share the name "fmtAgo", and since the later function declaration silently wins for every
+// call site in JS, the live feed's raw-seconds timestamps were being fed through the ISO parser:
+// new Date(rawSecondsNumber) reads that number as MILLISECONDS, landing in January 1970, so every
+// live-feed row showed a nonsense decades-old date instead of "5 daqiqa oldin".
+function fmtAgoTs(tsSec){
   const s=Math.max(0,Math.round(Date.now()/1000-tsSec));
   if(s<5)return 'hozir';
   if(s<60)return s+' soniya oldin';
@@ -1436,7 +1441,7 @@ function renderLiveFeed(events){
   if(!events||!events.length){box.innerHTML='<div class="lfEmpty">Hali faollik yo\'q</div>';return;}
   box.innerHTML=events.map(e=>{
     const[icon,label]=LIVE_EVENT_LABELS[e.type]||['👤','harakat qildi'];
-    return `<div class="lfRow"><span class="lfIcon">${icon}</span><span class="lfText"><b>${esc(e.name||'Reader')}</b> ${label}</span><span class="lfTime">${fmtAgo(e.ts)}</span></div>`;
+    return `<div class="lfRow"><span class="lfIcon">${icon}</span><span class="lfText"><b>${esc(e.name||'Reader')}</b> ${label}</span><span class="lfTime">${fmtAgoTs(e.ts)}</span></div>`;
   }).join('');
 }
 function liveRefreshAdminFeed(){
