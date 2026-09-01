@@ -1908,7 +1908,12 @@ $('#dtReplySend').onclick=()=>{
     loadDavraThread(davraFocusedPostId);
   }).catch(()=>toast('Xatolik yuz berdi')).finally(()=>{btn.disabled=false;});
 };
-const COVERS=[['#c17a3d','#8c4a24'],['#a8452f','#6b2418'],['#4a6b4a','#2d4530'],['#c99a2e','#8a5c16'],['#5a4a6b','#382d45'],['#8a3a4a','#5c2530'],['#3a6b6b','#254545'],['#b06a2a','#6b3816'],['#6b5a3a','#453825']];
+// Tonal sweep through the app's own accent hue family (blue #5b8cff -> purple #8a5cf6 -> violet),
+// not a hue-hopping rainbow — replaces an earlier palette that was entirely warm/earthy tones
+// (terracotta, olive, maroon...) with zero actual brand color in it. Keeps the real benefit of a
+// hashed palette (a shelf full of no-cover books still reads as visually distinct book-to-book)
+// while every card reinforces the same identity instead of fighting it.
+const COVERS=[['#2170ca','#133f72'],['#1d52cd','#112e74'],['#2334c7','#141d71'],['#3526c5','#1e156f'],['#5421ca','#2f1372'],['#7029c2','#3f176d'],['#882fbc','#4d1b6a'],['#4b41aa','#2a2460']];
 function coverFor(id){let h=0;const s=String(id||'');for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;return COVERS[h%COVERS.length];}
 function initials(t){return String(t||'?').replace(/[^\p{L}\p{N} ]/gu,'').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'📖';}
 function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
@@ -2472,8 +2477,10 @@ async function loadContinueReading(){
 // lives one tap away in the Mutolaaxonam tab) so the same top item isn't shown twice in a row.
 function heroHtml(item){
   const b=item.book,pct=item.percent==null?0:item.percent;
-  const[c1,c2]=coverFor(b.i);
-  return `<div class="hero" style="background:linear-gradient(135deg,${c1},${c2})" data-id="${esc(b.i)}">
+  // Fixed brand gradient, not coverFor()'s hashed palette — this is the single most prominent
+  // element on the home screen, shown fresh every visit; whichever book happens to be in
+  // progress shouldn't decide whether it looks like a deliberate design choice or a coin-flip.
+  return `<div class="hero" style="background:linear-gradient(135deg,var(--accent),var(--accent2))" data-id="${esc(b.i)}">
     <div class="heroCover">${b.hc?`<img class="ci" src="covers/${encodeURIComponent(b.i)}.jpg" loading="lazy" onerror="this.remove()">`:''}<span class="ini">${esc(initials(b.t))}</span></div>
     <div class="heroInfo">
       <div class="heroTitle">${esc(b.t)}</div>
@@ -2504,8 +2511,7 @@ function heroStatsHtml(b){
   return b.rc?`<span>⭐ ${b.rt} (${b.rc})</span>`:'';
 }
 function heroStartHtml(b){
-  const[c1,c2]=coverFor(b.i);
-  return `<div class="hero" style="background:linear-gradient(135deg,${c1},${c2})" data-id="${esc(b.i)}">
+  return `<div class="hero" style="background:linear-gradient(135deg,var(--accent),var(--accent2))" data-id="${esc(b.i)}">
     <div class="heroCover">${b.hc?`<img class="ci" src="covers/${encodeURIComponent(b.i)}.jpg" loading="lazy" onerror="this.remove()">`:''}<span class="ini">${esc(initials(b.t))}</span></div>
     <div class="heroInfo">
       <div class="heroTitle">${esc(b.t)}</div>
