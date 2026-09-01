@@ -52,7 +52,10 @@
      look reasonably sized on one phone and comically oversized (with everything padded around
      that inflated text growing to match) on another, despite identical CSS. Locking this to 100%
      makes every size in this file the actual rendered size, consistently, everywhere. */
-  html{-webkit-text-size-adjust:100%; text-size-adjust:100%}
+  /* Reserves the scrollbar's gutter permanently so its appearance/disappearance (e.g. the home
+     skeleton→real-content swap changing page height mid-load) never changes usable width — the
+     exact mechanism that used to nudge #bottomNav (position:fixed; left:0; right:0) sideways. */
+  html{-webkit-text-size-adjust:100%; text-size-adjust:100%; scrollbar-gutter:stable}
   html,body{margin:0; padding:0}
   body{background:var(--bg); color:var(--text); font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;
     padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom); overscroll-behavior-y:none;
@@ -4815,6 +4818,13 @@ function hideSplash(){
   const wait=Math.max(0,350-(performance.now()-_bootSplashShownAt));
   setTimeout(()=>{
     el.classList.add('hide');
+    // #home was set visibility:hidden the moment its skeleton went in (see boot()) so the
+    // skeleton→real-content swap behind the splash is genuinely unpainted, not just visually
+    // covered — a real-device CLS trace showed that swap scoring layout-shift even while fully
+    // hidden under the opaque splash, since the Layout Instability API only exempts unpainted
+    // content, not merely occluded content. Reveal now, in the same frame the splash starts
+    // fading, so #home's first-ever paint is already its final settled content.
+    $('#home').style.visibility='';
     setTimeout(()=>el.remove(),450); // past the .4s CSS opacity transition, then it's dead weight
   },wait);
 }
@@ -4886,6 +4896,9 @@ async function boot(){
   // sections a given catalog/user has), but it gets the FIRST paint in the right ballpark instead
   // of ~2 shelves' worth short, which is what CLS actually measures — closer, not pixel-perfect.
   $('#home').style.display='block';
+  // Genuinely unpainted (not just covered by the splash) until hideSplash() reveals it below —
+  // see that function for why this matters for the CLS score, not just what's visually seen.
+  $('#home').style.visibility='hidden';
   $('#home').innerHTML=heroSkeletonHtml()+skeletonShelf()+skeletonShelf()+skeletonShelf()+skeletonShelf();
   $('.bar').style.display='none';
   const _rumBooksJsonStart=performance.now();
