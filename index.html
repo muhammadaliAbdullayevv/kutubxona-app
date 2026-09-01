@@ -786,6 +786,36 @@
   .certProg{height:5px; border-radius:3px; background:var(--line); margin-top:8px; overflow:hidden}
   .certProgBar{height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2)); border-radius:3px}
   .certProgText{font-size:11px; color:var(--muted); margin-top:3px}
+  /* Certificate detail — a deliberate one-off "diploma moment" that breaks from the app's normal
+     chrome entirely (own background, own button colors), the same way onboardTourSheet already
+     does for the welcome tour. Radiating green backdrop: a solid radial base plus a slowly
+     rotating repeating-conic-gradient ray layer on top — self-authored (no reference asset), kept
+     slow (90s/turn) and reduced-motion-aware so it reads as a gentle shimmer, not a spinner. */
+  #certDetailSheet{background:radial-gradient(circle at 50% 15%, #35d488 0%, #12b467 42%, #099254 100%); overflow:hidden}
+  #certDetailSheet .gclose{background:rgba(0,0,0,.22); border-color:rgba(255,255,255,.25); color:#fff}
+  .certRays{position:absolute; inset:-60% -20%; z-index:0; pointer-events:none;
+    background:repeating-conic-gradient(from 0deg, rgba(255,255,255,.09) 0deg 7deg, transparent 7deg 16deg);
+    animation:certRaysSpin 90s linear infinite}
+  @keyframes certRaysSpin{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.certRays{animation:none}}
+  .certCelebrateContent{position:relative; z-index:1; text-align:center; padding-top:14px}
+  .certHangWrap{position:relative; max-width:380px; margin:34px auto 0}
+  .certPin{position:absolute; top:-5px; left:50%; transform:translateX(-50%); width:9px; height:9px; border-radius:50%; background:#182018; box-shadow:0 1px 3px rgba(0,0,0,.4); z-index:2}
+  .certString{position:absolute; top:0; left:0; width:100%; height:64px; z-index:1}
+  .certHangImg{position:relative; z-index:1; display:block; width:100%; border-radius:8px; margin-top:56px;
+    box-shadow:0 20px 34px rgba(0,0,0,.35); transform:rotate(-0.7deg); background:#fff}
+  .certCongratsTitle{font-size:27px; font-weight:900; color:#0c2116; margin:26px 18px 0}
+  .certCongratsDesc{font-size:14.5px; line-height:1.5; color:rgba(12,33,22,.72); font-weight:600; margin:10px 26px 0}
+  .certStatRow{display:flex; gap:10px; margin:22px 18px 0}
+  .certStat{flex:1; background:rgba(255,255,255,.28); border:1px solid rgba(255,255,255,.35); border-radius:16px; padding:14px 12px; text-align:left}
+  .certStatLabel{font-size:12px; font-weight:700; color:rgba(12,33,22,.65)}
+  .certStatValue{font-size:22px; font-weight:900; color:#0c2116; margin-top:4px; font-variant-numeric:tabular-nums}
+  .certActionCol{display:flex; flex-direction:column; gap:10px; margin:24px 18px 0}
+  .certActionBtn{border:0; border-radius:16px; padding:15px; font-weight:800; font-size:15.5px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px}
+  .certActionBtn.share{background:#ff6a3d; color:#fff; box-shadow:0 10px 22px rgba(255,106,61,.4)}
+  .certActionBtn.download{background:rgba(255,255,255,.25); color:#0c2116; border:1px solid rgba(255,255,255,.35)}
+  .certActionBtn:active{transform:scale(.97)}
+  .certLongPressHint{margin:12px 18px 22px; color:rgba(12,33,22,.6); font-weight:600}
   .rrow{padding:10px 0; border-top:1px solid var(--line)}
   .rrow:first-child{border-top:0}
   .rrow .rstars{color:#ffb100; font-size:13px}
@@ -1066,12 +1096,26 @@
 <!-- Certificate detail — a real server-rendered "diploma" PNG (/api/users/{id}/certificates/{code}/image,
      Pillow-drawn), shown large, with a share/download button. The image itself IS the design —
      no separate HTML rendition to keep in sync with it. -->
-<div class="sheet" id="certDetailSheet" style="z-index:57; align-items:stretch; background:var(--bg)">
-  <div class="stopbar"><div class="gclose" id="certDetailClose">✕</div><div class="stopbarTitle">🎓 Sertifikat</div></div>
-  <div class="ssheetc" style="text-align:center">
-    <img id="certDetailImg" style="width:100%; max-width:420px; border-radius:16px; box-shadow:var(--shadow)" alt="Sertifikat">
-    <button class="btn primary" id="certShareBtn" style="width:100%; max-width:420px; margin-top:18px">📤 Ulashish</button>
-    <p class="hint" style="margin-top:10px">Rasmni saqlash uchun uzoq bosib turing</p>
+<div class="sheet" id="certDetailSheet" style="z-index:57; align-items:stretch">
+  <div class="certRays"></div>
+  <div class="gclose" id="certDetailClose">‹</div>
+  <div class="ssheetc certCelebrateContent">
+    <div class="certHangWrap">
+      <div class="certPin"></div>
+      <svg class="certString" viewBox="0 0 300 64" preserveAspectRatio="none"><path d="M4 0 L150 58 L296 0" stroke="#182018" stroke-width="2" fill="none"/></svg>
+      <img id="certDetailImg" class="certHangImg" alt="Sertifikat">
+    </div>
+    <h2 class="certCongratsTitle">Tabriklaymiz!</h2>
+    <p class="certCongratsDesc" id="certDetailDesc"></p>
+    <div class="certStatRow">
+      <div class="certStat"><div class="certStatLabel">Erishilgan sertifikatlar</div><div class="certStatValue" id="certStatCount">–</div></div>
+      <div class="certStat"><div class="certStatLabel">Erishilgan sana</div><div class="certStatValue" id="certStatDate">–</div></div>
+    </div>
+    <div class="certActionCol">
+      <button class="certActionBtn share" id="certShareBtn">📤 Ulashish</button>
+      <button class="certActionBtn download" id="certDownloadBtn">⬇️ Sertifikatni yuklab olish</button>
+    </div>
+    <p class="certLongPressHint">Rasmni saqlash uchun uzoq bosib turing</p>
   </div>
 </div>
 <!-- Tap-to-enlarge for a profile avatar (own or someone else's) — centered, not full-screen, and
@@ -4040,7 +4084,7 @@ function certificatesTabHtml(userId,containerId){
     }).join('')}</div>`;
     c.querySelectorAll('[data-cert]').forEach(el=>{
       const cert=items.find(x=>x.code===el.dataset.cert);
-      if(cert)el.onclick=()=>openCertDetail(effectiveUserId,cert);
+      if(cert)el.onclick=()=>openCertDetail(effectiveUserId,cert,items);
     });
     // Celebrate newly-earned certificates the same way checkMilestones already does for badges
     // — but only on the SELF view (userId falsy): a third party opening someone else's profile
@@ -4071,12 +4115,20 @@ function certificatesTabHtml(userId,containerId){
 function certImageUrl(userId,code){
   return COMMUNITY_API_BASE+'/api/users/'+encodeURIComponent(userId)+'/certificates/'+encodeURIComponent(code)+'/image';
 }
-function openCertDetail(userId,cert){
+function openCertDetail(userId,cert,allItems){
   haptic();
   $('#certDetailImg').src=certImageUrl(userId,cert.code);
+  $('#certDetailDesc').textContent=cert.description||'';
+  $('#certStatDate').textContent=cert.earned_at
+    ?new Date(cert.earned_at).toLocaleDateString('uz-UZ',{day:'numeric',month:'short',year:'numeric'})
+    :'—';
+  const total=(allItems||[]).length;
+  const achievedCount=(allItems||[]).filter(x=>x.achieved).length;
+  $('#certStatCount').textContent=total?`${achievedCount} / ${total}`:'—';
   $('#certDetailSheet').classList.add('open');
   tg?.BackButton?.show();
   $('#certShareBtn').onclick=()=>shareCertificate(userId,cert);
+  $('#certDownloadBtn').onclick=()=>downloadCertificate(userId,cert);
 }
 function closeCertDetail(){$('#certDetailSheet').classList.remove('open');tg?.BackButton?.hide();}
 $('#certDetailClose').onclick=closeCertDetail;
@@ -4104,6 +4156,30 @@ async function shareCertificate(userId,cert){
   }catch(e){
     // AbortError means the user just closed the native share sheet — not a real failure.
     if(e&&e.name!=='AbortError')toast('Ulashib bo\'lmadi — rasmni uzoq bosib saqlang');
+  }finally{
+    btn.disabled=false;btn.textContent=label;
+  }
+}
+// Explicit "just save it" button, separate from Ulashish — the share button's own fallback
+// already does this same synthetic-download dance when navigator.share isn't available, but
+// someone who wants to save the file has no reason to try the (possibly absent) native share
+// sheet first and wait on it.
+async function downloadCertificate(userId,cert){
+  haptic('medium');
+  const btn=$('#certDownloadBtn');
+  const label=btn.textContent;
+  btn.disabled=true;btn.textContent='Tayyorlanmoqda...';
+  try{
+    const resp=await fetch(certImageUrl(userId,cert.code));
+    if(!resp.ok)throw new Error('fetch failed');
+    const blob=await resp.blob();
+    const blobUrl=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=blobUrl;a.download='sertifikat.png';
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(blobUrl),4000);
+  }catch(e){
+    toast('Yuklab bo\'lmadi — rasmni uzoq bosib saqlang');
   }finally{
     btn.disabled=false;btn.textContent=label;
   }
