@@ -250,6 +250,12 @@
   .btn{flex:1; border:0; border-radius:13px; padding:14px; font-weight:800; font-size:15px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:7px}
   .btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff}
   .btn.ghost{flex:0 0 auto; width:52px; background:var(--card); border:1px solid var(--line); color:var(--text)}
+  /* Distinct from .btn.ghost (a plain utility look, still used for Yuklab olish/Bekor qilish/
+     crop-cancel elsewhere) — Tinglash is a real alternate primary action for audiobook titles,
+     not a minor utility button, so it shouldn't read with the same visual weight as Download.
+     Sizing (width/flex) still comes from the #openBot,#dListen ID rule above — this only
+     changes color/border. */
+  .btn.accentGhost{background:var(--chip); border:1.5px solid var(--accent); color:var(--accent)}
   .btn.ghost.on{color:var(--danger)}
   /* Yuklab olish / Tinglash are real labeled actions in a row of at most 3 now (not one of six
      icon-only squares like before) — they need equal-width room for their label, not the narrow
@@ -298,11 +304,13 @@
      rather than duration/narrator data this catalog doesn't carry. Replaces both the old inline
      "★★★★★ 4.6 (40)" line here AND the 5/4/3/2/1 distribution bar chart further down in the
      Reyting section — that breakdown graph is gone in favor of this simpler at-a-glance row. */
-  .dStatRow{display:flex; margin:10px 0 14px}
-  .dStat{flex:1; text-align:center; padding:0 6px; min-width:0}
-  .dStat+.dStat{border-left:1px solid var(--line)}
+  /* Card-styled to match .statgrid .st (the profile page's near-identical stat row) — this used
+     to be bare text with a thin border-left divider between columns, the only "stat row" in the
+     app not styled as real cards, for no apparent reason. */
+  .dStatRow{display:flex; gap:8px; margin:10px 0 14px}
+  .dStat{flex:1; text-align:center; min-width:0; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:9px 6px}
   .dStatL{font-size:11px; color:var(--muted); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
-  .dStatV{font-size:14.5px; font-weight:800; color:var(--text); margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .dStatV{font-size:16.5px; font-weight:800; color:var(--text); margin-top:3px; font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
   .subMore{color:var(--muted)}
   .gzoom{position:fixed; right:14px; top:50%; transform:translateY(-50%); display:flex; flex-direction:column; gap:10px; z-index:1}
   .gzoom button{width:42px; height:42px; border-radius:50%; background:var(--chip); border:1px solid var(--line); color:var(--text); font-size:21px; font-weight:700; font-family:inherit; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:var(--shadow); padding:0; line-height:1; transition:transform .15s}
@@ -2778,7 +2786,7 @@ function openDetail(id){
     <div class="actions">
       <button class="btn primary" id="dRead">📖 Kitobni o'qish</button>
       <button class="btn ghost" id="openBot">⬇️ Yuklab olish</button>
-      ${b.ha?`<button class="btn ghost" id="dListen">🎧 Tinglash</button>`:''}
+      ${b.ha?`<button class="btn accentGhost" id="dListen">🎧 Tinglash</button>`:''}
       ${openedFromGlobe?'<button class="btn ghost" id="dBackGlobe">🌐</button>':''}
     </div>`;
   const url=`https://t.me/${DB.bot}?start=b_${encodeURIComponent(b.i)}`;
