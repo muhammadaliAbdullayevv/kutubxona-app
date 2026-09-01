@@ -1530,9 +1530,10 @@ function loadDavraFeed(reset){
   // A fresh load previously left #davraList (and the empty-state message, which only ever gets
   // set inside the response handler below) completely blank until the fetch resolved — on a slow
   // connection that reads as "Davra just isn't switching" rather than "still loading", since
-  // nothing on screen changes at all. Same "Yuklanmoqda..." convention already used for every
-  // other loading gap in this app (profile edit, certificates, ...).
-  if(reset){davraCursor=null;davraDone=false;$('#davraList').innerHTML='<p class="hint" id="davraLoadingHint">Yuklanmoqda...</p>';}
+  // nothing on screen changes at all. Shaped skeleton post cards (postFeedSkeletonHtml) instead of
+  // a bare "Yuklanmoqda..." line — a real screenshot on 3G showed that text sitting completely
+  // alone in an otherwise-empty screen, reading as broken rather than loading.
+  if(reset){davraCursor=null;davraDone=false;$('#davraList').innerHTML=`<div id="davraLoadingHint">${postFeedSkeletonHtml(3)}</div>`;}
   davraLoading=true;
   $('#davraMore').style.display='none';
   const endpoint=davraFeedMode==='following'?'/api/davra/following-feed':'/api/davra/feed';
@@ -2109,8 +2110,9 @@ function renderReading(){
     // HOME.continueLoaded exists specifically to tell "still loading" apart from "genuinely
     // nothing in progress" (see loadContinueReading) — this just wasn't checking it, so switching
     // here before that fetch resolved showed the wrong message ("nothing in progress") for a
-    // moment, self-correcting only once the real data arrived a beat later.
-    cur.innerHTML='<p class="hint">Yuklanmoqda...</p>';
+    // moment, self-correcting only once the real data arrived a beat later. heroSkeletonHtml() is
+    // the same shimmer shape the real hero card below settles into, not a bare loading line.
+    cur.innerHTML=`<div class="section"><div class="shead"><h2 class="skel" style="width:180px;height:16px;border-radius:6px"></h2></div>${heroSkeletonHtml()}</div>`;
   }else if(!HOME.continue.length){
     cur.innerHTML='<p class="hint">Hozircha o\'qilayotgan kitob yo\'q — birortasini boshlang</p>';
   }else{
@@ -3895,6 +3897,11 @@ function loadProfile(){
   const body=$('#pBody');if(!body)return;
   $('#pTabs').style.display=canAct()?'flex':'none';
   if(!canAct()){body.innerHTML='<p class="hint">Profilingizni ko\'rish uchun botda oching.</p>';$('#pTabContent').innerHTML='';return;}
+  // Skeleton stat tiles while /api/profile/me is in flight — every visit to Sahifam re-fetches
+  // this (not just the first), so without this line the page briefly showed whatever the LAST
+  // real content was (fine on a fast connection, confusing/stale-looking on a slow one) or, on
+  // the very first load, the bare "Yuklanmoqda..." still sitting in #pBody's initial markup.
+  body.innerHTML=profileStatSkeletonHtml();
   api('/api/profile/me').then(r=>{
     myBadgesCache=r.badges;
     checkMilestones(r);
@@ -3941,7 +3948,7 @@ const _postsTabState={};
 function postsTabHtml(userId,containerId,reset){
   if(reset===undefined)reset=true;
   const c=$('#'+containerId);
-  if(reset){_postsTabState[containerId]={cursor:null,done:false};c.innerHTML='Yuklanmoqda...';}
+  if(reset){_postsTabState[containerId]={cursor:null,done:false};c.innerHTML=postFeedSkeletonHtml(3);}
   const st=_postsTabState[containerId];
   if(st.done&&!reset)return;
   const path=`/api/users/${userId}/posts?limit=20`+(st.cursor?'&before='+encodeURIComponent(st.cursor):'');
@@ -4690,6 +4697,21 @@ $('#btnTheme').onclick=toggleThemeQuick;
 document.querySelectorAll('.viewThemeBtn').forEach(el=>el.onclick=toggleThemeQuick);
 
 function skeletonShelf(){return `<div class="section"><div class="shead"><h2 class="skel" style="width:140px;height:16px;border-radius:6px"></h2></div><div class="shelf">${Array(4).fill('<div class="si"><div class="skel" style="height:170px;border-radius:14px"></div></div>').join('')}</div></div>`;}
+// Same shimmer language as skeletonShelf()/heroSkeletonHtml() above, shaped like a real .fitem
+// post card — used everywhere a Davra-style feed (the main feed, and the profile's own "Fikrlar"
+// tab, which renders the same post cards) shows its very first loading state. Replaces a bare
+// "Yuklanmoqda..." text line that, on a slow connection, could sit alone in an otherwise-empty
+// screen for seconds — same category of issue as the home-screen CLS fix, just visual polish
+// instead of a layout-shift score this time.
+function postCardSkeletonHtml(){return `<div class="fitem" style="pointer-events:none">
+  <div class="fmeta"><span class="skel" style="width:26px;height:26px;border-radius:50%;flex-shrink:0"></span><span class="skel" style="width:96px;height:12px;border-radius:6px"></span></div>
+  <div class="skel" style="height:12px;width:94%;border-radius:6px;margin-bottom:6px"></div>
+  <div class="skel" style="height:12px;width:65%;border-radius:6px"></div>
+</div>`;}
+function postFeedSkeletonHtml(n){return Array(n||4).fill(0).map(postCardSkeletonHtml).join('');}
+// Matches .statgrid/.st exactly (see loadProfile()) so the real stats popping in doesn't jump
+// the tile sizes around either.
+function profileStatSkeletonHtml(){return `<div class="statgrid">${Array(4).fill('<div class="st"><div class="skel" style="height:18px;width:55%;border-radius:6px;margin-bottom:6px"></div><div class="skel" style="height:11px;width:75%;border-radius:6px"></div></div>').join('')}</div>`;}
 // Every full-screen/bottom overlay in the app shares the .sheet class; this registry maps each
 // one's id to its own close function (which often does more than remove 'open' — clearing
 // timers, resetting focused-item state, etc). Used below so the Telegram BackButton closes
