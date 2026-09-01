@@ -963,7 +963,6 @@
   <div class="ssheetc" id="shelvesSheetc"></div>
 </div>
 <div class="sheet" id="userProfileSheet" style="z-index:52; align-items:stretch; background:var(--bg)">
-  <div class="stopbar"><div class="gclose" id="userProfileClose">✕</div><div class="stopbarTitle">👤 Profil</div></div>
   <div class="ssheetc">
     <div id="uProfileCard"></div>
     <div id="uBody">Yuklanmoqda...</div>
@@ -4135,7 +4134,6 @@ function openUserProfile(userId){
 }
 function closeUserProfile(){$('#userProfileSheet').classList.remove('open');tg?.BackButton?.hide();}
 $('#userProfileSheet').onclick=e=>{if(e.target.id==='userProfileSheet')closeUserProfile();};
-$('#userProfileClose').onclick=closeUserProfile;
 $('#uTabs').querySelectorAll('.ptab').forEach(el=>el.onclick=()=>{
   haptic();
   const userId=parseInt($('#userProfileSheet').dataset.uid,10);
