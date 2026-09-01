@@ -226,8 +226,15 @@
      search/theme/profile row correctly stopped bleeding onto every screen — a quick theme toggle
      alongside each title keeps that one genuinely useful control reachable without a trip to
      Sahifam, without reviving the redundant profile-shortcut icon. */
-  .viewHead{display:flex; align-items:center; justify-content:space-between; margin-bottom:4px}
-  .viewHead .dtitle{margin-bottom:0}
+  /* Sticky + a real background band, matching how <header> itself anchors Asosiy/search — this
+     used to be bare text with no background, so switching into Mutolaaxonam/Davra (whose content
+     right below it, e.g. the "continue reading" hero card, can look near-identical to Asosiy's
+     own) gave almost no visible signal that the screen had actually changed, easy to miss
+     entirely on a quick tap. Staying visible while scrolling keeps that signal up the whole time
+     you're on the screen, not just for an instant at the top. */
+  .viewHead{position:sticky; top:0; z-index:15; display:flex; align-items:center; justify-content:space-between;
+    margin:0 -14px 12px; padding:10px 14px 12px; background:linear-gradient(180deg,var(--bg) 80%,transparent)}
+  .viewHead .dtitle{margin-bottom:0; font-size:23px}
   .viewThemeBtn{flex-shrink:0; width:34px; height:34px; border-radius:50%; background:var(--chip); border:1px solid var(--line); color:var(--text); display:flex; align-items:center; justify-content:center; font-size:15px; cursor:pointer}
   .dauthor{color:var(--muted); font-size:14px; margin-bottom:14px}
   /* Swipeable, not wrapping — a book with a lot of tag pills (genre/audience/year/lang/format/
