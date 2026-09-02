@@ -800,13 +800,44 @@
   .dmConvTime{font-size:11px; color:var(--muted)}
   .dmConvUnreadBadge{min-width:18px; height:18px; padding:0 5px; border-radius:999px; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; font-size:10.5px; font-weight:800; display:flex; align-items:center; justify-content:center}
   .dmChatTitle{flex:1; display:flex; align-items:center; gap:8px; min-width:0; cursor:pointer}
-  .dmChatTitle span{overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:16px; font-weight:800}
+  .dmChatTitleText{display:flex; flex-direction:column; min-width:0; gap:1px}
+  .dmChatTitleName{overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:15.5px; font-weight:800; color:var(--text)}
+  .dmChatTitleStatus{font-size:11.5px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .dmChatTitleStatus.online{color:#2ecc71; font-weight:700}
   .dmBubbleRow{display:flex; margin-bottom:8px}
   .dmBubbleRow.mine{justify-content:flex-end}
-  .dmBubble{max-width:78%; background:var(--card); border:1px solid var(--line); border-radius:16px 16px 16px 4px; padding:9px 12px; font-size:13.5px; line-height:1.4; color:var(--text)}
-  .dmBubble.mine{background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border:0; border-radius:16px 16px 4px 16px}
+  /* A defined 1px border on BOTH bubble variants (not just "theirs") — reads more precisely and
+     stays legible once a wallpaper can sit behind the bubbles, instead of the gradient "mine"
+     bubble floating with no edge of its own. */
+  .dmBubble{max-width:78%; background:var(--card); border:1px solid var(--line); border-radius:16px 16px 16px 4px; padding:9px 12px; font-size:13.5px; line-height:1.4; color:var(--text); box-shadow:0 1px 2px rgba(0,0,0,.06)}
+  .dmBubble.mine{background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border:1px solid color-mix(in srgb, var(--accent2) 55%, transparent); border-radius:16px 16px 4px 16px; box-shadow:0 1px 3px rgba(0,0,0,.18)}
   .dmBubble i{opacity:.75}
-  .dmBubbleTime{font-size:10px; opacity:.65; margin-top:4px; text-align:right}
+  .dmBubbleTime{font-size:10px; opacity:.65; margin-top:4px; text-align:right; display:flex; justify-content:flex-end; align-items:center; gap:3px}
+  .dmTick{opacity:.75; letter-spacing:-1px}
+  .dmTick.read{opacity:1}
+  .dmImgMsg{display:block; max-width:220px; max-height:280px; width:100%; height:auto; border-radius:11px; cursor:pointer; background:color-mix(in srgb, var(--line) 40%, transparent)}
+  .dmMsgCaption{margin-top:6px}
+  .dmAudioLabel{font-size:11.5px; font-weight:700; opacity:.85; margin-bottom:5px}
+  .dmAudioMsg{display:block; max-width:230px; width:56vw; height:34px}
+  /* Lightbox for tapping an image bubble — full-screen, tap anywhere to close. */
+  .dmLightbox{position:fixed; inset:0; z-index:80; background:rgba(0,0,0,.92); display:none; align-items:center; justify-content:center; padding:20px; box-sizing:border-box}
+  .dmLightbox.open{display:flex}
+  .dmLightbox img{max-width:100%; max-height:100%; border-radius:8px}
+  /* ---- composer attach/mic + recording state ---- */
+  .dmComposerIcon{width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0; cursor:pointer; background:var(--chip); border:1px solid var(--line)}
+  .dmComposerIcon:active{transform:scale(.94)}
+  .dmComposerIcon.recording{background:#ef4444; border-color:#ef4444; color:#fff}
+  .dmRecordingRow{display:flex; align-items:center; gap:10px; padding:2px 2px 6px}
+  .dmRecDot{width:9px; height:9px; border-radius:50%; background:#ef4444; flex-shrink:0; animation:dmPulse 1s infinite}
+  @keyframes dmPulse{0%,100%{opacity:1}50%{opacity:.25}}
+  .dmRecTimer{font-variant-numeric:tabular-nums; font-weight:700; color:var(--text); font-size:14px}
+  .dmRecCancel{flex:1; text-align:center; color:var(--muted); font-size:13px; font-weight:700; cursor:pointer}
+  .dmRecStop{width:36px; height:36px; border-radius:50%; border:none; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; font-size:14px; flex-shrink:0; cursor:pointer}
+  /* ---- chat wallpaper (#dmWallpaperSheet) — client-side only (localStorage), per device, never
+     synced or shown to the other person; see applyDmWallpaper(). ---- */
+  .dmWallSwatchRow{display:flex; gap:10px; flex-wrap:wrap; margin:4px 0 14px}
+  .dmWallSwatch{width:40px; height:40px; border-radius:50%; cursor:pointer; border:2px solid var(--line); flex-shrink:0}
+  .dmWallSwatch.active{border-color:var(--accent); box-shadow:0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent)}
   /* Push-notification opt-out row, top of #notifSheetc — see openNotifications(). A small,
      reusable on/off switch (no such component existed before this) rather than a second tap-to-
      cycle row style, since a persistent setting reads more clearly as a real switch. */
@@ -1103,18 +1134,40 @@
   </div>
   <div class="ssheetc" id="dmChatSheetc" style="padding-bottom:100px"></div>
   <div id="dmComposerBar">
-    <div class="dtComposerRow">
+    <div class="dmRecordingRow" id="dmRecordingRow" style="display:none">
+      <span class="dmRecDot"></span>
+      <span class="dmRecTimer" id="dmRecTimer">0:00</span>
+      <span class="dmRecCancel" id="dmRecCancel">Bekor qilish</span>
+      <button class="dmRecStop" id="dmRecStop">⏹</button>
+    </div>
+    <div class="dtComposerRow" id="dmComposerRow">
+      <input type="file" id="dmAttachInput" accept="image/*,audio/*" hidden>
+      <span class="dmComposerIcon" id="dmAttachBtn" title="Fayl biriktirish">📎</span>
       <textarea id="dmChatText" maxlength="2000" placeholder="Xabar yozing..." rows="1"></textarea>
+      <span class="dmComposerIcon" id="dmMicBtn" title="Ovozli xabar">🎤</span>
       <button id="dmChatSend">➤</button>
     </div>
   </div>
 </div>
 <div class="sheet" id="dmChatMenuSheet" style="z-index:55">
   <div class="reshareMenuCard">
+    <div class="reshareMenuItem" id="dmWallpaperItem"><span class="rmIcon">🎨</span><div><div class="rmTitle">Suhbat foni</div><div class="rmSub">Rang yoki rasm tanlang</div></div></div>
     <div class="reshareMenuItem" id="dmBlockItem"><span class="rmIcon">🚫</span><div><div class="rmTitle" id="dmBlockItemTitle">Bloklash</div><div class="rmSub" id="dmBlockItemSub">Bu foydalanuvchi sizga xabar yubora olmaydi</div></div></div>
     <div class="reshareMenuItem" id="dmReportItem"><span class="rmIcon">⚠️</span><div><div class="rmTitle">Shikoyat qilish</div><div class="rmSub">Suhbatni ko'rib chiqish uchun yuborish</div></div></div>
   </div>
 </div>
+<!-- Chat wallpaper — a per-device preference only (localStorage, see applyDmWallpaper()), never
+     synced to the server or visible to the other person: nobody else needs to see how YOU chose
+     to decorate the conversation. -->
+<div class="sheet" id="dmWallpaperSheet" style="z-index:56">
+  <div class="reshareMenuCard">
+    <input type="file" id="dmWallpaperPhotoInput" accept="image/*" hidden>
+    <div class="dmWallSwatchRow" id="dmWallSwatchRow"></div>
+    <div class="reshareMenuItem" id="dmWallPhotoItem"><span class="rmIcon">🖼</span><div><div class="rmTitle">Rasm tanlash</div><div class="rmSub">Galereyadan fon rasmi yuklang</div></div></div>
+    <div class="reshareMenuItem" id="dmWallResetItem"><span class="rmIcon">↺</span><div><div class="rmTitle">Standart holatga qaytarish</div></div></div>
+  </div>
+</div>
+<div class="dmLightbox" id="dmLightbox"><img id="dmLightboxImg" src="" alt=""></div>
 <!-- Reviews used to be a single inline vertical list capped at 20, with the write-a-review form
      also inline in the same scroll — a real full "all reviews" page (with its own pagination)
      plus a dedicated "write a review" page match how a reviews section that might actually grow
@@ -4594,14 +4647,80 @@ function closeDmConversations(){$('#dmConversationsSheet').classList.remove('ope
 $('#dmConversationsClose').onclick=closeDmConversations;
 $('#dmConversationsSheet').onclick=e=>{if(e.target.id==='dmConversationsSheet')closeDmConversations();};
 
-let dmChatPeerId=null, dmChatPeerName='', dmChatBlockedByMe=false, dmChatPollTimer=null;
+let dmChatPeerId=null, dmChatPeerName='', dmChatBlockedByMe=false, dmChatPollTimer=null, dmPresencePollTimer=null;
+let _dmLastRenderedKey='';
+// Stream-token cache (getStreamToken, defined above for book/audio reading) — a media message's
+// <img>/<audio> src can't carry our normal Authorization header, so each one needs a short-lived
+// per-resource token minted via /api/stream-token, same mechanism the PDF/audio readers already
+// use. Cached per message id so a 5s poll re-render doesn't re-mint a fresh token every time
+// (server TTL is 2h — plenty for one chat session).
+const _dmTokenCache=new Map();
+function dmMediaSrc(messageId,mediaUrl){
+  if(_dmTokenCache.has(messageId))return Promise.resolve(COMMUNITY_API_BASE+mediaUrl+'?token='+_dmTokenCache.get(messageId));
+  return getStreamToken('dm_'+messageId).then(token=>{
+    _dmTokenCache.set(messageId,token);
+    return COMMUNITY_API_BASE+mediaUrl+'?token='+token;
+  });
+}
+function wireDmMediaSrcs(scope){
+  scope.querySelectorAll('[data-media-pending]').forEach(el=>{
+    const mid=el.dataset.mediaPending, url=el.dataset.mediaUrl;
+    el.removeAttribute('data-media-pending');
+    dmMediaSrc(mid,url).then(src=>{el.src=src;}).catch(()=>{});
+  });
+  scope.querySelectorAll('.dmImgMsg').forEach(el=>{
+    if(el.dataset.wired)return; el.dataset.wired='1';
+    el.onclick=()=>{if(el.src)openDmLightbox(el.src);};
+  });
+}
+function fmtDuration(sec){
+  sec=Math.max(0,Math.round(sec||0));
+  return Math.floor(sec/60)+':'+String(sec%60).padStart(2,'0');
+}
 function dmBubbleHtml(m){
+  const tick=m.is_mine?`<span class="dmTick${m.read?' read':''}">${m.read?'✓✓':'✓'}</span>`:'';
+  let inner;
+  if(m.status!=='active'){
+    inner='<i>Xabar o\'chirilgan</i>';
+  } else if(m.message_type==='image'){
+    inner=`<img class="dmImgMsg" alt="" data-media-pending="${esc(m.id)}" data-media-url="${esc(m.media_url)}">`
+      +(m.text?`<div class="dmMsgCaption">${esc(m.text)}</div>`:'');
+  } else if(m.message_type==='voice'||m.message_type==='audio'){
+    const label=(m.message_type==='voice'?'🎤 Ovozli xabar':'🎵 Audio')+(m.duration_sec?' · '+fmtDuration(m.duration_sec):'');
+    inner=`<div class="dmAudioLabel">${label}</div>`
+      +`<audio class="dmAudioMsg" controls preload="none" data-media-pending="${esc(m.id)}" data-media-url="${esc(m.media_url)}"></audio>`
+      +(m.text?`<div class="dmMsgCaption">${esc(m.text)}</div>`:'');
+  } else {
+    inner=esc(m.text||'');
+  }
   return `<div class="dmBubbleRow${m.is_mine?' mine':''}">
     <div class="dmBubble${m.is_mine?' mine':''}" data-id="${esc(m.id)}">
-      ${m.text?esc(m.text):'<i>Xabar o\'chirilgan</i>'}
-      <div class="dmBubbleTime">${fmtAgo(m.created_at)}</div>
+      ${inner}
+      <div class="dmBubbleTime">${fmtAgo(m.created_at)}${tick}</div>
     </div>
   </div>`;
+}
+function openDmLightbox(src){
+  $('#dmLightboxImg').src=src;
+  $('#dmLightbox').classList.add('open');
+}
+function closeDmLightbox(){$('#dmLightbox').classList.remove('open');$('#dmLightboxImg').src='';}
+$('#dmLightbox').onclick=closeDmLightbox;
+function dmPresenceLabel(pr){
+  if(!pr)return'';
+  if(pr.online)return'Onlayn';
+  return pr.last_active_at?('Oxirgi faollik: '+fmtAgo(pr.last_active_at)):'';
+}
+function refreshDmChatPresence(){
+  if(!dmChatPeerId)return;
+  const peerId=dmChatPeerId;
+  api('/api/users/'+peerId+'/presence').then(pr=>{
+    if(dmChatPeerId!==peerId)return;
+    const el=$('#dmChatTitleStatus');
+    if(!el)return;
+    el.textContent=dmPresenceLabel(pr);
+    el.classList.toggle('online',!!pr.online);
+  }).catch(()=>{});
 }
 function openDmChat(peerId){
   peerId=parseInt(peerId,10);
@@ -4609,9 +4728,11 @@ function openDmChat(peerId){
   if(!canAct()){toast('Xabarlashish uchun botni Telegram ichida oching');return;}
   haptic();
   dmChatPeerId=peerId;
+  _dmLastRenderedKey='';
   $('#dmChatTitle').innerHTML='';
   $('#dmChatSheetc').innerHTML='Yuklanmoqda...';
   $('#dmChatSheet').classList.add('open');
+  applyDmWallpaper();
   tg?.BackButton?.show();
   Promise.all([
     api('/api/users/'+peerId+'/profile'),
@@ -4619,13 +4740,17 @@ function openDmChat(peerId){
   ]).then(([p,dm])=>{
     dmChatPeerName=p.display_name||'Foydalanuvchi';
     dmChatBlockedByMe=!!dm.is_blocked_by_me;
-    $('#dmChatTitle').innerHTML=authorAvatarHtml(peerId,p.avatar_version,p.display_name,28)+`<span>${esc(dmChatPeerName)}</span>`;
+    $('#dmChatTitle').innerHTML=authorAvatarHtml(peerId,p.avatar_version,p.display_name,28)
+      +`<div class="dmChatTitleText"><div class="dmChatTitleName">${esc(dmChatPeerName)}</div><div class="dmChatTitleStatus" id="dmChatTitleStatus"></div></div>`;
     $('#dmChatTitle').onclick=()=>{closeDmChat();openUserProfile(peerId);};
-  }).catch(()=>{$('#dmChatTitle').innerHTML='<span>Xabar</span>';});
+    refreshDmChatPresence();
+  }).catch(()=>{$('#dmChatTitle').innerHTML='<div class="dmChatTitleText"><div class="dmChatTitleName">Xabar</div></div>';});
   loadDmMessages(true);
   api('/api/dm/'+peerId+'/read',{method:'POST'}).then(refreshDmDot).catch(()=>{});
   clearInterval(dmChatPollTimer);
   dmChatPollTimer=setInterval(()=>{if(document.visibilityState==='visible')loadDmMessages(false);},5000);
+  clearInterval(dmPresencePollTimer);
+  dmPresencePollTimer=setInterval(()=>{if(document.visibilityState==='visible')refreshDmChatPresence();},15000);
 }
 function loadDmMessages(scrollToBottom){
   if(!dmChatPeerId)return;
@@ -4633,16 +4758,27 @@ function loadDmMessages(scrollToBottom){
   api('/api/dm/'+peerId+'/messages').then(r=>{
     if(dmChatPeerId!==peerId)return; // chat was switched/closed while this was in flight
     const items=(r.items||[]).slice().reverse(); // API returns newest-first; render oldest-first
+    // Skip re-render when nothing actually changed (id + read-state signature) — a naive
+    // innerHTML replace on every 5s poll would tear down and restart any <audio>/<img> element
+    // mid-playback for no reason.
+    const key=items.map(m=>m.id+':'+(m.read?1:0)).join(',');
+    if(key===_dmLastRenderedKey && !scrollToBottom)return;
+    _dmLastRenderedKey=key;
     const c=$('#dmChatSheetc');
     const wasNearBottom=c.scrollHeight-c.scrollTop-c.clientHeight<80;
     c.innerHTML=items.length?items.map(dmBubbleHtml).join(''):'<p class="hint">Hali xabar yo\'q. Birinchi bo\'lib yozing!</p>';
+    wireDmMediaSrcs(c);
     if(scrollToBottom||wasNearBottom)c.scrollTop=c.scrollHeight;
   }).catch(()=>{});
 }
 function closeDmChat(){
   $('#dmChatSheet').classList.remove('open');tg?.BackButton?.hide();
-  clearInterval(dmChatPollTimer);dmChatPollTimer=null;dmChatPeerId=null;
+  clearInterval(dmChatPollTimer);dmChatPollTimer=null;
+  clearInterval(dmPresencePollTimer);dmPresencePollTimer=null;
+  if(dmMediaRecorder)stopDmRecording(true);
+  dmChatPeerId=null;
   $('#dmChatText').value='';
+  closeDmLightbox();
   loadDmConversations(); // refresh the inbox list's preview/unread state for next open
 }
 $('#dmChatClose').onclick=closeDmChat;
@@ -4657,6 +4793,84 @@ $('#dmChatSend').onclick=()=>{
     loadDmMessages(true);
   }).catch(()=>toast('Xatolik yuz berdi')).finally(()=>{btn.disabled=false;});
 };
+
+// ---- media attachments: image / audio-file pick, and voice-note recording. Video is
+// deliberately out of scope (see migration 113's note — no ffmpeg on the VPS, upload cap too
+// small for real clips). ----
+async function sendDmMedia(file,kind,caption,durationSec){
+  if(!dmChatPeerId)return;
+  const form=new FormData();
+  form.append('kind',kind);
+  form.append('file',file,file.name||(kind+'.dat'));
+  if(caption)form.append('caption',caption);
+  if(durationSec)form.append('duration_sec',String(Math.round(durationSec)));
+  return api('/api/dm/'+dmChatPeerId+'/media',{method:'POST',body:form});
+}
+$('#dmAttachBtn').onclick=()=>{
+  if(!canAct()){toast('Xabarlashish uchun botni Telegram ichida oching');return;}
+  $('#dmAttachInput').click();
+};
+$('#dmAttachInput').onchange=e=>{
+  const file=e.target.files[0];e.target.value='';
+  if(!file||!dmChatPeerId)return;
+  const kind=file.type.startsWith('image/')?'image':file.type.startsWith('audio/')?'audio':null;
+  if(!kind){toast('Faqat rasm yoki audio fayl yuborish mumkin');return;}
+  if(file.size>8*1024*1024){toast('Fayl juda katta (maksimum 8MB)');return;}
+  haptic();
+  sendDmMedia(file,kind,null,null).then(()=>loadDmMessages(true)).catch(()=>toast('Yuborilmadi'));
+};
+let dmMediaRecorder=null, dmRecordedChunks=[], dmRecordStartTs=0, dmRecordTimerHandle=null, dmRecordStream=null;
+function dmRecTimerTick(){
+  const secs=Math.floor((Date.now()-dmRecordStartTs)/1000);
+  $('#dmRecTimer').textContent=Math.floor(secs/60)+':'+String(secs%60).padStart(2,'0');
+}
+async function startDmRecording(){
+  if(dmMediaRecorder)return;
+  if(!canAct()){toast('Xabarlashish uchun botni Telegram ichida oching');return;}
+  if(!navigator.mediaDevices?.getUserMedia||typeof MediaRecorder==='undefined'){
+    toast('Qurilma ovoz yozishni qo\'llab-quvvatlamaydi');return;
+  }
+  let stream;
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({audio:true});
+  }catch(e){toast('Mikrofonga ruxsat berilmadi');return;}
+  dmRecordStream=stream;
+  dmRecordedChunks=[];
+  let cancelled=false;
+  const mr=new MediaRecorder(stream);
+  dmMediaRecorder=mr;
+  mr.__cancel=()=>{cancelled=true;};
+  mr.ondataavailable=e=>{if(e.data&&e.data.size>0)dmRecordedChunks.push(e.data);};
+  mr.onstop=()=>{
+    stream.getTracks().forEach(t=>t.stop());
+    const durationSec=(Date.now()-dmRecordStartTs)/1000;
+    const mimeType=mr.mimeType||'audio/webm';
+    dmMediaRecorder=null;
+    clearInterval(dmRecordTimerHandle);
+    $('#dmRecordingRow').style.display='none';
+    $('#dmComposerRow').style.display='flex';
+    if(cancelled||dmRecordedChunks.length===0)return;
+    const ext=mimeType.includes('ogg')?'ogg':mimeType.includes('mp4')?'m4a':'webm';
+    const file=new File(dmRecordedChunks,'voice.'+ext,{type:mimeType});
+    sendDmMedia(file,'voice',null,durationSec).then(()=>loadDmMessages(true)).catch(()=>toast('Yuborilmadi'));
+  };
+  dmRecordStartTs=Date.now();
+  mr.start();
+  haptic();
+  $('#dmComposerRow').style.display='none';
+  $('#dmRecordingRow').style.display='flex';
+  $('#dmRecTimer').textContent='0:00';
+  dmRecordTimerHandle=setInterval(dmRecTimerTick,500);
+}
+function stopDmRecording(cancel){
+  if(!dmMediaRecorder)return;
+  if(cancel)dmMediaRecorder.__cancel();
+  dmMediaRecorder.stop();
+}
+$('#dmMicBtn').onclick=()=>startDmRecording();
+$('#dmRecStop').onclick=()=>stopDmRecording(false);
+$('#dmRecCancel').onclick=()=>stopDmRecording(true);
+
 $('#dmChatMenuBtn').onclick=()=>{
   if(!dmChatPeerId)return;
   haptic();
@@ -4695,6 +4909,73 @@ function refreshDmDot(){
     const dot=$('#dmDot');if(dot)dot.style.display=(r.count>0)?'block':'none';
   }).catch(()=>{});
 }
+
+// ---- chat wallpaper — a per-device preference only (localStorage), never synced to the server
+// or visible to the other person. Solid-color swatches apply instantly; a custom photo is
+// downscaled+compressed client-side via canvas before being stored as a data URL, so it never
+// touches the backend at all. ----
+const DM_WALL_COLORS=['#0f1424','#12203a','#1b2f22','#3a1f12','#331428','#232323'];
+function applyDmWallpaper(){
+  const c=$('#dmChatSheetc');
+  if(!c)return;
+  let wp=null;
+  try{wp=JSON.parse(localStorage.getItem('dmWallpaper')||'null');}catch(e){}
+  if(!wp){c.style.background='';c.style.backgroundImage='';return;}
+  if(wp.type==='color'){c.style.backgroundImage='';c.style.background=wp.value;}
+  else if(wp.type==='photo'){c.style.background='';c.style.backgroundImage=`url("${wp.value}")`;c.style.backgroundSize='cover';c.style.backgroundPosition='center';}
+}
+function dmWallSwatchRowHtml(){
+  let active=null;
+  try{const wp=JSON.parse(localStorage.getItem('dmWallpaper')||'null');if(wp?.type==='color')active=wp.value;}catch(e){}
+  return DM_WALL_COLORS.map(c=>`<span class="dmWallSwatch${c===active?' active':''}" data-color="${c}" style="background:${c}"></span>`).join('');
+}
+function openDmWallpaperSheet(){
+  haptic();
+  $('#dmWallSwatchRow').innerHTML=dmWallSwatchRowHtml();
+  $('#dmWallSwatchRow').querySelectorAll('[data-color]').forEach(el=>el.onclick=()=>{
+    haptic();
+    localStorage.setItem('dmWallpaper',JSON.stringify({type:'color',value:el.dataset.color}));
+    applyDmWallpaper();
+    closeDmWallpaperSheet();
+  });
+  $('#dmWallpaperSheet').classList.add('open');
+}
+function closeDmWallpaperSheet(){$('#dmWallpaperSheet').classList.remove('open');}
+$('#dmWallpaperSheet').onclick=e=>{if(e.target.id==='dmWallpaperSheet')closeDmWallpaperSheet();};
+$('#dmWallpaperItem').onclick=()=>{closeDmChatMenu();openDmWallpaperSheet();};
+$('#dmWallPhotoItem').onclick=()=>$('#dmWallpaperPhotoInput').click();
+$('#dmWallpaperPhotoInput').onchange=e=>{
+  const file=e.target.files[0];e.target.value='';
+  if(!file)return;
+  const img=new Image();
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    img.onload=()=>{
+      const maxW=900;
+      const scale=Math.min(1,maxW/img.width);
+      const canvas=document.createElement('canvas');
+      canvas.width=Math.round(img.width*scale);
+      canvas.height=Math.round(img.height*scale);
+      const ctx=canvas.getContext('2d');
+      ctx.drawImage(img,0,0,canvas.width,canvas.height);
+      const dataUrl=canvas.toDataURL('image/jpeg',0.6);
+      try{
+        localStorage.setItem('dmWallpaper',JSON.stringify({type:'photo',value:dataUrl}));
+        applyDmWallpaper();
+        toast('Fon o\'rnatildi');
+      }catch(err){toast('Rasm juda katta, kichikroq rasm tanlang');}
+      closeDmWallpaperSheet();
+    };
+    img.src=ev.target.result;
+  };
+  reader.readAsDataURL(file);
+};
+$('#dmWallResetItem').onclick=()=>{
+  haptic();
+  localStorage.removeItem('dmWallpaper');
+  applyDmWallpaper();
+  closeDmWallpaperSheet();
+};
 
 // ---- notifications (#notifSheet) — new follower, like/reply on your own Davra post, plus a
 // "today's quote" card that's always re-fetched fresh on open (server picks/records it via the
@@ -5215,6 +5496,7 @@ const SHEET_CLOSERS={
   onboardTourSheet:closeOnboardTour, notifSheet:closeNotifications, avatarViewSheet:closeAvatarView,
   usersListSheet:closeUsersList, leaderboardSheet:closeLeaderboard, certDetailSheet:closeCertDetail,
   dmConversationsSheet:closeDmConversations, dmChatSheet:closeDmChat, dmChatMenuSheet:closeDmChatMenu,
+  dmWallpaperSheet:closeDmWallpaperSheet,
   // closeGlobe lives in the separate type="module" script below (Three.js globe) and only
   // becomes a real global once that deferred module finishes running — referencing it bare HERE
   // (evaluated immediately, before the module has loaded) throws ReferenceError. Wrapping it in
