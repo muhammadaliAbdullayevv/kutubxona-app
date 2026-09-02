@@ -833,6 +833,22 @@
   .dmMsgPopupItem{display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:9px; cursor:pointer; font-size:14px; font-weight:700; color:var(--text)}
   .dmMsgPopupItem:active{background:var(--chip)}
   .dmMsgPopupItem.danger{color:var(--danger)}
+  .dmMsgReactionRow{display:flex; flex-wrap:wrap; justify-content:space-between; gap:2px; padding:6px 4px; margin-bottom:2px; border-bottom:1px solid var(--line)}
+  .dmMsgReactionOpt{font-size:21px; cursor:pointer; border-radius:50%; width:32px; height:32px; display:flex; align-items:center; justify-content:center; transition:transform .1s}
+  .dmMsgReactionOpt:active{transform:scale(1.25)}
+  .dmMsgReactionOpt.mine{background:color-mix(in srgb, var(--accent) 18%, transparent)}
+  /* Quoted preview of the message being replied to, shown at the top of the replying bubble —
+     tap it to jump to (and briefly highlight) the original message, same as Telegram. */
+  .dmReplyQuote{border-left:3px solid var(--accent); padding:3px 8px; margin-bottom:6px; border-radius:4px; background:color-mix(in srgb, currentColor 8%, transparent); cursor:pointer}
+  .dmReplyQuoteName{font-size:11.5px; font-weight:800; color:var(--accent)}
+  .dmBubble.mine .dmReplyQuoteName{color:#fff; opacity:.9}
+  .dmReplyQuoteText{font-size:12px; opacity:.85; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .dmBubble.dmJumpHighlight{animation:dmJumpFlash 1.1s ease}
+  @keyframes dmJumpFlash{0%,100%{box-shadow:0 1px 2px rgba(0,0,0,.06)}30%{box-shadow:0 0 0 3px var(--accent)}}
+  .dmReactionBadges{display:flex; gap:4px; margin-top:5px}
+  .dmReactionBadge{background:var(--card); border:1px solid var(--line); border-radius:999px; padding:1px 7px; font-size:13px; line-height:1.5}
+  .dmBubble.mine .dmReactionBadge{background:rgba(255,255,255,.18); border-color:rgba(255,255,255,.3)}
+  .dmReactionBadge.mine{border-color:var(--accent)}
   .dmImgMsg{display:block; max-width:220px; max-height:280px; width:100%; height:auto; border-radius:11px; cursor:pointer; background:color-mix(in srgb, var(--line) 40%, transparent)}
   .dmMsgCaption{margin-top:6px}
   .dmAudioLabel{font-size:11.5px; font-weight:700; opacity:.85; margin-bottom:5px}
@@ -1153,6 +1169,7 @@
   <div class="ssheetc" id="dmChatSheetc" style="padding-bottom:100px"></div>
   <div id="dmComposerBar">
     <div class="dtReplyChip" id="dmEditChip" style="display:none"><span>✏️ Xabarni tahrirlash</span><span class="dtReplyChipX" id="dmEditChipX">✕</span></div>
+    <div class="dtReplyChip" id="dmReplyChip" style="display:none"><span id="dmReplyChipText">↩️ Javob berish</span><span class="dtReplyChipX" id="dmReplyChipX">✕</span></div>
     <div class="dmRecordingRow" id="dmRecordingRow" style="display:none">
       <span class="dmRecDot"></span>
       <span class="dmRecTimer" id="dmRecTimer">0:00</span>
@@ -1171,6 +1188,7 @@
 <div class="sheet" id="dmChatMenuSheet" style="z-index:55">
   <div class="reshareMenuCard">
     <div class="reshareMenuItem" id="dmWallpaperItem"><span class="rmIcon">🎨</span><div><div class="rmTitle">Suhbat foni</div><div class="rmSub">Rang yoki rasm tanlang</div></div></div>
+    <div class="reshareMenuItem" id="dmMuteItem"><span class="rmIcon" id="dmMuteItemIcon">🔕</span><div><div class="rmTitle" id="dmMuteItemTitle">Ovozsiz qilish</div><div class="rmSub" id="dmMuteItemSub">Bu suhbatdan push-xabar kelmaydi</div></div></div>
     <div class="reshareMenuItem" id="dmBlockItem"><span class="rmIcon">🚫</span><div><div class="rmTitle" id="dmBlockItemTitle">Bloklash</div><div class="rmSub" id="dmBlockItemSub">Bu foydalanuvchi sizga xabar yubora olmaydi</div></div></div>
     <div class="reshareMenuItem" id="dmReportItem"><span class="rmIcon">⚠️</span><div><div class="rmTitle">Shikoyat qilish</div><div class="rmSub">Suhbatni ko'rib chiqish uchun yuborish</div></div></div>
   </div>
@@ -1186,12 +1204,15 @@
     <div class="reshareMenuItem" id="dmWallResetItem"><span class="rmIcon">↺</span><div><div class="rmTitle">Standart holatga qaytarish</div></div></div>
   </div>
 </div>
-<!-- Edit/Delete for your own DM messages — reached by tapping the bubble itself. Deliberately NOT
-     a bottom sheet: a small popup anchored right next to the tapped bubble (see
+<!-- Reply/React/Edit/Delete for a DM message — reached by tapping the bubble itself. Deliberately
+     NOT a bottom sheet: a small popup anchored right next to the tapped bubble (see
      openDmMessageActions' positioning logic), matching Telegram's own on-message context menu
-     rather than this app's usual full-width drawer. -->
+     rather than this app's usual full-width drawer. Reply/React apply to any active message;
+     Edit/Delete are hidden by JS unless the tapped message is your own. -->
 <div class="dmMsgPopupOverlay" id="dmMsgPopupOverlay"></div>
 <div class="dmMsgPopup" id="dmMsgPopup">
+  <div class="dmMsgReactionRow" id="dmMsgReactionRow"></div>
+  <div class="dmMsgPopupItem" id="dmMsgReplyItem"><span>↩️</span>Javob berish</div>
   <div class="dmMsgPopupItem" id="dmMsgEditItem"><span>✏️</span>Tahrirlash</div>
   <div class="dmMsgPopupItem danger" id="dmMsgDeleteItem"><span>🗑</span>O'chirish</div>
 </div>
@@ -4675,7 +4696,7 @@ function closeDmConversations(){$('#dmConversationsSheet').classList.remove('ope
 $('#dmConversationsClose').onclick=closeDmConversations;
 $('#dmConversationsSheet').onclick=e=>{if(e.target.id==='dmConversationsSheet')closeDmConversations();};
 
-let dmChatPeerId=null, dmChatPeerName='', dmChatBlockedByMe=false, dmChatPollTimer=null, dmPresencePollTimer=null, dmEditingMessageId=null;
+let dmChatPeerId=null, dmChatPeerName='', dmChatBlockedByMe=false, dmChatMuted=false, dmChatPollTimer=null, dmPresencePollTimer=null, dmEditingMessageId=null;
 let _dmLastRenderedKey='';
 // Stream-token cache (getStreamToken, defined above for book/audio reading) — a media message's
 // <img>/<audio> src can't carry our normal Authorization header, so each one needs a short-lived
@@ -4705,10 +4726,23 @@ function fmtDuration(sec){
   sec=Math.max(0,Math.round(sec||0));
   return Math.floor(sec/60)+':'+String(sec%60).padStart(2,'0');
 }
+function dmReplyPreviewText(reply){
+  if(reply.deleted)return"Xabar o'chirilgan";
+  if(reply.message_type==='image')return'📷 Rasm';
+  if(reply.message_type==='voice')return'🎤 Ovozli xabar';
+  if(reply.message_type==='audio')return'🎵 Audio';
+  return esc((reply.text||'').slice(0,80));
+}
 function dmBubbleHtml(m){
   const tick=m.is_mine?`<span class="dmTick${m.read?' read':''}">${m.read?'✓✓':'✓'}</span>`:'';
   const edited=m.edited?`<span class="dmEditedLabel">tahrirlangan</span>`:'';
-  const mineActive=m.is_mine&&m.status==='active';
+  const tappable=m.status==='active';
+  const replyBlock=m.reply_to?`<div class="dmReplyQuote" data-jump="${esc(m.reply_to.id)}">
+    <div class="dmReplyQuoteName">${m.reply_to.deleted?'':(m.reply_to.is_mine?'Siz':esc(dmChatPeerName))}</div>
+    <div class="dmReplyQuoteText">${dmReplyPreviewText(m.reply_to)}</div>
+  </div>`:'';
+  const reactions=m.reactions||[];
+  const reactionBlock=reactions.length?`<div class="dmReactionBadges">${reactions.map(r=>`<span class="dmReactionBadge${r.emoji===m.my_reaction?' mine':''}">${esc(r.emoji)}</span>`).join('')}</div>`:'';
   let inner;
   if(m.status!=='active'){
     inner='<i>Xabar o\'chirilgan</i>';
@@ -4724,40 +4758,70 @@ function dmBubbleHtml(m){
     inner=esc(m.text||'');
   }
   return `<div class="dmBubbleRow${m.is_mine?' mine':''}">
-    <div class="dmBubble${m.is_mine?' mine':''}" data-id="${esc(m.id)}"${mineActive?` data-mine-msg="1" data-msg-text="${esc(m.text||'')}"`:''}>
+    <div class="dmBubble${m.is_mine?' mine':''}" data-id="${esc(m.id)}"${tappable?` data-msg-tap="1" data-msg-mine="${m.is_mine?1:0}" data-msg-text="${esc(m.text||'')}" data-msg-reaction="${esc(m.my_reaction||'')}"`:''}>
+      ${replyBlock}
       ${inner}
       <div class="dmBubbleTime">${edited}${fmtAgo(m.created_at)}${tick}</div>
+      ${reactionBlock}
     </div>
   </div>`;
 }
-// Edit/Delete are reachable by TAPPING one of your own bubbles (Telegram-style — a menu appears
-// on interaction, not two icons sitting on the bubble permanently). Taps on an actual control
-// inside the bubble (the native <audio> player, the image that opens the lightbox) are excluded
-// so this doesn't fight those.
+// Reply/React are reachable by tapping ANY active bubble; Edit/Delete only your own (Telegram-
+// style — a menu appears on interaction, not icons sitting on the bubble permanently). Taps on an
+// actual control inside the bubble (the native <audio> player, the image that opens the
+// lightbox, a reply quote that jumps to the original) are excluded so this doesn't fight those.
 function wireDmMessageActions(scope){
-  scope.querySelectorAll('.dmBubble[data-mine-msg]').forEach(el=>{
+  scope.querySelectorAll('.dmBubble[data-msg-tap]').forEach(el=>{
     if(el.dataset.wired)return; el.dataset.wired='1';
     el.onclick=e=>{
-      if(e.target.closest('audio')||e.target.classList.contains('dmImgMsg'))return;
-      openDmMessageActions(el.dataset.id,el.dataset.msgText||'',el);
+      if(e.target.closest('audio')||e.target.classList.contains('dmImgMsg')||e.target.closest('.dmReplyQuote'))return;
+      openDmMessageActions(el.dataset.id,el.dataset.msgText||'',el,el.dataset.msgMine==='1',el.dataset.msgReaction||null);
+    };
+  });
+  scope.querySelectorAll('.dmReplyQuote[data-jump]').forEach(el=>{
+    if(el.dataset.wired)return; el.dataset.wired='1';
+    el.onclick=e=>{
+      e.stopPropagation();
+      const target=scope.querySelector('.dmBubble[data-id="'+CSS.escape(el.dataset.jump)+'"]');
+      if(!target)return;
+      target.scrollIntoView({behavior:'smooth',block:'center'});
+      target.classList.remove('dmJumpHighlight');
+      void target.offsetWidth; // restart the animation if it was already just played
+      target.classList.add('dmJumpHighlight');
     };
   });
 }
-let dmMessageActionTargetId=null, dmMessageActionTargetText='';
-function openDmMessageActions(id,text,anchorEl){
+let dmMessageActionTargetId=null, dmMessageActionTargetText='', dmMessageActionTargetMine=false;
+const DM_REACTION_CHOICES=['❤️','👍','😂','😮','😢','🙏'];
+function openDmMessageActions(id,text,anchorEl,isMine,myReaction){
   haptic();
   dmMessageActionTargetId=id;
   dmMessageActionTargetText=text;
+  dmMessageActionTargetMine=isMine;
   const popup=$('#dmMsgPopup'),overlay=$('#dmMsgPopupOverlay');
+  $('#dmMsgEditItem').style.display=isMine?'flex':'none';
+  $('#dmMsgDeleteItem').style.display=isMine?'flex':'none';
+  $('#dmMsgReactionRow').innerHTML=DM_REACTION_CHOICES.map(em=>`<span class="dmMsgReactionOpt${em===myReaction?' mine':''}" data-emoji="${em}">${em}</span>`).join('');
+  $('#dmMsgReactionRow').querySelectorAll('[data-emoji]').forEach(el=>el.onclick=()=>{
+    const emoji=el.dataset.emoji;
+    const targetId=dmMessageActionTargetId;
+    closeDmMessageActionSheet();
+    haptic();
+    const isRemoving=emoji===myReaction;
+    const req=isRemoving
+      ?api('/api/dm/messages/'+targetId+'/reaction',{method:'DELETE'})
+      :api('/api/dm/messages/'+targetId+'/reaction',{method:'POST',body:JSON.stringify({emoji})});
+    req.then(()=>{_dmLastRenderedKey='';loadDmMessages(false);}).catch(()=>toast('Xatolik yuz berdi'));
+  });
   const rect=anchorEl.getBoundingClientRect();
   overlay.classList.add('open');
   popup.classList.add('open');
   // Positioned relative to the tapped bubble itself (not the bottom of the screen), flipped
   // above<->below and clamped to the viewport so it never renders off-screen. The popup is never
-  // display:none (only opacity:0 pre-.open), so its size is already measurable synchronously —
-  // no need to defer via requestAnimationFrame (which, besides being unnecessary here, behaves
-  // inconsistently enough across headless/automation contexts that it was actually leaving the
-  // popup unpositioned in some of them).
+  // display:none (only opacity:0 pre-.open), so its size is already measurable synchronously
+  // (right after the content above is set) — no need to defer via requestAnimationFrame (which,
+  // besides being unnecessary here, behaves inconsistently enough across headless/automation
+  // contexts that it was actually leaving the popup unpositioned in some of them).
   const pw=popup.offsetWidth,ph=popup.offsetHeight,margin=8;
   let top=rect.top-ph-margin;
   if(top<margin)top=Math.min(rect.bottom+margin,window.innerHeight-ph-margin);
@@ -4772,6 +4836,11 @@ function closeDmMessageActionSheet(){
   $('#dmMsgPopupOverlay').classList.remove('open');
 }
 $('#dmMsgPopupOverlay').onclick=closeDmMessageActionSheet;
+$('#dmMsgReplyItem').onclick=()=>{
+  const id=dmMessageActionTargetId,text=dmMessageActionTargetText,mine=dmMessageActionTargetMine;
+  closeDmMessageActionSheet();
+  startDmReply(id,text,mine);
+};
 $('#dmMsgEditItem').onclick=()=>{
   const id=dmMessageActionTargetId,text=dmMessageActionTargetText;
   closeDmMessageActionSheet();
@@ -4782,6 +4851,7 @@ $('#dmMsgDeleteItem').onclick=()=>{
   closeDmMessageActionSheet();
   haptic();
   if(dmEditingMessageId===id)cancelDmEdit();
+  if(dmReplyTargetId===id)cancelDmReply();
   api('/api/dm/messages/'+id,{method:'DELETE'}).then(()=>{
     toast('O\'chirildi');
     _dmLastRenderedKey=''; // force a re-render even though id/read-state alone wouldn't change
@@ -4841,10 +4911,11 @@ function openDmChat(peerId){
   tg?.BackButton?.show();
   Promise.all([
     api('/api/users/'+peerId+'/profile'),
-    api('/api/users/'+peerId+'/dm-eligibility').catch(()=>({is_blocked_by_me:false})),
+    api('/api/users/'+peerId+'/dm-eligibility').catch(()=>({is_blocked_by_me:false,is_muted:false})),
   ]).then(([p,dm])=>{
     dmChatPeerName=p.display_name||'Foydalanuvchi';
     dmChatBlockedByMe=!!dm.is_blocked_by_me;
+    dmChatMuted=!!dm.is_muted;
     $('#dmChatTitle').innerHTML=authorAvatarHtml(peerId,p.avatar_version,p.display_name,28)
       +`<div class="dmChatTitleText"><div class="dmChatTitleName">${esc(dmChatPeerName)}</div><div class="dmChatTitleStatus" id="dmChatTitleStatus"></div></div>`;
     $('#dmChatTitle').onclick=()=>{closeDmChat();openUserProfile(peerId);};
@@ -4887,6 +4958,7 @@ function closeDmChat(){
   if(dmMediaRecorder)stopDmRecording(true);
   dmChatPeerId=null;
   cancelDmEdit();
+  cancelDmReply();
   closeDmMessageActionSheet();
   closeDmLightbox();
   loadDmConversations(); // refresh the inbox list's preview/unread state for next open
@@ -4896,9 +4968,11 @@ $('#dmChatSheet').onclick=e=>{if(e.target.id==='dmChatSheet')closeDmChat();};
 // Editing reuses the same composer textarea/send button a new message uses — tapping ✏️ on one
 // of your own bubbles (wireDmMessageActions) loads its text in, shows a chip (same shape as
 // Davra's own reply chip), and re-targets the send button at the PATCH route instead of POST
-// until either sent or cancelled.
+// until either sent or cancelled. Edit and Reply are mutually exclusive — starting one cancels
+// the other, same as Telegram's composer only ever showing one active chip at a time.
 function startDmEdit(id,text){
   if(dmMediaRecorder)stopDmRecording(true);
+  cancelDmReply();
   dmEditingMessageId=id;
   $('#dmChatText').value=text;
   $('#dmChatText').focus();
@@ -4910,6 +4984,19 @@ function cancelDmEdit(){
   $('#dmEditChip').style.display='none';
 }
 $('#dmEditChipX').onclick=cancelDmEdit;
+let dmReplyTargetId=null;
+function startDmReply(id,text,isMine){
+  cancelDmEdit();
+  dmReplyTargetId=id;
+  $('#dmReplyChipText').textContent='↩️ '+(isMine?'O\'zingizga':dmChatPeerName+'ga')+' javob: '+(text?text.slice(0,40):'(media)');
+  $('#dmReplyChip').style.display='flex';
+  $('#dmChatText').focus();
+}
+function cancelDmReply(){
+  dmReplyTargetId=null;
+  $('#dmReplyChip').style.display='none';
+}
+$('#dmReplyChipX').onclick=cancelDmReply;
 $('#dmChatSend').onclick=()=>{
   const text=$('#dmChatText').value.trim();
   if(!text||!dmChatPeerId)return;
@@ -4923,8 +5010,10 @@ $('#dmChatSend').onclick=()=>{
     }).catch(()=>toast('Xatolik yuz berdi')).finally(()=>{btn.disabled=false;});
     return;
   }
-  api('/api/dm/'+dmChatPeerId+'/messages',{method:'POST',body:JSON.stringify({text})}).then(()=>{
+  const replyTo=dmReplyTargetId;
+  api('/api/dm/'+dmChatPeerId+'/messages',{method:'POST',body:JSON.stringify({text,reply_to_message_id:replyTo})}).then(()=>{
     $('#dmChatText').value='';
+    cancelDmReply();
     loadDmMessages(true);
   }).catch(()=>toast('Xatolik yuz berdi')).finally(()=>{btn.disabled=false;});
 };
@@ -4949,7 +5038,10 @@ async function sendDmMedia(file,kind,caption,durationSec){
   form.append('file',file,file.name||(kind+'.dat'));
   if(caption)form.append('caption',caption);
   if(durationSec)form.append('duration_sec',String(Math.round(durationSec)));
-  return api('/api/dm/'+dmChatPeerId+'/media',{method:'POST',body:form});
+  if(dmReplyTargetId)form.append('reply_to_message_id',String(dmReplyTargetId));
+  const req=api('/api/dm/'+dmChatPeerId+'/media',{method:'POST',body:form});
+  cancelDmReply();
+  return req;
 }
 $('#dmAttachBtn').onclick=()=>{
   if(!canAct()){toast('Xabarlashish uchun botni Telegram ichida oching');return;}
@@ -5021,10 +5113,25 @@ $('#dmChatMenuBtn').onclick=()=>{
   haptic();
   $('#dmBlockItemTitle').textContent=dmChatBlockedByMe?'Blokdan chiqarish':'Bloklash';
   $('#dmBlockItemSub').textContent=dmChatBlockedByMe?`${dmChatPeerName} sizga qayta xabar yubora oladi`:`${dmChatPeerName} sizga xabar yubora olmaydi`;
+  $('#dmMuteItemIcon').textContent=dmChatMuted?'🔔':'🔕';
+  $('#dmMuteItemTitle').textContent=dmChatMuted?'Ovozni yoqish':'Ovozsiz qilish';
+  $('#dmMuteItemSub').textContent=dmChatMuted?`${dmChatPeerName}dan push-xabar qayta keladi`:'Bu suhbatdan push-xabar kelmaydi';
   $('#dmChatMenuSheet').classList.add('open');
 };
 function closeDmChatMenu(){$('#dmChatMenuSheet').classList.remove('open');}
 $('#dmChatMenuSheet').onclick=e=>{if(e.target.id==='dmChatMenuSheet')closeDmChatMenu();};
+$('#dmMuteItem').onclick=()=>{
+  if(!dmChatPeerId)return;
+  haptic();
+  closeDmChatMenu();
+  const peerId=dmChatPeerId;
+  const wasMuted=dmChatMuted;
+  const method=wasMuted?'DELETE':'POST';
+  dmChatMuted=!wasMuted; // optimistic — reverted below only on a real failure
+  api('/api/dm/'+peerId+'/mute',{method}).then(()=>{
+    toast(wasMuted?'Ovoz yoqildi':'Ovozsiz qilindi');
+  }).catch(()=>{dmChatMuted=wasMuted;toast('Xatolik yuz berdi');});
+};
 $('#dmBlockItem').onclick=()=>{
   if(!dmChatPeerId)return;
   haptic();
