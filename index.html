@@ -772,6 +772,14 @@
   .quoteCard .qHead{display:flex; align-items:center; gap:6px; font-size:11.5px; font-weight:800; color:var(--accent); text-transform:uppercase; letter-spacing:.3px; margin-bottom:10px}
   .quoteCard .qText{font-size:15px; font-style:italic; line-height:1.5; color:var(--text)}
   .quoteCard .qMeta{font-size:12.5px; color:var(--muted); margin-top:10px; font-weight:700}
+  /* Deliberately the same accent gradient as the hero card, not a plain grey card like the
+     stat tiles above it — this is the one thing on Sahifam meant to prompt an action (share),
+     not just report a number, so it needs to actually stand out. */
+  .referralCard{background:linear-gradient(135deg,var(--accent),var(--accent2)); border-radius:16px; padding:16px; margin:14px 0; color:#fff}
+  .referralHead{font-size:15px; font-weight:800}
+  .referralSub{font-size:12.5px; opacity:.85; line-height:1.45; margin:4px 0 12px}
+  .referralShareBtn{width:100%; border:0; background:rgba(255,255,255,.2); color:#fff; font-weight:800; font-size:14px; padding:11px; border-radius:12px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px}
+  .referralShareBtn:active{transform:scale(.98)}
   /* Push-notification opt-out row, top of #notifSheetc — see openNotifications(). A small,
      reusable on/off switch (no such component existed before this) rather than a second tap-to-
      cycle row style, since a persistent setting reads more clearly as a real switch. */
@@ -4013,7 +4021,14 @@ function loadProfile(){
   // real content was (fine on a fast connection, confusing/stale-looking on a slow one) or, on
   // the very first load, the bare "Yuklanmoqda..." still sitting in #pBody's initial markup.
   body.innerHTML=profileStatSkeletonHtml();
-  api('/api/profile/me').then(r=>{
+  // The referral mechanic (coins per invite) already existed entirely on the backend — real
+  // tracking, real coin payout — but the only way to ever reach it was an unlisted bot command
+  // nobody would think to type. Fetched alongside the main profile call (not after) so it's on
+  // screen the moment Sahifam first renders, not a delayed afterthought.
+  Promise.all([
+    api('/api/profile/me'),
+    api('/api/profile/referral').catch(()=>null),
+  ]).then(([r,ref])=>{
     myBadgesCache=r.badges;
     checkMilestones(r);
     const rt=r.reading_time||{total_seconds:0,today_seconds:0,last_7_days_seconds:0,last_30_days_seconds:0};
@@ -4032,13 +4047,35 @@ function loadProfile(){
         <div class="st"><div class="sv">${fmtNum(toMin(rt.total_seconds))}</div><div class="sl">jami o'qildi (daq)</div></div>
         <div class="st" id="pRankTile" style="cursor:pointer"><div class="sv">${rankText}</div><div class="sl">reyting o'rni ›</div></div>
         <div class="st"><div class="sv">${fmtNum(toMin(rt.last_7_days_seconds))}</div><div class="sl">so'nggi 7 kun (daq)</div></div>
-      </div>`;
+      </div>
+      ${referralCardHtml(ref)}`;
     $('#pRankTile').onclick=()=>openLeaderboard();
+    wireReferralCard(ref);
     // Badges are already fetched above (myBadgesCache) — the Yutuqlar tab renders from that
     // cache instead of a second round trip, unless it's opened before this resolves.
     if(document.querySelector('#pTabs .ptab[data-pt="yutuq"]')?.classList.contains('on'))badgesTabHtml(myBadgesCache||[],'pTabContent');
   }).catch(()=>{body.innerHTML='<p class="hint">Ma\'lumot yuklanmadi.</p>';});
   switchProfileTab($('#pTabs').querySelector('.ptab.on')?.dataset.pt||'posts');
+}
+// ---- Referral card — see loadProfile()'s own comment for why this exists now. ref can be null
+// (the /api/profile/referral call failed, or the bot's own username couldn't be resolved) — in
+// that case this renders nothing rather than a broken/empty-link share button. ----
+function referralCardHtml(ref){
+  if(!ref||!ref.link)return'';
+  return `<div class="referralCard">
+    <div class="referralHead">🎁 Do'stlaringizni taklif qiling</div>
+    <div class="referralSub">Havolangiz orqali yangi foydalanuvchi botni ishga tushirsa, ${fmtNum(ref.coins_per_referral)} tanga olasiz. Hozircha: <b>${fmtNum(ref.referral_count)} ta taklif</b></div>
+    <button class="referralShareBtn" id="referralShareBtn">🔗 Havolani ulashish</button>
+  </div>`;
+}
+function wireReferralCard(ref){
+  const btn=$('#referralShareBtn');
+  if(!btn||!ref||!ref.link)return;
+  btn.onclick=()=>{
+    haptic();
+    const shareUrl=`https://t.me/share/url?url=${encodeURIComponent(ref.link)}&text=${encodeURIComponent("Botdan foydalaning va kitoblarni toping.")}`;
+    tg?.openTelegramLink?tg.openTelegramLink(shareUrl):window.open(shareUrl);
+  };
 }
 // ---- Profil screen tabs: Javonlar / Yutuqlar / Sertifikatlar — shared with the public
 // "someone else's profile" sheet (#userProfileSheet), which renders the exact same three tabs
@@ -4208,7 +4245,9 @@ async function shareCertificate(userId,cert){
     if(!resp.ok)throw new Error('fetch failed');
     const blob=await resp.blob();
     const file=new File([blob],'sertifikat.png',{type:'image/png'});
-    const text=`🎓 "${cert.title}" sertifikatini oldim! — Kutubxona`;
+    // Previously had no link at all — a nice image with no way for whoever sees it to actually
+    // try the app, purely a vanity share instead of the acquisition channel it could easily be.
+    const text=`🎓 "${cert.title}" sertifikatini oldim! — Kutubxona\n\nSiz ham sinab ko'ring: https://t.me/${DB.bot}`;
     if(navigator.canShare&&navigator.canShare({files:[file]})){
       await navigator.share({files:[file],title:cert.title,text});
     }else{
@@ -4280,7 +4319,7 @@ async function shareBookCertificate(userId,cert){
     if(!resp.ok)throw new Error('fetch failed');
     const blob=await resp.blob();
     const file=new File([blob],'sertifikat.png',{type:'image/png'});
-    const text=`🎓 "${cert.title}" kitobini tugatib, sertifikat oldim! — Kutubxona`;
+    const text=`🎓 "${cert.title}" kitobini tugatib, sertifikat oldim! — Kutubxona\n\nSiz ham sinab ko'ring: https://t.me/${DB.bot}`;
     if(navigator.canShare&&navigator.canShare({files:[file]})){
       await navigator.share({files:[file],title:cert.title,text});
     }else{
