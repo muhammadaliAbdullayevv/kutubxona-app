@@ -4794,11 +4794,23 @@ function openDmLightbox(src){
 }
 function closeDmLightbox(){$('#dmLightbox').classList.remove('open');$('#dmLightboxImg').src='';}
 $('#dmLightbox').onclick=closeDmLightbox;
+// Exact clock time, not a relative "X vaqt oldin" — bugun: "14:32", kecha: "kecha 14:32",
+// undan oldin: "3-sen 14:32". Same toLocaleDateString('uz-UZ',...) convention certificates
+// already use for earned_at, just with a time component and the today/yesterday shortcut.
+function fmtExactDateTime(iso){
+  const d=new Date(iso);
+  const now=new Date();
+  const time=d.toLocaleTimeString('uz-UZ',{hour:'2-digit',minute:'2-digit'});
+  if(d.toDateString()===now.toDateString())return time;
+  const yesterday=new Date(now);yesterday.setDate(now.getDate()-1);
+  if(d.toDateString()===yesterday.toDateString())return'kecha '+time;
+  return d.toLocaleDateString('uz-UZ',{day:'numeric',month:'short'})+' '+time;
+}
 function dmPresenceLabel(pr){
   if(!pr)return'';
   if(pr.typing)return"yozmoqda...";
   if(pr.online)return'Onlayn';
-  return pr.last_active_at?('Oxirgi faollik: '+fmtAgo(pr.last_active_at)):'';
+  return pr.last_active_at?('Oxirgi faollik: '+fmtExactDateTime(pr.last_active_at)):'';
 }
 function refreshDmChatPresence(){
   if(!dmChatPeerId)return;
