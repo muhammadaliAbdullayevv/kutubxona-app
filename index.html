@@ -5421,11 +5421,16 @@ async function boot(){
   hideSplash();
   // Deep-linked here from a shared "profile_<id>" bot message's web_app button (see
   // shareProfile() / bot.py's profile_ start-payload handler) — open straight to that profile
-  // instead of the normal home screen.
-  const deepLinkProfile=new URLSearchParams(location.search).get('profile');
-  if(deepLinkProfile)openUserProfile(deepLinkProfile);
-  // Skip the welcome tour on a deep-linked open — someone who tapped a shared profile link came
-  // for that profile specifically, not a general first impression of the app.
+  // instead of the normal home screen. "?dm=<peer_id>" is the same convention for a direct-
+  // message push notification's "💬 Xabarni ochish" button (bot.py's _bg_send_push_notifications)
+  // — opens straight into that conversation instead of leaving the tap at a bare bot chat.
+  const params=new URLSearchParams(location.search);
+  const deepLinkProfile=params.get('profile');
+  const deepLinkDm=params.get('dm');
+  if(deepLinkDm)openDmChat(deepLinkDm);
+  else if(deepLinkProfile)openUserProfile(deepLinkProfile);
+  // Skip the welcome tour on a deep-linked open — someone who tapped a shared profile/DM link
+  // came for that specific thing, not a general first impression of the app.
   else{try{if(!localStorage.getItem('onboardTourSeen'))openOnboardTour();}catch(e){}}
   checkOnboardingBanner();
   loadContinueReading();
