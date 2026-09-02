@@ -853,10 +853,14 @@
   .dmMsgCaption{margin-top:6px}
   .dmAudioLabel{font-size:11.5px; font-weight:700; opacity:.85; margin-bottom:5px}
   .dmAudioMsg{display:block; max-width:230px; width:56vw; height:34px}
-  /* Lightbox for tapping an image bubble — full-screen, tap anywhere to close. */
-  .dmLightbox{position:fixed; inset:0; z-index:80; background:rgba(0,0,0,.92); display:none; align-items:center; justify-content:center; padding:20px; box-sizing:border-box}
-  .dmLightbox.open{display:flex}
+  /* Lightbox for tapping an image bubble — full-screen, tap anywhere (or the ✕) to close. Uses
+     the shared .sheet class (position/z-index/display come from there) so it's a real participant
+     in closeTopmostSheet()/SHEET_CLOSERS — without that, the Telegram hardware back button had no
+     idea this was open and would close the chat sheet underneath it instead, leaving the image
+     stuck on screen with no way back. */
+  .dmLightbox{background:rgba(0,0,0,.92); padding:20px; box-sizing:border-box}
   .dmLightbox img{max-width:100%; max-height:100%; border-radius:8px}
+  #dmLightbox .gclose{background:rgba(255,255,255,.15); border-color:rgba(255,255,255,.3); color:#fff}
   /* ---- composer attach/mic + recording state ---- */
   .dmComposerIcon{width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0; cursor:pointer; background:var(--chip); border:1px solid var(--line)}
   .dmComposerIcon:active{transform:scale(.94)}
@@ -1216,7 +1220,10 @@
   <div class="dmMsgPopupItem" id="dmMsgEditItem"><span>✏️</span>Tahrirlash</div>
   <div class="dmMsgPopupItem danger" id="dmMsgDeleteItem"><span>🗑</span>O'chirish</div>
 </div>
-<div class="dmLightbox" id="dmLightbox"><img id="dmLightboxImg" src="" alt=""></div>
+<div class="sheet dmLightbox" id="dmLightbox" style="z-index:80; align-items:center; justify-content:center">
+  <span class="gclose" id="dmLightboxClose">✕</span>
+  <img id="dmLightboxImg" src="" alt="">
+</div>
 <!-- Reviews used to be a single inline vertical list capped at 20, with the write-a-review form
      also inline in the same scroll — a real full "all reviews" page (with its own pagination)
      plus a dedicated "write a review" page match how a reviews section that might actually grow
@@ -4861,9 +4868,17 @@ $('#dmMsgDeleteItem').onclick=()=>{
 function openDmLightbox(src){
   $('#dmLightboxImg').src=src;
   $('#dmLightbox').classList.add('open');
+  tg?.BackButton?.show();
 }
-function closeDmLightbox(){$('#dmLightbox').classList.remove('open');$('#dmLightboxImg').src='';}
+function closeDmLightbox(){
+  $('#dmLightbox').classList.remove('open');
+  $('#dmLightboxImg').src='';
+  // Deliberately NOT hiding the back button here — it's always opened on top of the chat sheet,
+  // which already wants the button shown to close itself next. closeTopmostSheet() (the button's
+  // global handler) will now correctly find the chat sheet as the new topmost open .sheet.
+}
 $('#dmLightbox').onclick=closeDmLightbox;
+$('#dmLightboxClose').onclick=e=>{e.stopPropagation();closeDmLightbox();};
 // Exact clock time, not a relative "X vaqt oldin" — bugun: "14:32", kecha: "kecha 14:32",
 // undan oldin: "3-sen 14:32". Same toLocaleDateString('uz-UZ',...) convention certificates
 // already use for earned_at, just with a time component and the today/yesterday shortcut.
@@ -5748,7 +5763,7 @@ const SHEET_CLOSERS={
   onboardTourSheet:closeOnboardTour, notifSheet:closeNotifications, avatarViewSheet:closeAvatarView,
   usersListSheet:closeUsersList, leaderboardSheet:closeLeaderboard, certDetailSheet:closeCertDetail,
   dmConversationsSheet:closeDmConversations, dmChatSheet:closeDmChat, dmChatMenuSheet:closeDmChatMenu,
-  dmWallpaperSheet:closeDmWallpaperSheet,
+  dmWallpaperSheet:closeDmWallpaperSheet, dmLightbox:closeDmLightbox,
   // closeGlobe lives in the separate type="module" script below (Three.js globe) and only
   // becomes a real global once that deferred module finishes running — referencing it bare HERE
   // (evaluated immediately, before the module has loaded) throws ReferenceError. Wrapping it in
