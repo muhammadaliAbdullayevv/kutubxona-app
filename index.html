@@ -4989,6 +4989,31 @@ function refreshDmChatPresence(){
 // still defaults to the bottom, same as before.
 var dmScrollPositions={}; // var (not let) — same reasoning as DB/byId above: a real global on
 // window, not just this script's own lexical scope.
+// Keyboard-aware chat height: #dmChatSheet is position:fixed;inset:0, sized off the LAYOUT
+// viewport — on iOS (and some Android WebViews) the on-screen keyboard overlays the page instead
+// of shrinking that layout viewport, so the sheet kept its full pre-keyboard height and its
+// bottom-pinned #dmComposerBar (position:absolute;bottom:0 within it) — and the newest message
+// right above it — ended up hidden behind the keyboard with no way to scroll them into view.
+// visualViewport tracks the REAL visible area, so set an explicit height from that instead of
+// relying on inset:0's bottom edge; #dmChatSheetc (flex:1) and the composer (bottom:0) both
+// reflow to the new, correct, keyboard-clear height for free.
+function _dmSyncViewportHeight(){
+  if(!dmChatPeerId)return;
+  const c=$('#dmChatSheetc');
+  // Measured against the CURRENT (pre-shrink) dimensions — shrinking the container first would
+  // make "distance from bottom" balloon by the shrink amount itself, wrongly reading a user who
+  // was already at the bottom as having scrolled away.
+  const wasNearBottom=c.scrollHeight-c.scrollTop-c.clientHeight<160;
+  const vv=window.visualViewport;
+  const h=vv?Math.round(vv.height):window.innerHeight;
+  $('#dmChatSheet').style.height=h+'px';
+  if(wasNearBottom)c.scrollTop=c.scrollHeight;
+}
+if(window.visualViewport)window.visualViewport.addEventListener('resize',_dmSyncViewportHeight);
+// Belt-and-suspenders: visualViewport's resize can lag the keyboard's own open animation by a
+// beat, and some WebViews fire it late/not at all — nudging on focus too (after the keyboard's
+// own ~250-300ms slide-in) catches whichever signal actually lands first.
+$('#dmChatText').addEventListener('focus',()=>setTimeout(_dmSyncViewportHeight,300));
 function openDmChat(peerId){
   peerId=parseInt(peerId,10);
   if(!peerId)return;
@@ -4998,6 +5023,7 @@ function openDmChat(peerId){
   _dmLastRenderedKey='';
   $('#dmChatTitle').innerHTML='';
   $('#dmChatSheetc').innerHTML='Yuklanmoqda...';
+  $('#dmChatSheet').style.height='';
   $('#dmChatSheet').classList.add('open');
   applyDmWallpaper();
   tg?.BackButton?.show();
@@ -5062,6 +5088,7 @@ function dmUnstack(sheetId){
 function closeDmChat(){
   if(dmChatPeerId)dmScrollPositions[dmChatPeerId]=$('#dmChatSheetc').scrollTop;
   $('#dmChatSheet').classList.remove('open');tg?.BackButton?.hide();
+  $('#dmChatSheet').style.height='';
   clearInterval(dmChatPollTimer);dmChatPollTimer=null;
   clearInterval(dmPresencePollTimer);dmPresencePollTimer=null;
   if(dmMediaRecorder)stopDmRecording(true);
