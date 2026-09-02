@@ -817,8 +817,22 @@
   .dmTick{opacity:.75; letter-spacing:-1px}
   .dmTick.read{opacity:1}
   .dmEditedLabel{opacity:.75; font-style:italic}
-  .dmEditBtn,.dmDelBtn{cursor:pointer; opacity:.7; font-size:10px}
-  .dmEditBtn:active,.dmDelBtn:active{opacity:1}
+  /* Tap target for Edit/Delete (#dmMsgPopup) — a hint that the bubble itself is
+     interactive, since there's no permanent icon sitting on it anymore. */
+  .dmBubble[data-mine-msg]{cursor:pointer}
+  .dmBubble[data-mine-msg]:active{opacity:.92}
+  /* Floating Edit/Delete popup (#dmMsgPopup) — anchored to the tapped bubble itself via JS
+     (openDmMessageActions), not pinned to the bottom of the screen like every other menu in the
+     app. The overlay is fully transparent (unlike .sheet's dimmed backdrop) since a message
+     right next to the popup should stay legible, not get dimmed out — it's still there to catch
+     an outside tap and close the popup. */
+  .dmMsgPopupOverlay{position:fixed; inset:0; z-index:56; display:none}
+  .dmMsgPopupOverlay.open{display:block}
+  .dmMsgPopup{position:fixed; z-index:57; top:0; left:0; background:var(--card); border:1px solid var(--line); border-radius:14px; box-shadow:0 8px 28px rgba(0,0,0,.32); min-width:170px; padding:6px; opacity:0; pointer-events:none; transform:scale(.95); transition:opacity .12s, transform .12s}
+  .dmMsgPopup.open{opacity:1; pointer-events:auto; transform:scale(1)}
+  .dmMsgPopupItem{display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:9px; cursor:pointer; font-size:14px; font-weight:700; color:var(--text)}
+  .dmMsgPopupItem:active{background:var(--chip)}
+  .dmMsgPopupItem.danger{color:var(--danger)}
   .dmImgMsg{display:block; max-width:220px; max-height:280px; width:100%; height:auto; border-radius:11px; cursor:pointer; background:color-mix(in srgb, var(--line) 40%, transparent)}
   .dmMsgCaption{margin-top:6px}
   .dmAudioLabel{font-size:11.5px; font-weight:700; opacity:.85; margin-bottom:5px}
@@ -1171,6 +1185,15 @@
     <div class="reshareMenuItem" id="dmWallPhotoItem"><span class="rmIcon">🖼</span><div><div class="rmTitle">Rasm tanlash</div><div class="rmSub">Galereyadan fon rasmi yuklang</div></div></div>
     <div class="reshareMenuItem" id="dmWallResetItem"><span class="rmIcon">↺</span><div><div class="rmTitle">Standart holatga qaytarish</div></div></div>
   </div>
+</div>
+<!-- Edit/Delete for your own DM messages — reached by tapping the bubble itself. Deliberately NOT
+     a bottom sheet: a small popup anchored right next to the tapped bubble (see
+     openDmMessageActions' positioning logic), matching Telegram's own on-message context menu
+     rather than this app's usual full-width drawer. -->
+<div class="dmMsgPopupOverlay" id="dmMsgPopupOverlay"></div>
+<div class="dmMsgPopup" id="dmMsgPopup">
+  <div class="dmMsgPopupItem" id="dmMsgEditItem"><span>✏️</span>Tahrirlash</div>
+  <div class="dmMsgPopupItem danger" id="dmMsgDeleteItem"><span>🗑</span>O'chirish</div>
 </div>
 <div class="dmLightbox" id="dmLightbox"><img id="dmLightboxImg" src="" alt=""></div>
 <!-- Reviews used to be a single inline vertical list capped at 20, with the write-a-review form
@@ -4685,9 +4708,7 @@ function fmtDuration(sec){
 function dmBubbleHtml(m){
   const tick=m.is_mine?`<span class="dmTick${m.read?' read':''}">${m.read?'✓✓':'✓'}</span>`:'';
   const edited=m.edited?`<span class="dmEditedLabel">tahrirlangan</span>`:'';
-  const actions=(m.is_mine&&m.status==='active')
-    ?`<span class="dmEditBtn" data-edit="${esc(m.id)}" data-text="${esc(m.text||'')}">✏️</span><span class="dmDelBtn" data-del="${esc(m.id)}">🗑</span>`
-    :'';
+  const mineActive=m.is_mine&&m.status==='active';
   let inner;
   if(m.status!=='active'){
     inner='<i>Xabar o\'chirilgan</i>';
@@ -4703,32 +4724,70 @@ function dmBubbleHtml(m){
     inner=esc(m.text||'');
   }
   return `<div class="dmBubbleRow${m.is_mine?' mine':''}">
-    <div class="dmBubble${m.is_mine?' mine':''}" data-id="${esc(m.id)}">
+    <div class="dmBubble${m.is_mine?' mine':''}" data-id="${esc(m.id)}"${mineActive?` data-mine-msg="1" data-msg-text="${esc(m.text||'')}"`:''}>
       ${inner}
-      <div class="dmBubbleTime">${actions}${edited}${fmtAgo(m.created_at)}${tick}</div>
+      <div class="dmBubbleTime">${edited}${fmtAgo(m.created_at)}${tick}</div>
     </div>
   </div>`;
 }
+// Edit/Delete are reachable by TAPPING one of your own bubbles (Telegram-style — a menu appears
+// on interaction, not two icons sitting on the bubble permanently). Taps on an actual control
+// inside the bubble (the native <audio> player, the image that opens the lightbox) are excluded
+// so this doesn't fight those.
 function wireDmMessageActions(scope){
-  scope.querySelectorAll('[data-edit]').forEach(el=>{
-    if(el.dataset.wired)return; el.dataset.wired='1';
-    el.onclick=e=>{e.stopPropagation();startDmEdit(el.dataset.edit,el.dataset.text||'');};
-  });
-  scope.querySelectorAll('[data-del]').forEach(el=>{
+  scope.querySelectorAll('.dmBubble[data-mine-msg]').forEach(el=>{
     if(el.dataset.wired)return; el.dataset.wired='1';
     el.onclick=e=>{
-      e.stopPropagation();
-      haptic();
-      const id=el.dataset.del;
-      if(dmEditingMessageId===id)cancelDmEdit();
-      api('/api/dm/messages/'+id,{method:'DELETE'}).then(()=>{
-        toast('O\'chirildi');
-        _dmLastRenderedKey=''; // force a re-render even though id/read-state alone wouldn't change
-        loadDmMessages(false);
-      }).catch(()=>toast('Xatolik yuz berdi'));
+      if(e.target.closest('audio')||e.target.classList.contains('dmImgMsg'))return;
+      openDmMessageActions(el.dataset.id,el.dataset.msgText||'',el);
     };
   });
 }
+let dmMessageActionTargetId=null, dmMessageActionTargetText='';
+function openDmMessageActions(id,text,anchorEl){
+  haptic();
+  dmMessageActionTargetId=id;
+  dmMessageActionTargetText=text;
+  const popup=$('#dmMsgPopup'),overlay=$('#dmMsgPopupOverlay');
+  const rect=anchorEl.getBoundingClientRect();
+  overlay.classList.add('open');
+  popup.classList.add('open');
+  // Positioned relative to the tapped bubble itself (not the bottom of the screen), flipped
+  // above<->below and clamped to the viewport so it never renders off-screen. The popup is never
+  // display:none (only opacity:0 pre-.open), so its size is already measurable synchronously —
+  // no need to defer via requestAnimationFrame (which, besides being unnecessary here, behaves
+  // inconsistently enough across headless/automation contexts that it was actually leaving the
+  // popup unpositioned in some of them).
+  const pw=popup.offsetWidth,ph=popup.offsetHeight,margin=8;
+  let top=rect.top-ph-margin;
+  if(top<margin)top=Math.min(rect.bottom+margin,window.innerHeight-ph-margin);
+  const mine=anchorEl.classList.contains('mine');
+  let left=mine?rect.right-pw:rect.left;
+  left=Math.max(margin,Math.min(left,window.innerWidth-pw-margin));
+  popup.style.top=top+'px';
+  popup.style.left=left+'px';
+}
+function closeDmMessageActionSheet(){
+  $('#dmMsgPopup').classList.remove('open');
+  $('#dmMsgPopupOverlay').classList.remove('open');
+}
+$('#dmMsgPopupOverlay').onclick=closeDmMessageActionSheet;
+$('#dmMsgEditItem').onclick=()=>{
+  const id=dmMessageActionTargetId,text=dmMessageActionTargetText;
+  closeDmMessageActionSheet();
+  startDmEdit(id,text);
+};
+$('#dmMsgDeleteItem').onclick=()=>{
+  const id=dmMessageActionTargetId;
+  closeDmMessageActionSheet();
+  haptic();
+  if(dmEditingMessageId===id)cancelDmEdit();
+  api('/api/dm/messages/'+id,{method:'DELETE'}).then(()=>{
+    toast('O\'chirildi');
+    _dmLastRenderedKey=''; // force a re-render even though id/read-state alone wouldn't change
+    loadDmMessages(false);
+  }).catch(()=>toast('Xatolik yuz berdi'));
+};
 function openDmLightbox(src){
   $('#dmLightboxImg').src=src;
   $('#dmLightbox').classList.add('open');
@@ -4813,6 +4872,7 @@ function closeDmChat(){
   if(dmMediaRecorder)stopDmRecording(true);
   dmChatPeerId=null;
   cancelDmEdit();
+  closeDmMessageActionSheet();
   closeDmLightbox();
   loadDmConversations(); // refresh the inbox list's preview/unread state for next open
 }
