@@ -669,6 +669,14 @@
   .dmPhotoStage{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:6px 16px calc(env(safe-area-inset-bottom) + 18px); overflow-y:auto}
   .dmPhotoCropWrap{width:100%; max-width:340px; height:auto; max-height:68vh; margin:0 auto}
   #dmPhotoCropCanvas{width:100%; height:100%; display:block}
+  /* Batch thumbnail strip — hidden entirely (display:none, set in JS) when only one photo is
+     selected, so the single-photo flow looks and behaves exactly as before. */
+  .dmPhotoBatchStrip{display:none; gap:8px; width:100%; max-width:340px; overflow-x:auto; padding:2px}
+  .dmPhotoBatchThumb{position:relative; width:44px; height:44px; border-radius:8px; overflow:hidden; flex-shrink:0; border:2px solid transparent; opacity:.55; transition:opacity .15s,border-color .15s; cursor:pointer}
+  .dmPhotoBatchThumb.active{opacity:1; border-color:var(--accent)}
+  .dmPhotoBatchThumbCanvas{width:100%; height:100%; display:block}
+  .dmPhotoBatchThumbX{position:absolute; top:-4px; right:-4px; width:16px; height:16px; border-radius:50%; background:rgba(0,0,0,.75); color:#fff; font-size:9px; display:flex; align-items:center; justify-content:center; cursor:pointer}
+  .dmPhotoBatchAdd{width:44px; height:44px; border-radius:8px; border:1.5px dashed rgba(255,255,255,.3); color:rgba(255,255,255,.6); display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0; cursor:pointer}
   .dmPhotoZoomRow{display:flex; align-items:center; gap:10px; width:100%; max-width:340px}
   .dmPhotoZoomRow input[type=range]{flex:1; margin:0}
   .dmPhotoZoomLabel{color:rgba(255,255,255,.65); font-size:12.5px; font-variant-numeric:tabular-nums; width:36px; text-align:right; flex-shrink:0}
@@ -1248,7 +1256,7 @@
       <button class="dmRecStop" id="dmVoicePreviewSend">➤</button>
     </div>
     <div class="dtComposerRow" id="dmComposerRow">
-      <input type="file" id="dmAttachInput" accept="image/*,audio/*" hidden>
+      <input type="file" id="dmAttachInput" accept="image/*,audio/*" multiple hidden>
       <span class="dmComposerIcon" id="dmAttachBtn" title="Fayl biriktirish">📎</span>
       <span class="dmComposerIcon" id="dmBookBtn" title="Kitob yuborish">📖</span>
       <textarea id="dmChatText" maxlength="2000" placeholder="Xabar yozing..." rows="1"></textarea>
@@ -1298,6 +1306,9 @@
   </div>
   <div class="dmPhotoStage" id="dmPhotoPreviewSheetc">
     <div class="cropWrap dmPhotoCropWrap" id="dmPhotoCropWrap"><canvas id="dmPhotoCropCanvas"></canvas></div>
+    <!-- Only shown once more than one photo is selected — each thumbnail keeps its own crop/zoom/
+         rotation state, switching just swaps which one the tool above is currently editing. -->
+    <div class="dmPhotoBatchStrip" id="dmPhotoBatchStrip"></div>
     <div class="dmPhotoZoomRow">
       <input type="range" id="dmPhotoCropZoom" min="100" max="300" value="100">
       <span class="dmPhotoZoomLabel" id="dmPhotoZoomLabel">100%</span>
@@ -5249,22 +5260,43 @@ $('#dmAttachBtn').onclick=()=>{
   $('#dmAttachInput').click();
 };
 $('#dmAttachInput').onchange=e=>{
-  const file=e.target.files[0];e.target.value='';
-  if(!file||!dmChatPeerId)return;
-  const kind=file.type.startsWith('image/')?'image':file.type.startsWith('audio/')?'audio':null;
-  if(!kind){toast('Faqat rasm yoki audio fayl yuborish mumkin');return;}
+  const files=Array.from(e.target.files);e.target.value='';
+  if(!files.length||!dmChatPeerId)return;
+  const images=files.filter(f=>f.type.startsWith('image/'));
+  if(images.length){
+    const usable=images.filter(f=>f.size<=8*1024*1024);
+    const oversized=images.length-usable.length;
+    if(oversized)toast(oversized===images.length?'Fayl juda katta (maksimum 8MB)':`${oversized} ta rasm juda katta, o'tkazib yuborildi`);
+    if(!usable.length)return;
+    haptic();
+    // The "+" button inside an already-open batch re-triggers this SAME input to pick more photos
+    // — dmPhotoBatch.length>0 at that point means append, not replace.
+    if(dmPhotoBatch.length)appendDmPhotoBatchFiles(usable);
+    else openDmPhotoPreview(usable);
+    return;
+  }
+  // No images in the selection — falls back to the original single-file audio path (audio was
+  // never a batch/multi-select case, and multi-selecting audio files isn't supported here).
+  const file=files[0];
+  if(!file.type.startsWith('audio/')){toast('Faqat rasm yoki audio fayl yuborish mumkin');return;}
   if(file.size>8*1024*1024){toast('Fayl juda katta (maksimum 8MB)');return;}
   haptic();
-  if(kind==='image'){openDmPhotoPreview(file);return;}
-  sendDmMedia(file,kind,null,null).then(()=>loadDmMessages(true)).catch(()=>toast('Yuborilmadi'));
+  sendDmMedia(file,'audio',null,null).then(()=>loadDmMessages(true)).catch(()=>toast('Yuborilmadi'));
 };
 
 // ---- DM photo send preview: a picked image used to upload the instant it was chosen, with no
 // way to back out, crop, or straighten it — this reviews it first, reusing the avatar/banner
 // crop tool's exact pan/pinch-zoom interaction (see initCropCanvas above) but with the frame's
 // aspect ratio set to the photo's OWN ratio instead of a fixed shape, so the untouched default
-// sends the whole photo and zooming in is an opt-in crop. ----
+// sends the whole photo and zooming in is an opt-in crop.
+//
+// Multi-photo batch: dmPhotoBatch always holds an array (length 1 for the plain single-photo
+// case, so that path is unchanged — the thumbnail strip just stays hidden). Each entry keeps its
+// own {bitmap, scale, offX, offY} so switching between photos in a batch doesn't lose edits;
+// dmPhotoCropState is always "whichever one is currently on screen", same shape as before. ----
 var dmPhotoCropState=null; // var, not let — needs to read as a real window property (see dmScrollPositions' own note on this)
+var dmPhotoBatch=[]; var dmPhotoBatchIndex=0; // var — same cross-script-access reasoning
+const DM_PHOTO_BATCH_MAX=10; // matches Telegram's own album cap
 function loadDmPhotoBitmap(file){
   // createImageBitmap({imageOrientation:'from-image'}) bakes in the camera's EXIF rotation flag —
   // a plain <img>/canvas draw ignores it, which is the classic "photo comes out sideways" bug.
@@ -5277,44 +5309,130 @@ function loadDmPhotoBitmap(file){
     img.src=url;
   });
 }
-function openDmPhotoPreview(file){
-  loadDmPhotoBitmap(file).then(bmp=>{
-    $('#dmPhotoCaption').value='';
-    // Names the actual recipient instead of a generic "Rasmni yuborish" — same reasoning as
-    // Telegram's own photo-send screen: confirms who this is actually going to before you send it.
-    $('#dmPhotoPreviewTitle').textContent=dmChatPeerName||'Rasmni yuborish';
-    $('#dmPhotoPreviewSheet').classList.add('open');
-    tg?.BackButton?.show();
-    // A macrotask tick (not requestAnimationFrame — doesn't reliably fire under headless/automation
-    // capture, confirmed once already this session with the message-action popup) so the sheet's own
-    // display:none->flex layout pass has happened before cropWrap's size is read; reading it in the
-    // same tick .open was applied can still measure a stale 0x0 box on some engines.
-    setTimeout(()=>initDmPhotoCrop(bmp),0);
-  }).catch(()=>toast('Rasmni ochib bo\'lmadi'));
+function openDmPhotoPreview(files){
+  $('#dmPhotoCaption').value='';
+  // Names the actual recipient instead of a generic "Rasmni yuborish" — same reasoning as
+  // Telegram's own photo-send screen: confirms who this is actually going to before you send it.
+  $('#dmPhotoPreviewTitle').textContent=dmChatPeerName||'Rasmni yuborish';
+  $('#dmPhotoPreviewSheet').classList.add('open');
+  tg?.BackButton?.show();
+  dmPhotoBatch=files.map(file=>({file,bitmap:null,scale:null,offX:null,offY:null}));
+  dmPhotoBatchIndex=0;
+  renderDmPhotoBatchStrip();
+  Promise.all(dmPhotoBatch.map(item=>loadDmPhotoBitmap(item.file).then(bmp=>{item.bitmap=bmp;renderDmPhotoBatchStrip();}).catch(()=>{item.failed=true;})))
+    .then(()=>{
+      dmPhotoBatch=dmPhotoBatch.filter(it=>!it.failed);
+      if(!dmPhotoBatch.length){toast('Rasmlarni ochib bo\'lmadi');closeDmPhotoPreview();return;}
+      if(dmPhotoBatchIndex>=dmPhotoBatch.length)dmPhotoBatchIndex=0;
+      renderDmPhotoBatchStrip();
+      // A macrotask tick (not requestAnimationFrame — doesn't reliably fire under headless/automation
+      // capture, confirmed once already this session with the message-action popup) so the sheet's own
+      // display:none->flex layout pass has happened before cropWrap's size is read; reading it in the
+      // same tick .open was applied can still measure a stale 0x0 box on some engines.
+      setTimeout(()=>initDmPhotoCrop(dmPhotoBatch[dmPhotoBatchIndex].bitmap),0);
+    });
 }
-function initDmPhotoCrop(bmp){
+function appendDmPhotoBatchFiles(files){
+  const room=DM_PHOTO_BATCH_MAX-dmPhotoBatch.length;
+  if(room<=0){toast(`Bitta xabarda maksimum ${DM_PHOTO_BATCH_MAX} ta rasm`);return;}
+  if(files.length>room)toast(`Bitta xabarda maksimum ${DM_PHOTO_BATCH_MAX} ta rasm`);
+  const newItems=files.slice(0,room).map(file=>({file,bitmap:null,scale:null,offX:null,offY:null}));
+  dmPhotoBatch=dmPhotoBatch.concat(newItems);
+  renderDmPhotoBatchStrip();
+  Promise.all(newItems.map(item=>loadDmPhotoBitmap(item.file).then(bmp=>{item.bitmap=bmp;renderDmPhotoBatchStrip();}).catch(()=>{item.failed=true;})))
+    .then(()=>{dmPhotoBatch=dmPhotoBatch.filter(it=>!it.failed);renderDmPhotoBatchStrip();});
+}
+// Pure sizing math shared between the live editor (initDmPhotoCrop) and export-time state for a
+// batch item that was never actually visited/switched to (dmPhotoEffectiveState) — both need the
+// SAME frame dimensions a given bitmap would get, without the latter touching the DOM canvas.
+function dmPhotoFrameDims(bmp){
   const wrap=$('#dmPhotoCropWrap');
   const imgRatio=bmp.width/bmp.height;
   const maxW=Math.min(wrap.parentElement.clientWidth||340,340);
   const maxH=window.innerHeight*0.62;
   let cssW=maxW,cssH=cssW/imgRatio;
   if(cssH>maxH){cssH=maxH;cssW=cssH*imgRatio;}
+  const dpr=Math.min(window.devicePixelRatio||1,2);
+  return{cssW,cssH,width:Math.round(cssW*dpr),height:Math.round(cssH*dpr)};
+}
+function initDmPhotoCrop(bmp,savedState){
+  const wrap=$('#dmPhotoCropWrap');
+  const{cssW,cssH,width,height}=dmPhotoFrameDims(bmp);
   wrap.style.width=Math.round(cssW)+'px';
   wrap.style.height=Math.round(cssH)+'px';
   const canvas=$('#dmPhotoCropCanvas');
-  const dpr=Math.min(window.devicePixelRatio||1,2);
-  canvas.width=Math.round(cssW*dpr);canvas.height=Math.round(cssH*dpr);
+  canvas.width=width;canvas.height=height;
   const minScale=Math.max(canvas.width/bmp.width,canvas.height/bmp.height);
   dmPhotoCropState={
     img:bmp, ctx:canvas.getContext('2d'), canvas,
-    scale:minScale, minScale,
-    offX:(canvas.width-bmp.width*minScale)/2,
-    offY:(canvas.height-bmp.height*minScale)/2,
+    scale:savedState?savedState.scale:minScale, minScale,
+    offX:savedState?savedState.offX:(canvas.width-bmp.width*minScale)/2,
+    offY:savedState?savedState.offY:(canvas.height-bmp.height*minScale)/2,
   };
-  $('#dmPhotoCropZoom').value=100;
-  $('#dmPhotoZoomLabel').textContent='100%';
+  const pct=Math.round((dmPhotoCropState.scale/minScale)*100);
+  $('#dmPhotoCropZoom').value=pct;
+  $('#dmPhotoZoomLabel').textContent=pct+'%';
   drawDmPhotoCrop();
   wireDmPhotoCropGestures();
+}
+// The crop/zoom state for ANY batch item, whether or not it's the one currently on screen —
+// items never switched to yet still have scale===null, so this computes the same default-fit
+// state initDmPhotoCrop would have set, without needing a live canvas for it.
+function dmPhotoEffectiveState(item){
+  const{width,height}=dmPhotoFrameDims(item.bitmap);
+  const minScale=Math.max(width/item.bitmap.width,height/item.bitmap.height);
+  if(item.scale!=null)return{img:item.bitmap,canvas:{width,height},scale:item.scale,offX:item.offX,offY:item.offY};
+  return{img:item.bitmap,canvas:{width,height},scale:minScale,offX:(width-item.bitmap.width*minScale)/2,offY:(height-item.bitmap.height*minScale)/2};
+}
+function renderDmPhotoBatchStrip(){
+  const strip=$('#dmPhotoBatchStrip');
+  if(dmPhotoBatch.length<=1){strip.style.display='none';strip.innerHTML='';return;}
+  strip.style.display='flex';
+  const canAdd=dmPhotoBatch.length<DM_PHOTO_BATCH_MAX;
+  strip.innerHTML=dmPhotoBatch.map((item,i)=>`<div class="dmPhotoBatchThumb${i===dmPhotoBatchIndex?' active':''}" data-idx="${i}">
+      ${item.bitmap?`<canvas class="dmPhotoBatchThumbCanvas" data-idx2="${i}"></canvas>`:''}
+      <span class="dmPhotoBatchThumbX" data-remove="${i}">✕</span>
+    </div>`).join('') + (canAdd?'<div class="dmPhotoBatchAdd" id="dmPhotoBatchAddBtn">+</div>':'');
+  strip.querySelectorAll('[data-idx]').forEach(el=>{
+    el.onclick=()=>showDmPhotoBatchItem(parseInt(el.dataset.idx,10));
+  });
+  strip.querySelectorAll('[data-remove]').forEach(el=>{
+    el.onclick=e=>{e.stopPropagation();removeDmPhotoBatchItem(parseInt(el.dataset.remove,10));};
+  });
+  const addBtn=$('#dmPhotoBatchAddBtn');
+  if(addBtn)addBtn.onclick=()=>$('#dmAttachInput').click();
+  strip.querySelectorAll('.dmPhotoBatchThumbCanvas').forEach(c=>{
+    const item=dmPhotoBatch[parseInt(c.dataset.idx2,10)];
+    if(!item||!item.bitmap)return;
+    const size=44,dpr=Math.min(window.devicePixelRatio||1,2);
+    c.width=size*dpr;c.height=size*dpr;
+    const bmp=item.bitmap;
+    const s=Math.max(c.width/bmp.width,c.height/bmp.height);
+    c.getContext('2d').drawImage(bmp,(c.width-bmp.width*s)/2,(c.height-bmp.height*s)/2,bmp.width*s,bmp.height*s);
+  });
+}
+function showDmPhotoBatchItem(index){
+  if(index===dmPhotoBatchIndex||!dmPhotoBatch[index])return;
+  haptic();
+  const cur=dmPhotoBatch[dmPhotoBatchIndex];
+  if(cur&&dmPhotoCropState){cur.scale=dmPhotoCropState.scale;cur.offX=dmPhotoCropState.offX;cur.offY=dmPhotoCropState.offY;}
+  dmPhotoBatchIndex=index;
+  const item=dmPhotoBatch[index];
+  initDmPhotoCrop(item.bitmap,item.scale!=null?{scale:item.scale,offX:item.offX,offY:item.offY}:null);
+  renderDmPhotoBatchStrip();
+}
+function removeDmPhotoBatchItem(index){
+  haptic();
+  if(dmPhotoBatch.length<=1){closeDmPhotoPreview();return;}
+  const wasActive=index===dmPhotoBatchIndex;
+  dmPhotoBatch.splice(index,1);
+  if(dmPhotoBatchIndex>=dmPhotoBatch.length)dmPhotoBatchIndex=dmPhotoBatch.length-1;
+  else if(index<dmPhotoBatchIndex)dmPhotoBatchIndex--;
+  if(wasActive){
+    const item=dmPhotoBatch[dmPhotoBatchIndex];
+    initDmPhotoCrop(item.bitmap,item.scale!=null?{scale:item.scale,offX:item.offX,offY:item.offY}:null);
+  }
+  renderDmPhotoBatchStrip();
 }
 function drawDmPhotoCrop(){
   const{ctx,canvas,img,scale,offX,offY}=dmPhotoCropState;
@@ -5391,42 +5509,64 @@ $('#dmPhotoRotateBtn').onclick=()=>{
   octx.translate(h/2,w/2);
   octx.rotate(Math.PI/2);
   octx.drawImage(img,-w/2,-h/2);
+  // Persists onto the batch item too (bitmap swapped, saved pan/zoom cleared since the rotated
+  // frame is a different shape) so the rotation survives switching away and back via the strip.
+  const item=dmPhotoBatch[dmPhotoBatchIndex];
+  if(item){item.bitmap=off;item.scale=null;item.offX=null;item.offY=null;}
   initDmPhotoCrop(off);
+  renderDmPhotoBatchStrip();
 };
+function exportDmPhotoBlob(state){
+  return new Promise(resolve=>{
+    const{img,canvas,scale,offX,offY}=state;
+    // Exported independently of the small on-screen preview canvas (which is capped by devicePixelRatio
+    // for smooth panning, not upload quality) — same offX/offY/scale state, translated into a source
+    // rect in the ORIGINAL image's own pixel space, then redrawn at a real resolution.
+    const srcX=-offX/scale,srcY=-offY/scale,srcW=canvas.width/scale,srcH=canvas.height/scale;
+    const MAX_DIM=1600;
+    let outW=srcW,outH=srcH;
+    if(outW>MAX_DIM||outH>MAX_DIM){
+      const r=Math.min(MAX_DIM/outW,MAX_DIM/outH);
+      outW*=r;outH*=r;
+    }
+    const out=document.createElement('canvas');
+    out.width=Math.max(1,Math.round(outW));out.height=Math.max(1,Math.round(outH));
+    out.getContext('2d').drawImage(img,srcX,srcY,srcW,srcH,0,0,out.width,out.height);
+    out.toBlob(blob=>resolve(blob),'image/jpeg',0.9);
+  });
+}
 function closeDmPhotoPreview(){
   $('#dmPhotoPreviewSheet').classList.remove('open');
   tg?.BackButton?.hide();
   dmPhotoCropState=null;
+  dmPhotoBatch=[];
+  dmPhotoBatchIndex=0;
 }
 $('#dmPhotoPreviewClose').onclick=closeDmPhotoPreview;
 $('#dmPhotoPreviewSheet').onclick=e=>{if(e.target.id==='dmPhotoPreviewSheet')closeDmPhotoPreview();};
-$('#dmPhotoSendBtn').onclick=()=>{
-  if(!dmPhotoCropState||!dmChatPeerId)return;
+$('#dmPhotoSendBtn').onclick=async()=>{
+  if(!dmPhotoCropState||!dmChatPeerId||!dmPhotoBatch.length)return;
+  const cur=dmPhotoBatch[dmPhotoBatchIndex];
+  if(cur){cur.scale=dmPhotoCropState.scale;cur.offX=dmPhotoCropState.offX;cur.offY=dmPhotoCropState.offY;}
   const btn=$('#dmPhotoSendBtn');btn.disabled=true;btn.style.opacity='.5';
-  const{img,canvas,scale,offX,offY}=dmPhotoCropState;
-  // Exported independently of the small on-screen preview canvas (which is capped by devicePixelRatio
-  // for smooth panning, not upload quality) — same offX/offY/scale state, translated into a source
-  // rect in the ORIGINAL image's own pixel space, then redrawn at a real resolution.
-  const srcX=-offX/scale,srcY=-offY/scale,srcW=canvas.width/scale,srcH=canvas.height/scale;
-  const MAX_DIM=1600;
-  let outW=srcW,outH=srcH;
-  if(outW>MAX_DIM||outH>MAX_DIM){
-    const r=Math.min(MAX_DIM/outW,MAX_DIM/outH);
-    outW*=r;outH*=r;
+  const caption=$('#dmPhotoCaption').value.trim()||null;
+  haptic('medium');
+  const batch=dmPhotoBatch; // snapshot — closeDmPhotoPreview() clears the shared array
+  let anyFail=false;
+  for(let i=0;i<batch.length;i++){
+    const state=dmPhotoEffectiveState(batch[i]);
+    const blob=await exportDmPhotoBlob(state);
+    if(!blob){anyFail=true;continue;}
+    const file=new File([blob],'photo'+(i+1)+'.jpg',{type:'image/jpeg'});
+    // One caption for the whole batch, same convention as Telegram's own albums (typed once,
+    // shown against the last item) rather than repeating it on every photo.
+    const isLast=i===batch.length-1;
+    try{await sendDmMedia(file,'image',isLast?caption:null,null);}catch(e){anyFail=true;}
   }
-  const out=document.createElement('canvas');
-  out.width=Math.max(1,Math.round(outW));out.height=Math.max(1,Math.round(outH));
-  out.getContext('2d').drawImage(img,srcX,srcY,srcW,srcH,0,0,out.width,out.height);
-  out.toBlob(blob=>{
-    if(!blob){toast('Xatolik yuz berdi');btn.disabled=false;btn.style.opacity='';return;}
-    const file=new File([blob],'photo.jpg',{type:'image/jpeg'});
-    const caption=$('#dmPhotoCaption').value.trim()||null;
-    haptic('medium');
-    sendDmMedia(file,'image',caption,null).then(()=>{
-      loadDmMessages(true);
-      closeDmPhotoPreview();
-    }).catch(()=>toast('Yuborilmadi')).finally(()=>{btn.disabled=false;btn.style.opacity='';});
-  },'image/jpeg',0.9);
+  loadDmMessages(true);
+  btn.disabled=false;btn.style.opacity='';
+  if(anyFail)toast('Ba\'zi rasmlar yuborilmadi');
+  else closeDmPhotoPreview();
 };
 
 // ---- share a book (📖) — searches the already-loaded catalog (DB.books) client-side with the
