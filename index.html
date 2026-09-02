@@ -4808,6 +4808,9 @@ function fmtExactDateTime(iso){
 }
 function dmPresenceLabel(pr){
   if(!pr)return'';
+  // A block (either direction) hides real presence server-side — see user_presence_route — same
+  // as Telegram: blocking someone also stops either side from seeing the other's online/last-seen.
+  if(pr.blocked)return"Ko'rilmagan";
   if(pr.typing)return"yozmoqda...";
   if(pr.online)return'Onlayn';
   return pr.last_active_at?('Oxirgi faollik: '+fmtExactDateTime(pr.last_active_at)):'';
