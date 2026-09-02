@@ -804,6 +804,7 @@
   .dmChatTitleName{overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:15.5px; font-weight:800; color:var(--text)}
   .dmChatTitleStatus{font-size:11.5px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
   .dmChatTitleStatus.online{color:#2ecc71; font-weight:700}
+  .dmChatTitleStatus.typing{color:var(--accent); font-style:italic}
   .dmBubbleRow{display:flex; margin-bottom:8px}
   .dmBubbleRow.mine{justify-content:flex-end}
   /* A defined 1px border on BOTH bubble variants (not just "theirs") — reads more precisely and
@@ -4708,6 +4709,7 @@ function closeDmLightbox(){$('#dmLightbox').classList.remove('open');$('#dmLight
 $('#dmLightbox').onclick=closeDmLightbox;
 function dmPresenceLabel(pr){
   if(!pr)return'';
+  if(pr.typing)return"yozmoqda...";
   if(pr.online)return'Onlayn';
   return pr.last_active_at?('Oxirgi faollik: '+fmtAgo(pr.last_active_at)):'';
 }
@@ -4719,7 +4721,8 @@ function refreshDmChatPresence(){
     const el=$('#dmChatTitleStatus');
     if(!el)return;
     el.textContent=dmPresenceLabel(pr);
-    el.classList.toggle('online',!!pr.online);
+    el.classList.toggle('online',!!(pr.online||pr.typing));
+    el.classList.toggle('typing',!!pr.typing);
   }).catch(()=>{});
 }
 function openDmChat(peerId){
@@ -4750,7 +4753,10 @@ function openDmChat(peerId){
   clearInterval(dmChatPollTimer);
   dmChatPollTimer=setInterval(()=>{if(document.visibilityState==='visible')loadDmMessages(false);},5000);
   clearInterval(dmPresencePollTimer);
-  dmPresencePollTimer=setInterval(()=>{if(document.visibilityState==='visible')refreshDmChatPresence();},15000);
+  // Fast enough for a typing indicator to feel live (server TTL on the typing key is 5s — see
+  // db.set_dm_typing), slow enough not to hammer the server for what's still just a decorative
+  // status line.
+  dmPresencePollTimer=setInterval(()=>{if(document.visibilityState==='visible')refreshDmChatPresence();},3000);
 }
 function loadDmMessages(scrollToBottom){
   if(!dmChatPeerId)return;
@@ -4792,6 +4798,16 @@ $('#dmChatSend').onclick=()=>{
     $('#dmChatText').value='';
     loadDmMessages(true);
   }).catch(()=>toast('Xatolik yuz berdi')).finally(()=>{btn.disabled=false;});
+};
+// Debounced typing ping — at most once every 2.5s while actually typing (the server key has a 5s
+// TTL, so this comfortably keeps it alive without a request on every keystroke).
+let dmLastTypingPingAt=0;
+$('#dmChatText').oninput=()=>{
+  if(!dmChatPeerId||!canAct())return;
+  const now=Date.now();
+  if(now-dmLastTypingPingAt<2500)return;
+  dmLastTypingPingAt=now;
+  api('/api/dm/'+dmChatPeerId+'/typing',{method:'POST'}).catch(()=>{});
 };
 
 // ---- media attachments: image / audio-file pick, and voice-note recording. Video is
