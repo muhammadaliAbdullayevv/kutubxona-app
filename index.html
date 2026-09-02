@@ -816,6 +816,9 @@
   .dmBubbleTime{font-size:10px; opacity:.65; margin-top:4px; text-align:right; display:flex; justify-content:flex-end; align-items:center; gap:3px}
   .dmTick{opacity:.75; letter-spacing:-1px}
   .dmTick.read{opacity:1}
+  .dmEditedLabel{opacity:.75; font-style:italic}
+  .dmEditBtn,.dmDelBtn{cursor:pointer; opacity:.7; font-size:10px}
+  .dmEditBtn:active,.dmDelBtn:active{opacity:1}
   .dmImgMsg{display:block; max-width:220px; max-height:280px; width:100%; height:auto; border-radius:11px; cursor:pointer; background:color-mix(in srgb, var(--line) 40%, transparent)}
   .dmMsgCaption{margin-top:6px}
   .dmAudioLabel{font-size:11.5px; font-weight:700; opacity:.85; margin-bottom:5px}
@@ -1135,6 +1138,7 @@
   </div>
   <div class="ssheetc" id="dmChatSheetc" style="padding-bottom:100px"></div>
   <div id="dmComposerBar">
+    <div class="dtReplyChip" id="dmEditChip" style="display:none"><span>✏️ Xabarni tahrirlash</span><span class="dtReplyChipX" id="dmEditChipX">✕</span></div>
     <div class="dmRecordingRow" id="dmRecordingRow" style="display:none">
       <span class="dmRecDot"></span>
       <span class="dmRecTimer" id="dmRecTimer">0:00</span>
@@ -4648,7 +4652,7 @@ function closeDmConversations(){$('#dmConversationsSheet').classList.remove('ope
 $('#dmConversationsClose').onclick=closeDmConversations;
 $('#dmConversationsSheet').onclick=e=>{if(e.target.id==='dmConversationsSheet')closeDmConversations();};
 
-let dmChatPeerId=null, dmChatPeerName='', dmChatBlockedByMe=false, dmChatPollTimer=null, dmPresencePollTimer=null;
+let dmChatPeerId=null, dmChatPeerName='', dmChatBlockedByMe=false, dmChatPollTimer=null, dmPresencePollTimer=null, dmEditingMessageId=null;
 let _dmLastRenderedKey='';
 // Stream-token cache (getStreamToken, defined above for book/audio reading) — a media message's
 // <img>/<audio> src can't carry our normal Authorization header, so each one needs a short-lived
@@ -4680,6 +4684,10 @@ function fmtDuration(sec){
 }
 function dmBubbleHtml(m){
   const tick=m.is_mine?`<span class="dmTick${m.read?' read':''}">${m.read?'✓✓':'✓'}</span>`:'';
+  const edited=m.edited?`<span class="dmEditedLabel">tahrirlangan</span>`:'';
+  const actions=(m.is_mine&&m.status==='active')
+    ?`<span class="dmEditBtn" data-edit="${esc(m.id)}" data-text="${esc(m.text||'')}">✏️</span><span class="dmDelBtn" data-del="${esc(m.id)}">🗑</span>`
+    :'';
   let inner;
   if(m.status!=='active'){
     inner='<i>Xabar o\'chirilgan</i>';
@@ -4697,9 +4705,29 @@ function dmBubbleHtml(m){
   return `<div class="dmBubbleRow${m.is_mine?' mine':''}">
     <div class="dmBubble${m.is_mine?' mine':''}" data-id="${esc(m.id)}">
       ${inner}
-      <div class="dmBubbleTime">${fmtAgo(m.created_at)}${tick}</div>
+      <div class="dmBubbleTime">${actions}${edited}${fmtAgo(m.created_at)}${tick}</div>
     </div>
   </div>`;
+}
+function wireDmMessageActions(scope){
+  scope.querySelectorAll('[data-edit]').forEach(el=>{
+    if(el.dataset.wired)return; el.dataset.wired='1';
+    el.onclick=e=>{e.stopPropagation();startDmEdit(el.dataset.edit,el.dataset.text||'');};
+  });
+  scope.querySelectorAll('[data-del]').forEach(el=>{
+    if(el.dataset.wired)return; el.dataset.wired='1';
+    el.onclick=e=>{
+      e.stopPropagation();
+      haptic();
+      const id=el.dataset.del;
+      if(dmEditingMessageId===id)cancelDmEdit();
+      api('/api/dm/messages/'+id,{method:'DELETE'}).then(()=>{
+        toast('O\'chirildi');
+        _dmLastRenderedKey=''; // force a re-render even though id/read-state alone wouldn't change
+        loadDmMessages(false);
+      }).catch(()=>toast('Xatolik yuz berdi'));
+    };
+  });
 }
 function openDmLightbox(src){
   $('#dmLightboxImg').src=src;
@@ -4764,16 +4792,17 @@ function loadDmMessages(scrollToBottom){
   api('/api/dm/'+peerId+'/messages').then(r=>{
     if(dmChatPeerId!==peerId)return; // chat was switched/closed while this was in flight
     const items=(r.items||[]).slice().reverse(); // API returns newest-first; render oldest-first
-    // Skip re-render when nothing actually changed (id + read-state signature) — a naive
-    // innerHTML replace on every 5s poll would tear down and restart any <audio>/<img> element
-    // mid-playback for no reason.
-    const key=items.map(m=>m.id+':'+(m.read?1:0)).join(',');
+    // Skip re-render when nothing actually changed (id + read/edited/deleted-status signature) —
+    // a naive innerHTML replace on every 5s poll would tear down and restart any <audio>/<img>
+    // element mid-playback for no reason.
+    const key=items.map(m=>m.id+':'+(m.read?1:0)+':'+(m.edited?1:0)+':'+m.status).join(',');
     if(key===_dmLastRenderedKey && !scrollToBottom)return;
     _dmLastRenderedKey=key;
     const c=$('#dmChatSheetc');
     const wasNearBottom=c.scrollHeight-c.scrollTop-c.clientHeight<80;
     c.innerHTML=items.length?items.map(dmBubbleHtml).join(''):'<p class="hint">Hali xabar yo\'q. Birinchi bo\'lib yozing!</p>';
     wireDmMediaSrcs(c);
+    wireDmMessageActions(c);
     if(scrollToBottom||wasNearBottom)c.scrollTop=c.scrollHeight;
   }).catch(()=>{});
 }
@@ -4783,17 +4812,42 @@ function closeDmChat(){
   clearInterval(dmPresencePollTimer);dmPresencePollTimer=null;
   if(dmMediaRecorder)stopDmRecording(true);
   dmChatPeerId=null;
-  $('#dmChatText').value='';
+  cancelDmEdit();
   closeDmLightbox();
   loadDmConversations(); // refresh the inbox list's preview/unread state for next open
 }
 $('#dmChatClose').onclick=closeDmChat;
 $('#dmChatSheet').onclick=e=>{if(e.target.id==='dmChatSheet')closeDmChat();};
+// Editing reuses the same composer textarea/send button a new message uses — tapping ✏️ on one
+// of your own bubbles (wireDmMessageActions) loads its text in, shows a chip (same shape as
+// Davra's own reply chip), and re-targets the send button at the PATCH route instead of POST
+// until either sent or cancelled.
+function startDmEdit(id,text){
+  if(dmMediaRecorder)stopDmRecording(true);
+  dmEditingMessageId=id;
+  $('#dmChatText').value=text;
+  $('#dmChatText').focus();
+  $('#dmEditChip').style.display='flex';
+}
+function cancelDmEdit(){
+  dmEditingMessageId=null;
+  $('#dmChatText').value='';
+  $('#dmEditChip').style.display='none';
+}
+$('#dmEditChipX').onclick=cancelDmEdit;
 $('#dmChatSend').onclick=()=>{
   const text=$('#dmChatText').value.trim();
   if(!text||!dmChatPeerId)return;
   const btn=$('#dmChatSend');
   btn.disabled=true;
+  if(dmEditingMessageId){
+    api('/api/dm/messages/'+dmEditingMessageId,{method:'PATCH',body:JSON.stringify({text})}).then(()=>{
+      cancelDmEdit();
+      _dmLastRenderedKey=''; // force a re-render — edited-state alone already differs, but be explicit
+      loadDmMessages(false);
+    }).catch(()=>toast('Xatolik yuz berdi')).finally(()=>{btn.disabled=false;});
+    return;
+  }
   api('/api/dm/'+dmChatPeerId+'/messages',{method:'POST',body:JSON.stringify({text})}).then(()=>{
     $('#dmChatText').value='';
     loadDmMessages(true);
