@@ -425,7 +425,7 @@
   .liveBadgeRight{display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700; opacity:.92}
   /* The panel is a full page (like the PDF reader), not a bottom drawer — a "footer" card reads
      as a minor add-on; a whole page reads as what it actually is, the app's stats dashboard. */
-  #liveSheet,#listSheet,#shelvesSheet,#reviewsSheet,#writeReviewSheet,#profileEditSheet,#avatarCropSheet,#bannerCropSheet,#davraComposeSheet,#davraThreadSheet,#userProfileSheet,#followListSheet,#notifSheet,#usersListSheet,#leaderboardSheet,#certDetailSheet{flex-direction:column}
+  #liveSheet,#listSheet,#shelvesSheet,#reviewsSheet,#writeReviewSheet,#profileEditSheet,#avatarCropSheet,#bannerCropSheet,#davraComposeSheet,#davraThreadSheet,#userProfileSheet,#followListSheet,#notifSheet,#usersListSheet,#leaderboardSheet,#certDetailSheet,#dmConversationsSheet,#dmChatSheet{flex-direction:column}
   /* Generalized from the Statistika panel's own topbar so new full-page sheets (Reading Room's
      drill-in lists, Javon) get the same "whole page, not a bottom drawer" treatment for free. */
   /* Close/back button first, title right after it — both left-aligned (not space-between, which
@@ -506,7 +506,7 @@
   .dcPickedTitle{font-size:13px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text)}
   .dcPickedAuthor{font-size:11.5px; color:var(--muted)}
   .dcPickedChange{font-size:12px; font-weight:700; color:var(--accent); cursor:pointer; flex-shrink:0}
-  #dtComposerBar{position:absolute; left:0; right:0; bottom:0; background:var(--bg); border-top:1px solid var(--line); padding:8px 14px calc(env(safe-area-inset-bottom) + 8px); box-sizing:border-box}
+  #dtComposerBar,#dmComposerBar{position:absolute; left:0; right:0; bottom:0; background:var(--bg); border-top:1px solid var(--line); padding:8px 14px calc(env(safe-area-inset-bottom) + 8px); box-sizing:border-box}
   .dtReplyChip{display:flex; align-items:center; justify-content:space-between; background:var(--chip); border-radius:10px; padding:5px 10px; margin-bottom:6px; font-size:12px; color:var(--muted)}
   .dtReplyChipX{cursor:pointer; font-weight:700; padding:0 4px}
   .dtComposerRow{display:flex; align-items:flex-end; gap:8px}
@@ -739,9 +739,14 @@
   /* Follow, unlike edit, is the primary action on someone else's profile — it keeps a real
      button, just moved to its own row below the identity so it never fights name/username for
      width either. */
-  .pHeroActions{padding:0 14px 14px}
+  .pHeroActions{padding:0 14px 14px; display:flex; gap:8px; flex-wrap:wrap}
   .followBtn{padding:8px 18px; border-radius:13px; border:0; font-weight:800; font-size:12.5px; white-space:nowrap; cursor:pointer; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff}
   .followBtn.on{background:var(--card); border:1px solid var(--line); color:var(--text)}
+  /* Message button — only rendered when dm-eligibility says the pair are mutual follows and
+     neither has blocked the other (see loadUserProfileHero); a blocked-by-me viewer sees an
+     Unblock affordance here instead, so blocking someone never strands them with no way back. */
+  .dmMsgBtn{padding:8px 18px; border-radius:13px; border:1px solid var(--line); font-weight:800; font-size:12.5px; white-space:nowrap; cursor:pointer; background:var(--chip); color:var(--text)}
+  .dmMsgBtn.blocked{color:var(--danger); border-color:var(--danger)}
   /* Follow-counts and bio are now their own bordered sections — a divider above each rather than
      just stacked text — so the identity row, the stats, and the bio read as distinct blocks. */
   .pFollowRow{display:flex; gap:20px; padding:14px; border-top:1px solid var(--line)}
@@ -780,6 +785,28 @@
   .referralSub{font-size:12.5px; opacity:.85; line-height:1.45; margin:4px 0 12px}
   .referralShareBtn{width:100%; border:0; background:rgba(255,255,255,.2); color:#fff; font-weight:800; font-size:14px; padding:11px; border-radius:12px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px}
   .referralShareBtn:active{transform:scale(.98)}
+  /* ---- direct messages (#dmConversationsSheet / #dmChatSheet) — mutual-follows-only, migration
+     111. Conversation rows mirror .notifRow's shape; bubbles are a standard two-column chat
+     layout with "mine" right-aligned in the accent gradient (matching every other "my action"
+     surface — the follow button, the composer send button). ---- */
+  .dmDot{position:absolute; top:2px; right:2px; width:9px; height:9px; border-radius:50%; background:#ff4d4f; border:2px solid var(--bg)}
+  .dmConvRow{display:flex; align-items:center; gap:10px; padding:12px 2px; border-top:1px solid var(--line); cursor:pointer}
+  .dmConvRow:first-of-type{border-top:0}
+  .dmConvBody{flex:1; min-width:0}
+  .dmConvName{font-size:14px; font-weight:800; color:var(--text)}
+  .dmConvPreview{font-size:12.5px; color:var(--muted); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .dmConvRow.unread .dmConvPreview{color:var(--text); font-weight:600}
+  .dmConvMeta{display:flex; flex-direction:column; align-items:flex-end; gap:5px; flex-shrink:0}
+  .dmConvTime{font-size:11px; color:var(--muted)}
+  .dmConvUnreadBadge{min-width:18px; height:18px; padding:0 5px; border-radius:999px; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; font-size:10.5px; font-weight:800; display:flex; align-items:center; justify-content:center}
+  .dmChatTitle{flex:1; display:flex; align-items:center; gap:8px; min-width:0; cursor:pointer}
+  .dmChatTitle span{overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:16px; font-weight:800}
+  .dmBubbleRow{display:flex; margin-bottom:8px}
+  .dmBubbleRow.mine{justify-content:flex-end}
+  .dmBubble{max-width:78%; background:var(--card); border:1px solid var(--line); border-radius:16px 16px 16px 4px; padding:9px 12px; font-size:13.5px; line-height:1.4; color:var(--text)}
+  .dmBubble.mine{background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border:0; border-radius:16px 16px 4px 16px}
+  .dmBubble i{opacity:.75}
+  .dmBubbleTime{font-size:10px; opacity:.65; margin-top:4px; text-align:right}
   /* Push-notification opt-out row, top of #notifSheetc — see openNotifications(). A small,
      reusable on/off switch (no such component existed before this) rather than a second tap-to-
      cycle row style, since a persistent setting reads more clearly as a real switch. */
@@ -932,7 +959,7 @@
 <div class="wrap">
   <header>
     <div id="homeHeader">
-      <h1><img class="headerLogo" src="ptr-logo.png" alt=""> Kutubxona <a href="quran.html" id="btnQuran" style="float:right; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle">📖 Qur'on</a><a id="btnNotif" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer; position:relative"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span id="notifDot" class="notifDot" style="display:none"></span></a><a id="btnTheme" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer">☀️</a><a id="btnSearchIcon" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer">🔍</a></h1>
+      <h1><img class="headerLogo" src="ptr-logo.png" alt=""> Kutubxona <a href="quran.html" id="btnQuran" style="float:right; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle">📖 Qur'on</a><a id="btnNotif" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer; position:relative"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span id="notifDot" class="notifDot" style="display:none"></span></a><a id="btnDm" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer; position:relative"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:block"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg><span id="dmDot" class="dmDot" style="display:none"></span></a><a id="btnTheme" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer">☀️</a><a id="btnSearchIcon" style="float:right; margin-right:8px; font-size:13px; font-weight:700; color:var(--accent); text-decoration:none; background:var(--chip); border:1px solid var(--line); border-radius:999px; padding:6px 13px; vertical-align:middle; cursor:pointer">🔍</a></h1>
       <div class="liveHeaderRow"><a id="btnLive" class="liveBadge">📊 Statistika<span class="liveBadgeRight"><span class="liveDot"></span><span id="btnLiveN">–</span> onlayn</span></a></div>
     </div>
     <!-- Search's own header: an explicit back arrow (the thing that was missing — the only way
@@ -1059,6 +1086,34 @@
 <div class="sheet" id="notifSheet" style="z-index:53; align-items:stretch; background:var(--bg)">
   <div class="stopbar"><div class="gclose" id="notifClose">✕</div><div class="stopbarTitle">🔔 Bildirishnomalar</div></div>
   <div class="ssheetc" id="notifSheetc"></div>
+</div>
+<!-- Direct messages (migration 111) — gated to mutual follows only. #dmConversationsSheet is the
+     inbox (opened from the header envelope icon); #dmChatSheet is a single conversation, openable
+     either from a row here or straight from a profile's "Xabar" button (openDmChat), stacking on
+     top of whichever sheet is already open the same way #followListSheet stacks on #userProfileSheet. -->
+<div class="sheet" id="dmConversationsSheet" style="z-index:53; align-items:stretch; background:var(--bg)">
+  <div class="stopbar"><div class="gclose" id="dmConversationsClose">✕</div><div class="stopbarTitle">✉️ Xabarlar</div></div>
+  <div class="ssheetc" id="dmConversationsSheetc"></div>
+</div>
+<div class="sheet" id="dmChatSheet" style="z-index:54; align-items:stretch; background:var(--bg)">
+  <div class="stopbar">
+    <div class="gclose" id="dmChatClose">✕</div>
+    <div class="dmChatTitle" id="dmChatTitle"></div>
+    <span class="pHeroShareBtn" id="dmChatMenuBtn" title="Ko'proq" style="margin-left:auto">⋮</span>
+  </div>
+  <div class="ssheetc" id="dmChatSheetc" style="padding-bottom:100px"></div>
+  <div id="dmComposerBar">
+    <div class="dtComposerRow">
+      <textarea id="dmChatText" maxlength="2000" placeholder="Xabar yozing..." rows="1"></textarea>
+      <button id="dmChatSend">➤</button>
+    </div>
+  </div>
+</div>
+<div class="sheet" id="dmChatMenuSheet" style="z-index:55">
+  <div class="reshareMenuCard">
+    <div class="reshareMenuItem" id="dmBlockItem"><span class="rmIcon">🚫</span><div><div class="rmTitle" id="dmBlockItemTitle">Bloklash</div><div class="rmSub" id="dmBlockItemSub">Bu foydalanuvchi sizga xabar yubora olmaydi</div></div></div>
+    <div class="reshareMenuItem" id="dmReportItem"><span class="rmIcon">⚠️</span><div><div class="rmTitle">Shikoyat qilish</div><div class="rmSub">Suhbatni ko'rib chiqish uchun yuborish</div></div></div>
+  </div>
 </div>
 <!-- Reviews used to be a single inline vertical list capped at 20, with the write-a-review form
      also inline in the same scroll — a real full "all reviews" page (with its own pagination)
@@ -4392,12 +4447,20 @@ $('#uTabs').querySelectorAll('.ptab').forEach(el=>el.onclick=()=>{
   else if(tab==='cert')certificatesTabHtml(userId,'uTabContent');
 });
 function loadUserProfileHero(userId){
-  api('/api/users/'+userId+'/profile').then(p=>{
+  Promise.all([
+    api('/api/users/'+userId+'/profile'),
+    canAct()?api('/api/users/'+userId+'/dm-eligibility').catch(()=>({can_message:false,is_blocked_by_me:false})):Promise.resolve({can_message:false,is_blocked_by_me:false}),
+  ]).then(([p,dm])=>{
     $('#userProfileSheet').dataset.uid=userId;
     const[c1,c2]=coverFor(String(userId));
     const avSize=84;
     const img=p.avatar_version?`<img class="avImg" style="width:${avSize}px;height:${avSize}px" src="${avatarUrl(userId,p.avatar_version)}" onerror="this.remove()">`:'';
     const followBtn=canAct()?`<button class="followBtn${p.is_following?' on':''}" id="uFollowBtn">${p.is_following?'✓ Obuna bo\'lgan':'+ Obuna bo\'lish'}</button>`:'';
+    // Message button only when mutual-follow + not blocked either way; a viewer who blocked this
+    // person instead sees an Unblock action here — the only way back once the Message button
+    // itself has disappeared (dm-eligibility's can_message is false while blocked).
+    const dmBtn=dm.can_message?`<button class="dmMsgBtn" id="uDmBtn">✉️ Xabar</button>`
+      :(dm.is_blocked_by_me?`<button class="dmMsgBtn blocked" id="uUnblockBtn">🚫 Blokdan chiqarish</button>`:'');
     // Read-only mirror of the banner: a real photo if this person uploaded one, otherwise the
     // same default gradient (.pHeroBannerBlank) the own-profile card falls back to — so every
     // profile always has a banner-shaped area, and the avatar always overlaps it the same way.
@@ -4417,7 +4480,7 @@ function loadUserProfileHero(userId){
           <div class="pHeroJoined">${formatJoinedYear(p.joined_date)}</div>
         </div>
       </div>
-      ${followBtn?`<div class="pHeroActions">${followBtn}</div>`:''}
+      ${(followBtn||dmBtn)?`<div class="pHeroActions">${followBtn}${dmBtn}</div>`:''}
       ${p.bio?`<div class="pHeroBio"><div class="pHeroBioLabel">Tarjimai hol</div>${esc(p.bio)}</div>`:''}
       <div class="pFollowRow">
         <span class="pFollowStat" id="uFollowersStat"><b>${fmtNum(p.followers)}</b><span>obunachi</span></span>
@@ -4438,6 +4501,14 @@ function loadUserProfileHero(userId){
         fb.textContent=r.following?'✓ Obuna bo\'lgan':'+ Obuna bo\'lish';
         const st=$('#uFollowersStat b');if(st)st.textContent=fmtNum(r.follower_count);
       }).catch(()=>toast('Xatolik yuz berdi')).finally(()=>{fb.disabled=false;});
+    };
+    const dmb=$('#uDmBtn');
+    if(dmb)dmb.onclick=()=>{haptic();openDmChat(userId);};
+    const unb=$('#uUnblockBtn');
+    if(unb)unb.onclick=()=>{
+      haptic();
+      unb.disabled=true;
+      api('/api/dm/'+userId+'/block',{method:'DELETE'}).then(()=>{toast('Blokdan chiqarildi');loadUserProfileHero(userId);}).catch(()=>toast('Xatolik yuz berdi')).finally(()=>{unb.disabled=false;});
     };
   }).catch(()=>{$('#uProfileCard').innerHTML='<p class="hint">Profil topilmadi.</p>';});
 }
@@ -4481,6 +4552,150 @@ function openFollowList(userId,kind){
 function closeFollowList(){$('#followListSheet').classList.remove('open');tg?.BackButton?.hide();}
 $('#followListClose').onclick=closeFollowList;
 $('#followListSheet').onclick=e=>{if(e.target.id==='followListSheet')closeFollowList();};
+
+// ---- direct messages (#dmConversationsSheet / #dmChatSheet) — mutual-follows-only (migration
+// 111): both people already chose to follow each other, the strongest lever against unsolicited
+// DMs available without a full moderation team. #dmConversationsSheet is the inbox; #dmChatSheet
+// opens either from a row there or straight from a profile's "✉️ Xabar" button (openDmChat),
+// stacking on top of whatever's already open the same way #followListSheet stacks on
+// #userProfileSheet. Safety is block + report (#dmChatMenuSheet), mirroring the app's existing
+// book-comment moderation primitives server-side. ----
+function dmConvRowHtml(c){
+  return `<div class="dmConvRow${c.unread_count>0?' unread':''}" data-peer="${esc(c.peer_id)}">
+    ${authorAvatarHtml(c.peer_id,c.avatar_version,c.display_name,42)}
+    <div class="dmConvBody">
+      <div class="dmConvName">${esc(c.display_name)}</div>
+      <div class="dmConvPreview">${c.last_is_mine?'Siz: ':''}${esc(c.last_text||'')}</div>
+    </div>
+    <div class="dmConvMeta">
+      <span class="dmConvTime">${fmtAgo(c.last_created_at)}</span>
+      ${c.unread_count>0?`<span class="dmConvUnreadBadge">${c.unread_count>9?'9+':c.unread_count}</span>`:''}
+    </div>
+  </div>`;
+}
+function openDmConversations(){
+  haptic();
+  const c=$('#dmConversationsSheetc');
+  c.innerHTML='Yuklanmoqda...';
+  $('#dmConversationsSheet').classList.add('open');
+  tg?.BackButton?.show();
+  if(!canAct()){c.innerHTML='<p class="hint">Xabarlarni ko\'rish uchun botda oching.</p>';return;}
+  loadDmConversations();
+}
+function loadDmConversations(){
+  const c=$('#dmConversationsSheetc');
+  api('/api/dm/conversations').then(r=>{
+    const items=r.items||[];
+    c.innerHTML=items.length?items.map(dmConvRowHtml).join(''):'<p class="hint">Hozircha xabar yo\'q. Do\'stingizning profiliga o\'tib "✉️ Xabar" tugmasini bosing — bu faqat bir-biringizga obuna bo\'lgan holatda ko\'rinadi.</p>';
+    c.querySelectorAll('[data-peer]').forEach(el=>el.onclick=()=>openDmChat(el.dataset.peer));
+  }).catch(()=>{c.innerHTML='<p class="hint">Yuklab bo\'lmadi</p>';});
+}
+function closeDmConversations(){$('#dmConversationsSheet').classList.remove('open');tg?.BackButton?.hide();}
+$('#dmConversationsClose').onclick=closeDmConversations;
+$('#dmConversationsSheet').onclick=e=>{if(e.target.id==='dmConversationsSheet')closeDmConversations();};
+
+let dmChatPeerId=null, dmChatPeerName='', dmChatBlockedByMe=false, dmChatPollTimer=null;
+function dmBubbleHtml(m){
+  return `<div class="dmBubbleRow${m.is_mine?' mine':''}">
+    <div class="dmBubble${m.is_mine?' mine':''}" data-id="${esc(m.id)}">
+      ${m.text?esc(m.text):'<i>Xabar o\'chirilgan</i>'}
+      <div class="dmBubbleTime">${fmtAgo(m.created_at)}</div>
+    </div>
+  </div>`;
+}
+function openDmChat(peerId){
+  peerId=parseInt(peerId,10);
+  if(!peerId)return;
+  if(!canAct()){toast('Xabarlashish uchun botni Telegram ichida oching');return;}
+  haptic();
+  dmChatPeerId=peerId;
+  $('#dmChatTitle').innerHTML='';
+  $('#dmChatSheetc').innerHTML='Yuklanmoqda...';
+  $('#dmChatSheet').classList.add('open');
+  tg?.BackButton?.show();
+  Promise.all([
+    api('/api/users/'+peerId+'/profile'),
+    api('/api/users/'+peerId+'/dm-eligibility').catch(()=>({is_blocked_by_me:false})),
+  ]).then(([p,dm])=>{
+    dmChatPeerName=p.display_name||'Foydalanuvchi';
+    dmChatBlockedByMe=!!dm.is_blocked_by_me;
+    $('#dmChatTitle').innerHTML=authorAvatarHtml(peerId,p.avatar_version,p.display_name,28)+`<span>${esc(dmChatPeerName)}</span>`;
+    $('#dmChatTitle').onclick=()=>{closeDmChat();openUserProfile(peerId);};
+  }).catch(()=>{$('#dmChatTitle').innerHTML='<span>Xabar</span>';});
+  loadDmMessages(true);
+  api('/api/dm/'+peerId+'/read',{method:'POST'}).then(refreshDmDot).catch(()=>{});
+  clearInterval(dmChatPollTimer);
+  dmChatPollTimer=setInterval(()=>{if(document.visibilityState==='visible')loadDmMessages(false);},5000);
+}
+function loadDmMessages(scrollToBottom){
+  if(!dmChatPeerId)return;
+  const peerId=dmChatPeerId;
+  api('/api/dm/'+peerId+'/messages').then(r=>{
+    if(dmChatPeerId!==peerId)return; // chat was switched/closed while this was in flight
+    const items=(r.items||[]).slice().reverse(); // API returns newest-first; render oldest-first
+    const c=$('#dmChatSheetc');
+    const wasNearBottom=c.scrollHeight-c.scrollTop-c.clientHeight<80;
+    c.innerHTML=items.length?items.map(dmBubbleHtml).join(''):'<p class="hint">Hali xabar yo\'q. Birinchi bo\'lib yozing!</p>';
+    if(scrollToBottom||wasNearBottom)c.scrollTop=c.scrollHeight;
+  }).catch(()=>{});
+}
+function closeDmChat(){
+  $('#dmChatSheet').classList.remove('open');tg?.BackButton?.hide();
+  clearInterval(dmChatPollTimer);dmChatPollTimer=null;dmChatPeerId=null;
+  $('#dmChatText').value='';
+  loadDmConversations(); // refresh the inbox list's preview/unread state for next open
+}
+$('#dmChatClose').onclick=closeDmChat;
+$('#dmChatSheet').onclick=e=>{if(e.target.id==='dmChatSheet')closeDmChat();};
+$('#dmChatSend').onclick=()=>{
+  const text=$('#dmChatText').value.trim();
+  if(!text||!dmChatPeerId)return;
+  const btn=$('#dmChatSend');
+  btn.disabled=true;
+  api('/api/dm/'+dmChatPeerId+'/messages',{method:'POST',body:JSON.stringify({text})}).then(()=>{
+    $('#dmChatText').value='';
+    loadDmMessages(true);
+  }).catch(()=>toast('Xatolik yuz berdi')).finally(()=>{btn.disabled=false;});
+};
+$('#dmChatMenuBtn').onclick=()=>{
+  if(!dmChatPeerId)return;
+  haptic();
+  $('#dmBlockItemTitle').textContent=dmChatBlockedByMe?'Blokdan chiqarish':'Bloklash';
+  $('#dmBlockItemSub').textContent=dmChatBlockedByMe?`${dmChatPeerName} sizga qayta xabar yubora oladi`:`${dmChatPeerName} sizga xabar yubora olmaydi`;
+  $('#dmChatMenuSheet').classList.add('open');
+};
+function closeDmChatMenu(){$('#dmChatMenuSheet').classList.remove('open');}
+$('#dmChatMenuSheet').onclick=e=>{if(e.target.id==='dmChatMenuSheet')closeDmChatMenu();};
+$('#dmBlockItem').onclick=()=>{
+  if(!dmChatPeerId)return;
+  haptic();
+  closeDmChatMenu();
+  const peerId=dmChatPeerId;
+  const method=dmChatBlockedByMe?'DELETE':'POST';
+  api('/api/dm/'+peerId+'/block',{method}).then(()=>{
+    toast(dmChatBlockedByMe?'Blokdan chiqarildi':'Bloklandi');
+    if(!dmChatBlockedByMe)closeDmChat(); // no longer eligible to chat — leave the conversation view
+    else dmChatBlockedByMe=false;
+  }).catch(()=>toast('Xatolik yuz berdi'));
+};
+$('#dmReportItem').onclick=()=>{
+  if(!dmChatPeerId)return;
+  haptic();
+  closeDmChatMenu();
+  api('/api/dm/'+dmChatPeerId+'/messages').then(r=>{
+    const last=(r.items||[])[0];
+    if(!last)return toast('Shikoyat qilish uchun xabar yo\'q');
+    return api('/api/dm/messages/'+last.id+'/report',{method:'POST',body:JSON.stringify({})}).then(()=>toast('Shikoyat yuborildi'));
+  }).catch(()=>toast('Xatolik yuz berdi'));
+};
+$('#btnDm').onclick=()=>{haptic();openDmConversations();};
+function refreshDmDot(){
+  if(!canAct())return;
+  api('/api/dm/unread-count').then(r=>{
+    const dot=$('#dmDot');if(dot)dot.style.display=(r.count>0)?'block':'none';
+  }).catch(()=>{});
+}
+
 // ---- notifications (#notifSheet) — new follower, like/reply on your own Davra post, plus a
 // "today's quote" card that's always re-fetched fresh on open (server picks/records it via the
 // same taste-aware selection /myquote already uses — see db.get_personalized_quote_for_user). ----
@@ -4999,6 +5214,7 @@ const SHEET_CLOSERS={
   userProfileSheet:closeUserProfile, followListSheet:closeFollowList, themeMenuSheet:closeThemeMenu,
   onboardTourSheet:closeOnboardTour, notifSheet:closeNotifications, avatarViewSheet:closeAvatarView,
   usersListSheet:closeUsersList, leaderboardSheet:closeLeaderboard, certDetailSheet:closeCertDetail,
+  dmConversationsSheet:closeDmConversations, dmChatSheet:closeDmChat, dmChatMenuSheet:closeDmChatMenu,
   // closeGlobe lives in the separate type="module" script below (Three.js globe) and only
   // becomes a real global once that deferred module finishes running — referencing it bare HERE
   // (evaluated immediately, before the module has loaded) throws ReferenceError. Wrapping it in
@@ -5227,8 +5443,9 @@ async function boot(){
   // backgrounded and reopened. The visibility check inside the interval (not just at setup) is
   // what actually saves the requests while backgrounded — setInterval itself keeps firing either way.
   refreshNotifDot();
-  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refreshNotifDot();});
-  setInterval(()=>{if(document.visibilityState==='visible')refreshNotifDot();},45000);
+  refreshDmDot();
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){refreshNotifDot();refreshDmDot();}});
+  setInterval(()=>{if(document.visibilityState==='visible'){refreshNotifDot();refreshDmDot();}},45000);
   _rumMarkBootComplete(Math.round(performance.now()));
 }
 boot();
