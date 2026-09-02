@@ -425,7 +425,7 @@
   .liveBadgeRight{display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700; opacity:.92}
   /* The panel is a full page (like the PDF reader), not a bottom drawer — a "footer" card reads
      as a minor add-on; a whole page reads as what it actually is, the app's stats dashboard. */
-  #liveSheet,#listSheet,#shelvesSheet,#reviewsSheet,#writeReviewSheet,#profileEditSheet,#avatarCropSheet,#bannerCropSheet,#davraComposeSheet,#davraThreadSheet,#userProfileSheet,#followListSheet,#notifSheet,#usersListSheet,#leaderboardSheet,#certDetailSheet,#dmConversationsSheet,#dmChatSheet,#dmBookPickerSheet,#dmPhotoPreviewSheet{flex-direction:column}
+  #liveSheet,#listSheet,#shelvesSheet,#reviewsSheet,#writeReviewSheet,#profileEditSheet,#avatarCropSheet,#bannerCropSheet,#davraComposeSheet,#davraThreadSheet,#userProfileSheet,#followListSheet,#notifSheet,#usersListSheet,#leaderboardSheet,#certDetailSheet,#dmConversationsSheet,#dmChatSheet,#dmBookPickerSheet,#dmPhotoPreviewSheet,#dmMediaGallerySheet{flex-direction:column}
   /* Generalized from the Statistika panel's own topbar so new full-page sheets (Reading Room's
      drill-in lists, Javon) get the same "whole page, not a bottom drawer" treatment for free. */
   /* Close/back button first, title right after it — both left-aligned (not space-between, which
@@ -690,6 +690,14 @@
   .dmVoiceTrimCol{flex:1; min-width:0; display:flex; flex-direction:column}
   .dmVoiceTrimCol input[type=range]{width:100%; margin:0; height:20px}
   .dmVoiceTrimLabels{display:flex; justify-content:space-between; font-size:10.5px; color:var(--muted); font-variant-numeric:tabular-nums; margin-top:-4px}
+  /* ---- Shared media gallery (#dmMediaGallerySheet) ---- */
+  .dmGalleryGrid{display:grid; grid-template-columns:repeat(3,1fr); gap:3px}
+  .dmGalleryGrid .dmImgMsg{width:100%; aspect-ratio:1; object-fit:cover; border-radius:0; background:var(--chip); cursor:pointer}
+  .dmGalleryAudioRow{padding:12px 0; border-top:1px solid var(--line)}
+  .dmGalleryAudioRow:first-child{border-top:none}
+  .dmGalleryAudioMeta{font-size:12.5px; font-weight:700; color:var(--muted); margin-bottom:6px}
+  .dmGalleryBookRow{padding:10px 0; border-top:1px solid var(--line)}
+  .dmGalleryBookRow:first-child{border-top:none}
   .cropActions .btn{flex:1}
   /* ---- birth-date wheel picker (#birthPickerSheet) ---- */
   .wheelPicker{width:100%; background:var(--card); border-radius:20px 20px 0 0; padding:16px 16px calc(16px + env(safe-area-inset-bottom)); box-sizing:border-box}
@@ -1267,10 +1275,28 @@
 </div>
 <div class="sheet" id="dmChatMenuSheet" style="z-index:55">
   <div class="reshareMenuCard">
+    <div class="reshareMenuItem" id="dmMediaGalleryItem"><span class="rmIcon">🖼️</span><div><div class="rmTitle">Umumiy media</div><div class="rmSub">Rasm, ovoz, audio va kitoblar</div></div></div>
     <div class="reshareMenuItem" id="dmWallpaperItem"><span class="rmIcon">🎨</span><div><div class="rmTitle">Suhbat foni</div><div class="rmSub">Rang yoki rasm tanlang</div></div></div>
     <div class="reshareMenuItem" id="dmMuteItem"><span class="rmIcon" id="dmMuteItemIcon">🔕</span><div><div class="rmTitle" id="dmMuteItemTitle">Ovozsiz qilish</div><div class="rmSub" id="dmMuteItemSub">Bu suhbatdan push-xabar kelmaydi</div></div></div>
     <div class="reshareMenuItem" id="dmBlockItem"><span class="rmIcon">🚫</span><div><div class="rmTitle" id="dmBlockItemTitle">Bloklash</div><div class="rmSub" id="dmBlockItemSub">Bu foydalanuvchi sizga xabar yubora olmaydi</div></div></div>
     <div class="reshareMenuItem" id="dmReportItem"><span class="rmIcon">⚠️</span><div><div class="rmTitle">Shikoyat qilish</div><div class="rmSub">Suhbatni ko'rib chiqish uchun yuborish</div></div></div>
+  </div>
+</div>
+<!-- Shared media gallery — every image/voice/audio/book message ever sent in this conversation,
+     grouped by type, so finding one photo doesn't mean scrolling back through the whole chat
+     history. Each tab is its own independent paginated list (dmGalleryState). -->
+<div class="sheet" id="dmMediaGallerySheet" style="z-index:56; align-items:stretch; background:var(--bg)">
+  <div class="stopbar"><div class="gclose" id="dmMediaGalleryClose">✕</div><div class="stopbarTitle">🖼️ Umumiy media</div></div>
+  <div class="row" id="dmGalleryTabs" style="margin:10px 18px 0">
+    <span class="tw on" data-kind="image">📷 Rasmlar</span>
+    <span class="tw" data-kind="voice">🎤 Ovozli</span>
+    <span class="tw" data-kind="audio">🎵 Audio</span>
+    <span class="tw" data-kind="book">📖 Kitoblar</span>
+  </div>
+  <div class="ssheetc" id="dmGalleryBody">
+    <div class="dmGalleryGrid" id="dmGalleryGrid" style="display:none"></div>
+    <div id="dmGalleryList" style="display:none"></div>
+    <button class="more" id="dmGalleryMore" style="display:none">Yana yuklash</button>
   </div>
 </div>
 <!-- Chat wallpaper — a per-device preference only (localStorage, see applyDmWallpaper()), never
@@ -5168,6 +5194,7 @@ function closeDmChat(){
   if(dmMediaRecorder)stopDmRecording(true);
   closeDmVoicePreview();
   closeDmPhotoPreview();
+  closeDmMediaGallery();
   dmChatPeerId=null;
   cancelDmEdit();
   cancelDmReply();
@@ -5892,6 +5919,110 @@ function openDmWallpaperSheet(){
 function closeDmWallpaperSheet(){$('#dmWallpaperSheet').classList.remove('open');}
 $('#dmWallpaperSheet').onclick=e=>{if(e.target.id==='dmWallpaperSheet')closeDmWallpaperSheet();};
 $('#dmWallpaperItem').onclick=()=>{closeDmChatMenu();openDmWallpaperSheet();};
+
+// ---- Shared media gallery: every image/voice/audio/book message ever sent in this conversation,
+// grouped into tabs, so finding one photo doesn't mean scrolling back through the whole chat
+// history. Each tab keeps its own independent cursor/loading/done state (dmGalleryState) since
+// switching tabs shouldn't lose another tab's scroll/pagination progress. ----
+let dmGalleryKind='image';
+const dmGalleryState={
+  image:{cursor:null,done:false,loading:false},
+  voice:{cursor:null,done:false,loading:false},
+  audio:{cursor:null,done:false,loading:false},
+  book:{cursor:null,done:false,loading:false},
+};
+function dmGalleryRowHtml(m){
+  if(m.message_type==='image'){
+    return`<img class="dmImgMsg" alt="" data-media-pending="${esc(m.id)}" data-media-url="${esc(m.media_url)}">`;
+  }
+  if(m.message_type==='voice'||m.message_type==='audio'){
+    const label=(m.message_type==='voice'?'🎤 Ovozli xabar':'🎵 Audio')+(m.duration_sec?' · '+fmtDuration(m.duration_sec):'')+' · '+fmtExactDateTime(m.created_at);
+    return`<div class="dmGalleryAudioRow">
+      <div class="dmGalleryAudioMeta">${label}</div>
+      <audio class="dmAudioMsg" controls preload="none" data-media-pending="${esc(m.id)}" data-media-url="${esc(m.media_url)}"></audio>
+    </div>`;
+  }
+  const b=byId[m.book_id];
+  if(!b)return'';
+  return`<div class="dmGalleryBookRow dmBookCard" data-open-book="${esc(b.i)}">
+    ${dmBookTileHtml(b)}
+    <div class="dmBookCardInfo">
+      <div class="dmBookCardTitle">${esc(b.t)}</div>
+      <div class="dmBookCardAuthor">${esc(b.a||'')}</div>
+      <div class="dmBookCardOpen">📖 Ochish</div>
+    </div>
+  </div>`;
+}
+function loadDmGallery(reset){
+  const kind=dmGalleryKind;
+  const st=dmGalleryState[kind];
+  if(!dmChatPeerId||st.loading||(st.done&&!reset))return;
+  const isGrid=kind==='image';
+  const container=$(isGrid?'#dmGalleryGrid':'#dmGalleryList');
+  if(reset){
+    st.cursor=null;st.done=false;
+    container.innerHTML='<p class="hint" id="dmGalleryLoadingHint">Yuklanmoqda...</p>';
+  }
+  st.loading=true;
+  $('#dmGalleryMore').style.display='none';
+  const params=new URLSearchParams({kind,limit:'30'});
+  if(st.cursor)params.set('before',st.cursor);
+  api('/api/dm/'+dmChatPeerId+'/media?'+params.toString()).then(r=>{
+    if(dmGalleryKind!==kind)return; // tab switched while this was in flight
+    const hint=$('#dmGalleryLoadingHint');if(hint)hint.remove();
+    const items=r.items||[];
+    if(items.length){
+      container.insertAdjacentHTML('beforeend',items.map(dmGalleryRowHtml).join(''));
+      wireDmMediaSrcs(container);
+      container.querySelectorAll('[data-open-book]:not([data-wired])').forEach(el=>{
+        el.dataset.wired='1';
+        el.onclick=()=>{dmStackAbove('sheet');openDetail(el.dataset.openBook);};
+      });
+      st.cursor=items[items.length-1].created_at;
+    }
+    st.done=items.length<30;
+    if(container.children.length===0){
+      const emptyLabel={image:'Hali rasm yo\'q',voice:'Hali ovozli xabar yo\'q',audio:'Hali audio yo\'q',book:'Hali kitob ulashilmagan'}[kind];
+      container.innerHTML=`<p class="hint">${emptyLabel}</p>`;
+    }
+    $('#dmGalleryMore').style.display=st.done?'none':'block';
+  }).catch(()=>{
+    const hint=$('#dmGalleryLoadingHint');if(hint)hint.remove();
+    if(container.children.length===0)container.innerHTML='<p class="hint">Yuklab bo\'lmadi</p>';
+  }).finally(()=>{st.loading=false;});
+}
+function switchDmGalleryTab(kind){
+  dmGalleryKind=kind;
+  $('#dmGalleryTabs').querySelectorAll('.tw').forEach(t=>t.classList.toggle('on',t.dataset.kind===kind));
+  const isGrid=kind==='image';
+  $('#dmGalleryGrid').style.display=isGrid?'grid':'none';
+  $('#dmGalleryList').style.display=isGrid?'none':'block';
+  $(isGrid?'#dmGalleryGrid':'#dmGalleryList').innerHTML='';
+  loadDmGallery(true);
+}
+$('#dmGalleryTabs').querySelectorAll('.tw').forEach(el=>el.onclick=()=>{haptic();switchDmGalleryTab(el.dataset.kind);});
+$('#dmGalleryMore').onclick=()=>loadDmGallery(false);
+function openDmMediaGallery(){
+  haptic();
+  closeDmChatMenu();
+  dmGalleryKind='image';
+  for(const k in dmGalleryState)dmGalleryState[k]={cursor:null,done:false,loading:false};
+  $('#dmGalleryTabs').querySelectorAll('.tw').forEach(t=>t.classList.toggle('on',t.dataset.kind==='image'));
+  $('#dmGalleryGrid').style.display='grid';$('#dmGalleryGrid').innerHTML='';
+  $('#dmGalleryList').style.display='none';$('#dmGalleryList').innerHTML='';
+  // No dmStackAbove needed here (unlike book-detail/profile, which normally sit BELOW the chat) —
+  // this sheet's own z-index (56) already sits above the chat's (54), same as #dmBookPickerSheet.
+  $('#dmMediaGallerySheet').classList.add('open');
+  tg?.BackButton?.show();
+  loadDmGallery(true);
+}
+function closeDmMediaGallery(){
+  $('#dmMediaGallerySheet').classList.remove('open');
+  tg?.BackButton?.hide();
+}
+$('#dmMediaGalleryItem').onclick=openDmMediaGallery;
+$('#dmMediaGalleryClose').onclick=closeDmMediaGallery;
+$('#dmMediaGallerySheet').onclick=e=>{if(e.target.id==='dmMediaGallerySheet')closeDmMediaGallery();};
 $('#dmWallPhotoItem').onclick=()=>$('#dmWallpaperPhotoInput').click();
 $('#dmWallpaperPhotoInput').onchange=e=>{
   const file=e.target.files[0];e.target.value='';
@@ -6446,7 +6577,7 @@ const SHEET_CLOSERS={
   usersListSheet:closeUsersList, leaderboardSheet:closeLeaderboard, certDetailSheet:closeCertDetail,
   dmConversationsSheet:closeDmConversations, dmChatSheet:closeDmChat, dmChatMenuSheet:closeDmChatMenu,
   dmWallpaperSheet:closeDmWallpaperSheet, dmLightbox:closeDmLightbox, dmBookPickerSheet:closeDmBookPicker,
-  dmPhotoPreviewSheet:closeDmPhotoPreview,
+  dmPhotoPreviewSheet:closeDmPhotoPreview, dmMediaGallerySheet:closeDmMediaGallery,
   // closeGlobe lives in the separate type="module" script below (Three.js globe) and only
   // becomes a real global once that deferred module finishes running — referencing it bare HERE
   // (evaluated immediately, before the module has loaded) throws ReferenceError. Wrapping it in
