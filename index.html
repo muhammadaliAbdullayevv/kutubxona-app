@@ -657,10 +657,26 @@
   /* DM photo send preview: same pan/pinch-zoom crop tool as above, but the frame's aspect ratio
      is set per-image (to the photo's own natural ratio) instead of a fixed square/banner shape —
      so the default (untouched) state shows the WHOLE photo with nothing cropped off, and zooming
-     in is an opt-in crop rather than a forced one. No circular mask (a chat photo isn't a circle). */
-  .dmPhotoCropWrap{width:100%; max-width:320px; height:auto; max-height:65vh; margin:6px auto 12px}
+     in is an opt-in crop rather than a forced one. No circular mask (a chat photo isn't a circle).
+     Deliberately dark regardless of the app's own light/dark theme setting — a photo-editing
+     stage is its own immersive context (matches Telegram/Instagram/iOS's own photo editors, which
+     all go dark independent of the host app's theme), not a form the rest of the theme applies to. */
+  .dmPhotoSheet{background:#000}
+  .dmPhotoTopbar{display:flex; align-items:center; gap:10px; padding:calc(env(safe-area-inset-top) + 12px) 14px 12px; flex-shrink:0}
+  .dmPhotoIconBtn{width:38px; height:38px; border-radius:50%; background:rgba(255,255,255,.12); display:flex; align-items:center; justify-content:center; font-size:18px; color:#fff; cursor:pointer; flex-shrink:0; transition:transform .15s}
+  .dmPhotoIconBtn:active{transform:scale(.92)}
+  .dmPhotoTopbarTitle{flex:1; font-size:16px; font-weight:700; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .dmPhotoStage{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:6px 16px calc(env(safe-area-inset-bottom) + 18px); overflow-y:auto}
+  .dmPhotoCropWrap{width:100%; max-width:340px; height:auto; max-height:68vh; margin:0 auto}
   #dmPhotoCropCanvas{width:100%; height:100%; display:block}
-  #dmPhotoCaption{width:100%; max-width:320px; box-sizing:border-box; margin-bottom:12px; padding:10px 12px; border-radius:10px; border:1px solid var(--line); background:var(--card); color:var(--text); font:inherit}
+  .dmPhotoZoomRow{display:flex; align-items:center; gap:10px; width:100%; max-width:340px}
+  .dmPhotoZoomRow input[type=range]{flex:1; margin:0}
+  .dmPhotoZoomLabel{color:rgba(255,255,255,.65); font-size:12.5px; font-variant-numeric:tabular-nums; width:36px; text-align:right; flex-shrink:0}
+  .dmPhotoBottomBar{display:flex; align-items:center; gap:10px; width:100%; max-width:340px}
+  #dmPhotoCaption{flex:1; min-width:0; box-sizing:border-box; padding:11px 16px; border-radius:22px; border:1px solid rgba(255,255,255,.16); background:rgba(255,255,255,.1); color:#fff; font:inherit}
+  #dmPhotoCaption::placeholder{color:rgba(255,255,255,.5)}
+  .dmPhotoSendCircle{width:46px; height:46px; border-radius:50%; border:none; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; font-size:19px; flex-shrink:0; cursor:pointer; transition:transform .15s}
+  .dmPhotoSendCircle:active{transform:scale(.92)}
   /* ---- Voice message preview (records into #dmVoicePreviewRow instead of auto-sending) ---- */
   .dmVoicePreviewRow{display:flex; align-items:center; gap:8px; padding:6px 2px}
   .dmVoiceTrimCol{flex:1; min-width:0; display:flex; flex-direction:column}
@@ -1274,20 +1290,21 @@
      straighten it first. Same pan/pinch-zoom crop tool as the avatar/banner ones above, but the
      frame's aspect ratio is set to the photo's own (dmPhotoCropWrap) instead of a fixed shape, so
      nothing is cropped by default — zooming in is an opt-in crop, not a forced one. -->
-<div class="sheet" id="dmPhotoPreviewSheet" style="z-index:57; align-items:stretch; background:var(--bg)">
-  <div class="stopbar">
-    <div class="gclose" id="dmPhotoPreviewClose">✕</div>
-    <div class="stopbarTitle">Rasmni yuborish</div>
-    <span class="pHeroShareBtn" id="dmPhotoRotateBtn" title="Aylantirish" style="margin-left:auto">⟳</span>
+<div class="sheet dmPhotoSheet" id="dmPhotoPreviewSheet" style="z-index:57; align-items:stretch">
+  <div class="dmPhotoTopbar">
+    <span class="dmPhotoIconBtn" id="dmPhotoPreviewClose" title="Bekor qilish">←</span>
+    <div class="dmPhotoTopbarTitle" id="dmPhotoPreviewTitle">Rasmni yuborish</div>
+    <span class="dmPhotoIconBtn" id="dmPhotoRotateBtn" title="Aylantirish">⟳</span>
   </div>
-  <div class="ssheetc" id="dmPhotoPreviewSheetc" style="display:flex; flex-direction:column; align-items:center">
+  <div class="dmPhotoStage" id="dmPhotoPreviewSheetc">
     <div class="cropWrap dmPhotoCropWrap" id="dmPhotoCropWrap"><canvas id="dmPhotoCropCanvas"></canvas></div>
-    <p class="hint" style="text-align:center">Kesish uchun torting, kattalashtirish uchun siqing yoki slayderdan foydalaning</p>
-    <input type="range" id="dmPhotoCropZoom" min="100" max="300" value="100">
-    <input type="text" id="dmPhotoCaption" placeholder="Izoh qo'shish (ixtiyoriy)..." maxlength="1000">
-    <div class="cropActions">
-      <button class="btn ghost" id="dmPhotoCancelBtn">Bekor qilish</button>
-      <button class="btn primary" id="dmPhotoSendBtn">Yuborish</button>
+    <div class="dmPhotoZoomRow">
+      <input type="range" id="dmPhotoCropZoom" min="100" max="300" value="100">
+      <span class="dmPhotoZoomLabel" id="dmPhotoZoomLabel">100%</span>
+    </div>
+    <div class="dmPhotoBottomBar">
+      <input type="text" id="dmPhotoCaption" placeholder="Izoh qo'shish..." maxlength="1000">
+      <button class="dmPhotoSendCircle" id="dmPhotoSendBtn" title="Yuborish">➤</button>
     </div>
   </div>
 </div>
@@ -4873,7 +4890,7 @@ function dmBubbleHtml(m){
     <div class="dmBubble${m.is_mine?' mine':''}" data-id="${esc(m.id)}"${tappable?` data-msg-tap="1" data-msg-mine="${m.is_mine?1:0}" data-msg-text="${esc(m.text||'')}" data-msg-reaction="${esc(m.my_reaction||'')}"`:''}>
       ${replyBlock}
       ${inner}
-      <div class="dmBubbleTime">${edited}${fmtAgo(m.created_at)}${tick}</div>
+      <div class="dmBubbleTime">${edited}${fmtExactDateTime(m.created_at)}${tick}</div>
       ${reactionBlock}
     </div>
   </div>`;
@@ -5263,6 +5280,9 @@ function loadDmPhotoBitmap(file){
 function openDmPhotoPreview(file){
   loadDmPhotoBitmap(file).then(bmp=>{
     $('#dmPhotoCaption').value='';
+    // Names the actual recipient instead of a generic "Rasmni yuborish" — same reasoning as
+    // Telegram's own photo-send screen: confirms who this is actually going to before you send it.
+    $('#dmPhotoPreviewTitle').textContent=dmChatPeerName||'Rasmni yuborish';
     $('#dmPhotoPreviewSheet').classList.add('open');
     tg?.BackButton?.show();
     // A macrotask tick (not requestAnimationFrame — doesn't reliably fire under headless/automation
@@ -5275,8 +5295,8 @@ function openDmPhotoPreview(file){
 function initDmPhotoCrop(bmp){
   const wrap=$('#dmPhotoCropWrap');
   const imgRatio=bmp.width/bmp.height;
-  const maxW=Math.min(wrap.parentElement.clientWidth||320,320);
-  const maxH=window.innerHeight*0.6;
+  const maxW=Math.min(wrap.parentElement.clientWidth||340,340);
+  const maxH=window.innerHeight*0.62;
   let cssW=maxW,cssH=cssW/imgRatio;
   if(cssH>maxH){cssH=maxH;cssW=cssH*imgRatio;}
   wrap.style.width=Math.round(cssW)+'px';
@@ -5292,6 +5312,7 @@ function initDmPhotoCrop(bmp){
     offY:(canvas.height-bmp.height*minScale)/2,
   };
   $('#dmPhotoCropZoom').value=100;
+  $('#dmPhotoZoomLabel').textContent='100%';
   drawDmPhotoCrop();
   wireDmPhotoCropGestures();
 }
@@ -5315,7 +5336,9 @@ function setDmPhotoCropScale(newScale){
   dmPhotoCropState.offX=cx-imgX*newScale;
   dmPhotoCropState.offY=cy-imgY*newScale;
   clampDmPhotoCropOffsets();
-  $('#dmPhotoCropZoom').value=Math.round((newScale/minScale)*100);
+  const pct=Math.round((newScale/minScale)*100);
+  $('#dmPhotoCropZoom').value=pct;
+  $('#dmPhotoZoomLabel').textContent=pct+'%';
   drawDmPhotoCrop();
 }
 function wireDmPhotoCropGestures(){
@@ -5376,11 +5399,10 @@ function closeDmPhotoPreview(){
   dmPhotoCropState=null;
 }
 $('#dmPhotoPreviewClose').onclick=closeDmPhotoPreview;
-$('#dmPhotoCancelBtn').onclick=closeDmPhotoPreview;
 $('#dmPhotoPreviewSheet').onclick=e=>{if(e.target.id==='dmPhotoPreviewSheet')closeDmPhotoPreview();};
 $('#dmPhotoSendBtn').onclick=()=>{
   if(!dmPhotoCropState||!dmChatPeerId)return;
-  const btn=$('#dmPhotoSendBtn');btn.disabled=true;btn.textContent='Yuborilmoqda...';
+  const btn=$('#dmPhotoSendBtn');btn.disabled=true;btn.style.opacity='.5';
   const{img,canvas,scale,offX,offY}=dmPhotoCropState;
   // Exported independently of the small on-screen preview canvas (which is capped by devicePixelRatio
   // for smooth panning, not upload quality) — same offX/offY/scale state, translated into a source
@@ -5396,14 +5418,14 @@ $('#dmPhotoSendBtn').onclick=()=>{
   out.width=Math.max(1,Math.round(outW));out.height=Math.max(1,Math.round(outH));
   out.getContext('2d').drawImage(img,srcX,srcY,srcW,srcH,0,0,out.width,out.height);
   out.toBlob(blob=>{
-    if(!blob){toast('Xatolik yuz berdi');btn.disabled=false;btn.textContent='Yuborish';return;}
+    if(!blob){toast('Xatolik yuz berdi');btn.disabled=false;btn.style.opacity='';return;}
     const file=new File([blob],'photo.jpg',{type:'image/jpeg'});
     const caption=$('#dmPhotoCaption').value.trim()||null;
     haptic('medium');
     sendDmMedia(file,'image',caption,null).then(()=>{
       loadDmMessages(true);
       closeDmPhotoPreview();
-    }).catch(()=>toast('Yuborilmadi')).finally(()=>{btn.disabled=false;btn.textContent='Yuborish';});
+    }).catch(()=>toast('Yuborilmadi')).finally(()=>{btn.disabled=false;btn.style.opacity='';});
   },'image/jpeg',0.9);
 };
 
@@ -5465,8 +5487,10 @@ $('#dmBookBtn').onclick=()=>{
 
 let dmMediaRecorder=null, dmRecordedChunks=[], dmRecordStartTs=0, dmRecordTimerHandle=null, dmRecordStream=null;
 function dmRecTimerTick(){
-  const secs=Math.floor((Date.now()-dmRecordStartTs)/1000);
-  $('#dmRecTimer').textContent=Math.floor(secs/60)+':'+String(secs%60).padStart(2,'0');
+  const elapsed=(Date.now()-dmRecordStartTs)/1000;
+  const secs=Math.floor(elapsed);
+  const tenth=Math.floor((elapsed-secs)*10);
+  $('#dmRecTimer').textContent=Math.floor(secs/60)+':'+String(secs%60).padStart(2,'0')+','+tenth;
 }
 async function startDmRecording(){
   if(dmMediaRecorder)return;
@@ -5503,7 +5527,7 @@ async function startDmRecording(){
   $('#dmComposerRow').style.display='none';
   $('#dmRecordingRow').style.display='flex';
   $('#dmRecTimer').textContent='0:00';
-  dmRecordTimerHandle=setInterval(dmRecTimerTick,500);
+  dmRecordTimerHandle=setInterval(dmRecTimerTick,100);
 }
 function stopDmRecording(cancel){
   if(!dmMediaRecorder)return;
