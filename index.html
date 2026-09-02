@@ -851,6 +851,26 @@
   .dmReactionBadge.mine{border-color:var(--accent)}
   .dmImgMsg{display:block; max-width:220px; max-height:280px; width:100%; height:auto; border-radius:11px; cursor:pointer; background:color-mix(in srgb, var(--line) 40%, transparent)}
   .dmMsgCaption{margin-top:6px}
+  /* Shared cover-tile look for a shared book — used both in the picker's result rows and the
+     rich card rendered inside a bubble. Same coverFor()-gradient/initials-fallback shape every
+     other book cover in the app already uses (siHtml, detail hero, etc). */
+  .dmBookCoverTile{position:relative; flex-shrink:0; border-radius:8px; overflow:hidden; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800}
+  .dmBookCoverTile img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover}
+  .dmBookPickerInput{width:100%; box-sizing:border-box; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:11px 14px; font:inherit; color:var(--text); margin-bottom:14px}
+  .dmBookPickerRow{display:flex; align-items:center; gap:11px; padding:9px 2px; border-top:1px solid var(--line); cursor:pointer}
+  .dmBookPickerRow:first-child{border-top:0}
+  .dmBookPickerRow .dmBookCoverTile{width:42px; height:42px; font-size:14px}
+  .dmBookPickerInfo{flex:1; min-width:0}
+  .dmBookPickerTitle{font-size:13.5px; font-weight:700; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .dmBookPickerAuthor{font-size:12px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  /* Book-share card rendered inside a chat bubble. */
+  .dmBookCard{display:flex; align-items:center; gap:10px; cursor:pointer; padding:2px}
+  .dmBookCard .dmBookCoverTile{width:52px; height:52px; font-size:16px}
+  .dmBookCardInfo{flex:1; min-width:0}
+  .dmBookCardTitle{font-size:13.5px; font-weight:800; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical}
+  .dmBookCardAuthor{font-size:12px; opacity:.8; margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .dmBookCardOpen{font-size:11px; font-weight:800; margin-top:4px; opacity:.9}
+  .dmBookCardMissing{padding:6px 2px; font-size:13px; opacity:.75; cursor:default}
   .dmAudioLabel{font-size:11.5px; font-weight:700; opacity:.85; margin-bottom:5px}
   .dmAudioMsg{display:block; max-width:230px; width:56vw; height:34px}
   /* Lightbox for tapping an image bubble — full-screen, tap anywhere (or the ✕) to close. Uses
@@ -1183,6 +1203,7 @@
     <div class="dtComposerRow" id="dmComposerRow">
       <input type="file" id="dmAttachInput" accept="image/*,audio/*" hidden>
       <span class="dmComposerIcon" id="dmAttachBtn" title="Fayl biriktirish">📎</span>
+      <span class="dmComposerIcon" id="dmBookBtn" title="Kitob yuborish">📖</span>
       <textarea id="dmChatText" maxlength="2000" placeholder="Xabar yozing..." rows="1"></textarea>
       <span class="dmComposerIcon" id="dmMicBtn" title="Ovozli xabar">🎤</span>
       <button id="dmChatSend">➤</button>
@@ -1206,6 +1227,16 @@
     <div class="dmWallSwatchRow" id="dmWallSwatchRow"></div>
     <div class="reshareMenuItem" id="dmWallPhotoItem"><span class="rmIcon">🖼</span><div><div class="rmTitle">Rasm tanlash</div><div class="rmSub">Galereyadan fon rasmi yuklang</div></div></div>
     <div class="reshareMenuItem" id="dmWallResetItem"><span class="rmIcon">↺</span><div><div class="rmTitle">Standart holatga qaytarish</div></div></div>
+  </div>
+</div>
+<!-- Book picker for sharing a book in a DM — searches the SAME already-loaded client-side catalog
+     (DB.books) the main search/browse screens use, via the same score() function, so no separate
+     server round trip is needed just to find a book to share. -->
+<div class="sheet" id="dmBookPickerSheet" style="z-index:56; align-items:stretch; background:var(--bg)">
+  <div class="stopbar"><div class="gclose" id="dmBookPickerClose">✕</div><div class="stopbarTitle">📖 Kitob yuborish</div></div>
+  <div class="ssheetc">
+    <input type="text" id="dmBookPickerSearch" class="dmBookPickerInput" placeholder="Kitob nomi yoki muallif...">
+    <div id="dmBookPickerResults"></div>
   </div>
 </div>
 <!-- Reply/React/Edit/Delete for a DM message — reached by tapping the bubble itself. Deliberately
@@ -4738,7 +4769,15 @@ function dmReplyPreviewText(reply){
   if(reply.message_type==='image')return'📷 Rasm';
   if(reply.message_type==='voice')return'🎤 Ovozli xabar';
   if(reply.message_type==='audio')return'🎵 Audio';
+  if(reply.message_type==='book')return'📖 Kitob';
   return esc((reply.text||'').slice(0,80));
+}
+// Shared cover-tile markup for a book — used by the picker's result rows AND the rich card
+// rendered inside a bubble, the exact same coverFor()-gradient/initials-fallback shape every
+// other book cover in the app already uses.
+function dmBookTileHtml(b){
+  const[c1,c2]=coverFor(b.i);
+  return `<div class="dmBookCoverTile" style="background:linear-gradient(135deg,${c1},${c2})">${b.hc?`<img src="covers/${encodeURIComponent(b.i)}.jpg" onerror="this.remove()">`:''}<span>${esc(initials(b.t))}</span></div>`;
 }
 function dmBubbleHtml(m){
   const tick=m.is_mine?`<span class="dmTick${m.read?' read':''}">${m.read?'✓✓':'✓'}</span>`:'';
@@ -4761,6 +4800,19 @@ function dmBubbleHtml(m){
     inner=`<div class="dmAudioLabel">${label}</div>`
       +`<audio class="dmAudioMsg" controls preload="none" data-media-pending="${esc(m.id)}" data-media-url="${esc(m.media_url)}"></audio>`
       +(m.text?`<div class="dmMsgCaption">${esc(m.text)}</div>`:'');
+  } else if(m.message_type==='book'){
+    const b=byId[m.book_id];
+    inner=b
+      ? `<div class="dmBookCard" data-open-book="${esc(b.i)}">
+          ${dmBookTileHtml(b)}
+          <div class="dmBookCardInfo">
+            <div class="dmBookCardTitle">${esc(b.t)}</div>
+            <div class="dmBookCardAuthor">${esc(b.a||'')}</div>
+            <div class="dmBookCardOpen">📖 Ochish</div>
+          </div>
+        </div>`
+      : `<div class="dmBookCardMissing">📖 Kitob topilmadi</div>`;
+    inner+=(m.text?`<div class="dmMsgCaption">${esc(m.text)}</div>`:'');
   } else {
     inner=esc(m.text||'');
   }
@@ -4776,12 +4828,13 @@ function dmBubbleHtml(m){
 // Reply/React are reachable by tapping ANY active bubble; Edit/Delete only your own (Telegram-
 // style — a menu appears on interaction, not icons sitting on the bubble permanently). Taps on an
 // actual control inside the bubble (the native <audio> player, the image that opens the
-// lightbox, a reply quote that jumps to the original) are excluded so this doesn't fight those.
+// lightbox, a reply quote that jumps to the original, a book card that opens the book) are
+// excluded so this doesn't fight those.
 function wireDmMessageActions(scope){
   scope.querySelectorAll('.dmBubble[data-msg-tap]').forEach(el=>{
     if(el.dataset.wired)return; el.dataset.wired='1';
     el.onclick=e=>{
-      if(e.target.closest('audio')||e.target.classList.contains('dmImgMsg')||e.target.closest('.dmReplyQuote'))return;
+      if(e.target.closest('audio')||e.target.classList.contains('dmImgMsg')||e.target.closest('.dmReplyQuote')||e.target.closest('[data-open-book]'))return;
       openDmMessageActions(el.dataset.id,el.dataset.msgText||'',el,el.dataset.msgMine==='1',el.dataset.msgReaction||null);
     };
   });
@@ -4795,6 +4848,18 @@ function wireDmMessageActions(scope){
       target.classList.remove('dmJumpHighlight');
       void target.offsetWidth; // restart the animation if it was already just played
       target.classList.add('dmJumpHighlight');
+    };
+  });
+  scope.querySelectorAll('[data-open-book]').forEach(el=>{
+    if(el.dataset.wired)return; el.dataset.wired='1';
+    el.onclick=e=>{
+      e.stopPropagation();
+      // #sheet (the book detail) sits at the base z-index (50), below #dmChatSheet (54) — opening
+      // it while the chat is still open would render it hidden underneath the chat's own dimming
+      // layer. Close the chat first, same as tapping the peer's name in the header already does.
+      const id=el.dataset.openBook;
+      closeDmChat();
+      openDetail(id);
     };
   });
 }
@@ -5071,6 +5136,63 @@ $('#dmAttachInput').onchange=e=>{
   haptic();
   sendDmMedia(file,kind,null,null).then(()=>loadDmMessages(true)).catch(()=>toast('Yuborilmadi'));
 };
+
+// ---- share a book (📖) — searches the already-loaded catalog (DB.books) client-side with the
+// same score() function the main search screen uses, so this needs no server round trip just to
+// find something to share. Tapping a result sends it immediately (no confirm step), matching the
+// no-friction convention every other attach action in this chat already follows. ----
+function dmBookPickerRowHtml(b){
+  return `<div class="dmBookPickerRow" data-book="${esc(b.i)}">
+    ${dmBookTileHtml(b)}
+    <div class="dmBookPickerInfo">
+      <div class="dmBookPickerTitle">${esc(b.t)}</div>
+      <div class="dmBookPickerAuthor">${esc(b.a||'')}</div>
+    </div>
+  </div>`;
+}
+function renderDmBookPickerResults(q){
+  const terms=norm(q).split(/\s+/).filter(Boolean);
+  const results=(terms.length
+    ? DB.books.map(b=>({b,s:score(b,terms)})).filter(x=>x.s>0).sort((x,y)=>y.s-x.s).map(x=>x.b)
+    : DB.books
+  ).slice(0,30);
+  const c=$('#dmBookPickerResults');
+  c.innerHTML=results.length?results.map(dmBookPickerRowHtml).join(''):'<p class="hint">Kitob topilmadi</p>';
+  c.querySelectorAll('[data-book]').forEach(el=>el.onclick=()=>sendDmBook(el.dataset.book));
+}
+function openDmBookPicker(){
+  if(!canAct()){toast('Xabarlashish uchun botni Telegram ichida oching');return;}
+  haptic();
+  $('#dmBookPickerSearch').value='';
+  renderDmBookPickerResults('');
+  $('#dmBookPickerSheet').classList.add('open');
+  tg?.BackButton?.show();
+  setTimeout(()=>$('#dmBookPickerSearch').focus(),80);
+}
+function closeDmBookPicker(){$('#dmBookPickerSheet').classList.remove('open');tg?.BackButton?.hide();}
+$('#dmBookPickerClose').onclick=closeDmBookPicker;
+$('#dmBookPickerSheet').onclick=e=>{if(e.target.id==='dmBookPickerSheet')closeDmBookPicker();};
+let dmBookSearchDebounce=null;
+$('#dmBookPickerSearch').oninput=()=>{
+  clearTimeout(dmBookSearchDebounce);
+  const q=$('#dmBookPickerSearch').value;
+  dmBookSearchDebounce=setTimeout(()=>renderDmBookPickerResults(q),150);
+};
+function sendDmBook(bookId){
+  if(!dmChatPeerId)return;
+  haptic();
+  closeDmBookPicker();
+  const replyTo=dmReplyTargetId;
+  api('/api/dm/'+dmChatPeerId+'/book',{method:'POST',body:JSON.stringify({book_id:bookId,reply_to_message_id:replyTo})}).then(()=>{
+    cancelDmReply();
+    loadDmMessages(true);
+  }).catch(()=>toast('Yuborilmadi'));
+}
+$('#dmBookBtn').onclick=()=>{
+  if(!canAct()){toast('Xabarlashish uchun botni Telegram ichida oching');return;}
+  openDmBookPicker();
+};
+
 let dmMediaRecorder=null, dmRecordedChunks=[], dmRecordStartTs=0, dmRecordTimerHandle=null, dmRecordStream=null;
 function dmRecTimerTick(){
   const secs=Math.floor((Date.now()-dmRecordStartTs)/1000);
@@ -5763,7 +5885,7 @@ const SHEET_CLOSERS={
   onboardTourSheet:closeOnboardTour, notifSheet:closeNotifications, avatarViewSheet:closeAvatarView,
   usersListSheet:closeUsersList, leaderboardSheet:closeLeaderboard, certDetailSheet:closeCertDetail,
   dmConversationsSheet:closeDmConversations, dmChatSheet:closeDmChat, dmChatMenuSheet:closeDmChatMenu,
-  dmWallpaperSheet:closeDmWallpaperSheet, dmLightbox:closeDmLightbox,
+  dmWallpaperSheet:closeDmWallpaperSheet, dmLightbox:closeDmLightbox, dmBookPickerSheet:closeDmBookPicker,
   // closeGlobe lives in the separate type="module" script below (Three.js globe) and only
   // becomes a real global once that deferred module finishes running — referencing it bare HERE
   // (evaluated immediately, before the module has loaded) throws ReferenceError. Wrapping it in
