@@ -440,17 +440,23 @@
   .lrow{display:flex; align-items:center; gap:12px; padding:14px 4px; border-top:1px solid var(--line); cursor:pointer}
   .lrow:first-of-type{border-top:1px solid var(--line); margin-top:8px}
   .lrowIcon{font-size:20px; width:28px; text-align:center; flex-shrink:0}
-  /* Javon shelf-row cover collage — same 28px slot as .lrowIcon so it drops in without disturbing
-     row alignment, just a 2x2 mosaic of the shelf's own book covers instead of a flat folder
-     emoji every shelf shared identically. */
-  .lrowCollage{width:28px; height:28px; flex-shrink:0; display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; gap:1px; border-radius:7px; overflow:hidden; background:var(--line)}
+  /* Javon shelf rows: a real photo mosaic reads as nothing at icon scale (28px split 2x2 is a
+     ~13px tile — smaller than the initials fallback text itself), so shelf rows get their own
+     larger slot instead of reusing .lrowIcon's size, matching the 40-44px thumbnail scale already
+     used for real images elsewhere (DM conversation rows, follower lists). The name/count also
+     bump up a notch here — scoped to .shelfRow only so the plain-icon Reading Room summary rows
+     (Rejamdagi/Mutolaa qilingan/Saqlangan/Javon) are untouched. */
+  .lrowCollage{width:44px; height:44px; flex-shrink:0; display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; gap:1.5px; border-radius:10px; overflow:hidden; background:var(--line)}
   .lrowCollageTile{position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center}
   .lrowCollageTile img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover}
-  .lrowCollageIni{font-size:6.5px; font-weight:800; color:#fff; line-height:1}
+  .lrowCollageIni{font-size:9.5px; font-weight:800; color:#fff; line-height:1}
   .lrowCollageEmpty{background:var(--card)}
+  .shelfRow .lrowIcon{width:44px; height:44px; font-size:24px; display:flex; align-items:center; justify-content:center; border-radius:10px; background:var(--card)}
   .lrowBody{flex:1; min-width:0}
   .lrowT{font-size:14.5px; font-weight:700}
+  .shelfRow .lrowT{font-size:16px}
   .lrowN{font-size:12.5px; color:var(--muted); margin-top:2px}
+  .shelfRow .lrowN{font-size:13px}
   .lrowChev{color:var(--muted); font-size:18px; flex-shrink:0}
   .lbRank{font-size:15px; font-weight:800; width:30px; text-align:center; flex-shrink:0; font-variant-numeric:tabular-nums}
   .lbPoints{font-size:13px; font-weight:800; color:var(--accent); flex-shrink:0; white-space:nowrap}
@@ -2552,7 +2558,7 @@ function shelfCollageHtml(previewIds){
   return`<span class="lrowCollage">${tiles.join('')}</span>`;
 }
 function shelfRowHtml(s){
-  return`<div class="lrow" data-shelf="${s.id}">${shelfCollageHtml(s.preview_ids)}<div class="lrowBody"><div class="lrowT">${esc(s.name)}</div><div class="lrowN">${s.count} ta kitob</div></div><span class="lrowChev">›</span></div>`;
+  return`<div class="lrow shelfRow" data-shelf="${s.id}">${shelfCollageHtml(s.preview_ids)}<div class="lrowBody"><div class="lrowT">${esc(s.name)}</div><div class="lrowN">${s.count} ta kitob</div></div><span class="lrowChev">›</span></div>`;
 }
 async function loadShelvesList(){
   $('#shelvesTitle').textContent=shelvesPickBookId?'📚 Qaysi javonga qo\'shamiz?':'📚 Javon';
