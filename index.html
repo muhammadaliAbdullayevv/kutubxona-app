@@ -6700,7 +6700,22 @@ function hideSplash(){
   },wait);
 }
 async function boot(){
-  if(tg){tg.ready();tg.expand();tg.disableVerticalSwipes?.();tg.BackButton?.onClick(()=>{closeTopmostSheet();});applyThemeMode();tg.onEvent?.('themeChanged',()=>{if(themeMode==='system')applyThemeMode();});}
+  if(tg){
+    tg.ready();tg.expand();tg.disableVerticalSwipes?.();tg.BackButton?.onClick(()=>{closeTopmostSheet();});applyThemeMode();tg.onEvent?.('themeChanged',()=>{if(themeMode==='system')applyThemeMode();});
+    // tg.BackButton (wired above) is Telegram's OWN in-header arrow — Android's actual hardware/
+    // gesture back button is a completely separate input that Telegram's WebView intercepts
+    // itself, and since this page never pushed any browser history, there was nothing for it to
+    // "go back" to — it fell through to closing the whole Mini App instead of e.g. dismissing an
+    // open sheet. A standing history entry, re-pushed every time it's popped, gives the hardware
+    // back button somewhere to land every single time instead of ever reaching that fallback.
+    // pushState (unlike a real navigation) never fires its own popstate, so this can't loop; kept
+    // inside if(tg) so a plain browser tab opening this URL keeps its normal back-button behavior.
+    history.pushState({app:1},'');
+    window.addEventListener('popstate',()=>{
+      closeTopmostSheet();
+      history.pushState({app:1},'');
+    });
+  }
   if('serviceWorker' in navigator)window.addEventListener('load',()=>{
     navigator.serviceWorker.register('./sw.js').then(reg=>{
       // A long-lived, never-navigated Mini App session (Telegram keeps the WebView warm across
