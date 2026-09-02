@@ -3117,6 +3117,7 @@ function closeSheet(){
   $('#sheet').classList.remove('open');
   $('#sheetMenuPanel').style.display='none';
   tg?.BackButton?.hide();
+  dmUnstack('sheet'); // undo any DM-chat stacking bump (see dmStackAbove) — harmless no-op otherwise
   // Resuming the paused globe belongs here, not just on the explicit "back to map" button —
   // closing via the native/Telegram back button, the backdrop tap, or a swipe all bypass that
   // button entirely, and previously left the map's render loop frozen (paused, never resumed)
@@ -4574,7 +4575,7 @@ function openUserProfile(userId){
   loadUserProfileStats(userId);
   postsTabHtml(userId,'uTabContent');
 }
-function closeUserProfile(){$('#userProfileSheet').classList.remove('open');tg?.BackButton?.hide();}
+function closeUserProfile(){$('#userProfileSheet').classList.remove('open');tg?.BackButton?.hide();dmUnstack('userProfileSheet');}
 $('#userProfileSheet').onclick=e=>{if(e.target.id==='userProfileSheet')closeUserProfile();};
 $('#uTabs').querySelectorAll('.ptab').forEach(el=>el.onclick=()=>{
   haptic();
@@ -4854,12 +4855,10 @@ function wireDmMessageActions(scope){
     if(el.dataset.wired)return; el.dataset.wired='1';
     el.onclick=e=>{
       e.stopPropagation();
-      // #sheet (the book detail) sits at the base z-index (50), below #dmChatSheet (54) — opening
-      // it while the chat is still open would render it hidden underneath the chat's own dimming
-      // layer. Close the chat first, same as tapping the peer's name in the header already does.
-      const id=el.dataset.openBook;
-      closeDmChat();
-      openDetail(id);
+      // Stacks the book detail ON TOP of this still-open chat (see dmStackAbove) instead of
+      // closing the chat first — closing the book detail then naturally reveals the chat again.
+      dmStackAbove('sheet');
+      openDetail(el.dataset.openBook);
     };
   });
 }
@@ -4977,6 +4976,13 @@ function refreshDmChatPresence(){
     el.classList.toggle('typing',!!pr.typing);
   }).catch(()=>{});
 }
+// Per-peer scroll position, remembered only for this session (in-memory, not persisted) — closing
+// a chat and reopening it (e.g. via the conversations list, or stacking a book/profile sheet on
+// top and coming back — see dmStackAbove/dmUnstack) restores wherever you'd scrolled to, instead
+// of always jumping to the latest message. A peer with no entry yet (never opened this session)
+// still defaults to the bottom, same as before.
+var dmScrollPositions={}; // var (not let) — same reasoning as DB/byId above: a real global on
+// window, not just this script's own lexical scope.
 function openDmChat(peerId){
   peerId=parseInt(peerId,10);
   if(!peerId)return;
@@ -4998,10 +5004,16 @@ function openDmChat(peerId){
     dmChatMuted=!!dm.is_muted;
     $('#dmChatTitle').innerHTML=authorAvatarHtml(peerId,p.avatar_version,p.display_name,28)
       +`<div class="dmChatTitleText"><div class="dmChatTitleName">${esc(dmChatPeerName)}</div><div class="dmChatTitleStatus" id="dmChatTitleStatus"></div></div>`;
-    $('#dmChatTitle').onclick=()=>{closeDmChat();openUserProfile(peerId);};
+    // Stacks the profile sheet ON TOP of this still-open chat instead of closing the chat first —
+    // closing the profile then naturally reveals the chat again (scroll position and all), rather
+    // than dropping all the way back to the home screen. See dmStackAbove/dmUnstack.
+    $('#dmChatTitle').onclick=()=>{dmStackAbove('userProfileSheet');openUserProfile(peerId);};
     refreshDmChatPresence();
   }).catch(()=>{$('#dmChatTitle').innerHTML='<div class="dmChatTitleText"><div class="dmChatTitleName">Xabar</div></div>';});
-  loadDmMessages(true);
+  const savedScroll=dmScrollPositions[peerId];
+  loadDmMessages(savedScroll===undefined).then(()=>{
+    if(savedScroll!==undefined&&dmChatPeerId===peerId)$('#dmChatSheetc').scrollTop=savedScroll;
+  });
   api('/api/dm/'+peerId+'/read',{method:'POST'}).then(refreshDmDot).catch(()=>{});
   clearInterval(dmChatPollTimer);
   dmChatPollTimer=setInterval(()=>{if(document.visibilityState==='visible')loadDmMessages(false);},5000);
@@ -5012,9 +5024,9 @@ function openDmChat(peerId){
   dmPresencePollTimer=setInterval(()=>{if(document.visibilityState==='visible')refreshDmChatPresence();},3000);
 }
 function loadDmMessages(scrollToBottom){
-  if(!dmChatPeerId)return;
+  if(!dmChatPeerId)return Promise.resolve();
   const peerId=dmChatPeerId;
-  api('/api/dm/'+peerId+'/messages').then(r=>{
+  return api('/api/dm/'+peerId+'/messages').then(r=>{
     if(dmChatPeerId!==peerId)return; // chat was switched/closed while this was in flight
     const items=(r.items||[]).slice().reverse(); // API returns newest-first; render oldest-first
     // Skip re-render when nothing actually changed (id + read/edited/deleted-status signature) —
@@ -5031,7 +5043,18 @@ function loadDmMessages(scrollToBottom){
     if(scrollToBottom||wasNearBottom)c.scrollTop=c.scrollHeight;
   }).catch(()=>{});
 }
+// Lets a sheet that's normally BELOW #dmChatSheet in the stacking order (book detail z:50,
+// profile z:52, vs the chat's z:54) render ABOVE it instead when opened from within an open chat
+// — so closing that sheet reveals the chat again (right where it was, scroll position included)
+// instead of the chat having been closed first and dropping the user back to the home screen.
+function dmStackAbove(sheetId){
+  if(dmChatPeerId)$('#'+sheetId).style.zIndex='58';
+}
+function dmUnstack(sheetId){
+  $('#'+sheetId).style.zIndex='';
+}
 function closeDmChat(){
+  if(dmChatPeerId)dmScrollPositions[dmChatPeerId]=$('#dmChatSheetc').scrollTop;
   $('#dmChatSheet').classList.remove('open');tg?.BackButton?.hide();
   clearInterval(dmChatPollTimer);dmChatPollTimer=null;
   clearInterval(dmPresencePollTimer);dmPresencePollTimer=null;
